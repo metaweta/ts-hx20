@@ -18,49 +18,98 @@
 interface KeyMapping {
   col: number;
   row: number;
+  shift?: boolean;  // true = HX-20 shift must be pressed, false = must not be
 }
 
-// Map PC keyboard codes to HX-20 matrix positions
-const KEY_MAP: Record<string, KeyMapping> = {
-  // Numbers
-  'Digit0': { col: 0, row: 0 }, 'Digit1': { col: 0, row: 1 },
-  'Digit2': { col: 0, row: 2 }, 'Digit3': { col: 0, row: 3 },
-  'Digit4': { col: 0, row: 4 }, 'Digit5': { col: 0, row: 5 },
-  'Digit6': { col: 0, row: 6 }, 'Digit7': { col: 0, row: 7 },
-  'Digit8': { col: 1, row: 0 }, 'Digit9': { col: 1, row: 1 },
+// Character-based map: maps e.key values to HX-20 matrix positions.
+// shift: true means the HX-20 SHIFT key must be held for this character;
+//        false means it must NOT be held (override PC shift state).
+//        undefined means don't change the current shift state.
+const CHAR_MAP: Record<string, KeyMapping> = {
+  // Digits
+  '0': { col: 0, row: 0 },
+  '1': { col: 0, row: 1 },
+  '2': { col: 0, row: 2 },
+  '3': { col: 0, row: 3 },
+  '4': { col: 0, row: 4 },
+  '5': { col: 0, row: 5 },
+  '6': { col: 0, row: 6 },
+  '7': { col: 0, row: 7 },
+  '8': { col: 1, row: 0 },
+  '9': { col: 1, row: 1 },
 
-  // Punctuation
-  'Semicolon': { col: 1, row: 3 },   // ; / +
-  'Comma': { col: 1, row: 4 },       // , / <
-  'Minus': { col: 1, row: 5 },       // - / =
-  'Period': { col: 1, row: 6 },      // . / >
-  'Slash': { col: 1, row: 7 },       // / / ?
-  'Backquote': { col: 1, row: 2 },   // : / * (using backtick as proxy)
-  'Equal': { col: 1, row: 5 },       // - / = (alt mapping)
+  // Letters (shift state passed through for upper/lowercase)
+  'a': { col: 2, row: 1 }, 'b': { col: 2, row: 2 },
+  'c': { col: 2, row: 3 }, 'd': { col: 2, row: 4 },
+  'e': { col: 2, row: 5 }, 'f': { col: 2, row: 6 },
+  'g': { col: 2, row: 7 }, 'h': { col: 3, row: 0 },
+  'i': { col: 3, row: 1 }, 'j': { col: 3, row: 2 },
+  'k': { col: 3, row: 3 }, 'l': { col: 3, row: 4 },
+  'm': { col: 3, row: 5 }, 'n': { col: 3, row: 6 },
+  'o': { col: 3, row: 7 }, 'p': { col: 4, row: 0 },
+  'q': { col: 4, row: 1 }, 'r': { col: 4, row: 2 },
+  's': { col: 4, row: 3 }, 't': { col: 4, row: 4 },
+  'u': { col: 4, row: 5 }, 'v': { col: 4, row: 6 },
+  'w': { col: 4, row: 7 }, 'x': { col: 5, row: 0 },
+  'y': { col: 5, row: 1 }, 'z': { col: 5, row: 2 },
+  'A': { col: 2, row: 1, shift: true }, 'B': { col: 2, row: 2, shift: true },
+  'C': { col: 2, row: 3, shift: true }, 'D': { col: 2, row: 4, shift: true },
+  'E': { col: 2, row: 5, shift: true }, 'F': { col: 2, row: 6, shift: true },
+  'G': { col: 2, row: 7, shift: true }, 'H': { col: 3, row: 0, shift: true },
+  'I': { col: 3, row: 1, shift: true }, 'J': { col: 3, row: 2, shift: true },
+  'K': { col: 3, row: 3, shift: true }, 'L': { col: 3, row: 4, shift: true },
+  'M': { col: 3, row: 5, shift: true }, 'N': { col: 3, row: 6, shift: true },
+  'O': { col: 3, row: 7, shift: true }, 'P': { col: 4, row: 0, shift: true },
+  'Q': { col: 4, row: 1, shift: true }, 'R': { col: 4, row: 2, shift: true },
+  'S': { col: 4, row: 3, shift: true }, 'T': { col: 4, row: 4, shift: true },
+  'U': { col: 4, row: 5, shift: true }, 'V': { col: 4, row: 6, shift: true },
+  'W': { col: 4, row: 7, shift: true }, 'X': { col: 5, row: 0, shift: true },
+  'Y': { col: 5, row: 1, shift: true }, 'Z': { col: 5, row: 2, shift: true },
 
-  // Letters
-  'KeyA': { col: 2, row: 1 }, 'KeyB': { col: 2, row: 2 },
-  'KeyC': { col: 2, row: 3 }, 'KeyD': { col: 2, row: 4 },
-  'KeyE': { col: 2, row: 5 }, 'KeyF': { col: 2, row: 6 },
-  'KeyG': { col: 2, row: 7 }, 'KeyH': { col: 3, row: 0 },
-  'KeyI': { col: 3, row: 1 }, 'KeyJ': { col: 3, row: 2 },
-  'KeyK': { col: 3, row: 3 }, 'KeyL': { col: 3, row: 4 },
-  'KeyM': { col: 3, row: 5 }, 'KeyN': { col: 3, row: 6 },
-  'KeyO': { col: 3, row: 7 }, 'KeyP': { col: 4, row: 0 },
-  'KeyQ': { col: 4, row: 1 }, 'KeyR': { col: 4, row: 2 },
-  'KeyS': { col: 4, row: 3 }, 'KeyT': { col: 4, row: 4 },
-  'KeyU': { col: 4, row: 5 }, 'KeyV': { col: 4, row: 6 },
-  'KeyW': { col: 4, row: 7 }, 'KeyX': { col: 5, row: 0 },
-  'KeyY': { col: 5, row: 1 }, 'KeyZ': { col: 5, row: 2 },
+  // HX-20 unshifted punctuation (shift: false only where PC sends with shift)
+  '@': { col: 2, row: 0, shift: false },  // PC: Shift+2
+  ':': { col: 1, row: 2, shift: false },  // PC: Shift+;
+  ';': { col: 1, row: 3 },
+  ',': { col: 1, row: 4 },
+  '-': { col: 1, row: 5 },
+  '.': { col: 1, row: 6 },
+  '/': { col: 1, row: 7 },
+  '[': { col: 5, row: 3 },
+  ']': { col: 5, row: 4 },
+  '\\': { col: 5, row: 5 },
+  ' ': { col: 6, row: 1 },
 
-  // Brackets
-  'BracketLeft': { col: 5, row: 3 },
-  'BracketRight': { col: 5, row: 4 },
-  'Backslash': { col: 5, row: 5 },
+  // HX-20 shifted punctuation (Shift+key on HX-20)
+  '^': { col: 2, row: 0, shift: true },   // Shift+@
+  '*': { col: 1, row: 2, shift: true },   // Shift+:
+  '+': { col: 1, row: 3, shift: true },   // Shift+;
+  '<': { col: 1, row: 4, shift: true },   // Shift+,
+  '=': { col: 1, row: 5, shift: true },   // Shift+-
+  '>': { col: 1, row: 6, shift: true },   // Shift+.
+  '?': { col: 1, row: 7, shift: true },   // Shift+/
+  '{': { col: 5, row: 3, shift: true },   // Shift+[
+  '}': { col: 5, row: 4, shift: true },   // Shift+]
+  '|': { col: 5, row: 5, shift: true },   // Shift+\
 
+  // PC symbols with no direct HX-20 equivalent — map to closest match
+  '!': { col: 0, row: 1, shift: true },   // Shift+1 (HX-20 may differ)
+  '#': { col: 0, row: 3, shift: true },   // Shift+3
+  '$': { col: 0, row: 4, shift: true },   // Shift+4
+  '%': { col: 0, row: 5, shift: true },   // Shift+5
+  '&': { col: 0, row: 6, shift: true },   // Shift+6
+  '\'': { col: 0, row: 7, shift: true },  // Shift+7
+  '(': { col: 1, row: 0, shift: true },   // Shift+8
+  ')': { col: 1, row: 1, shift: true },   // Shift+9
+  '"': { col: 0, row: 2, shift: true },   // Shift+2
+  '_': { col: 0, row: 0, shift: true },   // Shift+0 on HX-20
+  '`': { col: 2, row: 0 },  // → mapped to @
+  '~': { col: 2, row: 0, shift: true },   // → mapped to Shift+@ (^)
+};
+
+// Code-based map: maps e.code values for non-character keys
+const CODE_MAP: Record<string, KeyMapping> = {
   // Special keys
   'Enter': { col: 6, row: 0 },
-  'Space': { col: 6, row: 1 },
   'Tab': { col: 6, row: 2 },
   'CapsLock': { col: 6, row: 7 },
   'Home': { col: 7, row: 0 },
@@ -72,7 +121,7 @@ const KEY_MAP: Record<string, KeyMapping> = {
   'End': { col: 7, row: 5 },       // MENU
 
   // Arrows (LEFT and RIGHT are physical HX-20 keys;
-  // UP = Shift+LEFT, DOWN = Shift+RIGHT on the real keyboard)
+  // UP = Shift+LEFT, DOWN = Shift+RIGHT — handled specially)
   'ArrowLeft': { col: 5, row: 7 },
   'ArrowRight': { col: 5, row: 6 },
 
@@ -93,6 +142,46 @@ const KEY_MAP: Record<string, KeyMapping> = {
   'F10': { col: 6, row: 5 },  // NUM
   'F11': { col: 6, row: 6 },  // GRPH
   'F12': { col: 7, row: 1 },  // SCRN
+
+  // Physical key positions (digits) — used by virtual keyboard
+  'Digit0': { col: 0, row: 0 },
+  'Digit1': { col: 0, row: 1 },
+  'Digit2': { col: 0, row: 2 },
+  'Digit3': { col: 0, row: 3 },
+  'Digit4': { col: 0, row: 4 },
+  'Digit5': { col: 0, row: 5 },
+  'Digit6': { col: 0, row: 6 },
+  'Digit7': { col: 0, row: 7 },
+  'Digit8': { col: 1, row: 0 },
+  'Digit9': { col: 1, row: 1 },
+
+  // Physical key positions (letters)
+  'KeyA': { col: 2, row: 1 }, 'KeyB': { col: 2, row: 2 },
+  'KeyC': { col: 2, row: 3 }, 'KeyD': { col: 2, row: 4 },
+  'KeyE': { col: 2, row: 5 }, 'KeyF': { col: 2, row: 6 },
+  'KeyG': { col: 2, row: 7 }, 'KeyH': { col: 3, row: 0 },
+  'KeyI': { col: 3, row: 1 }, 'KeyJ': { col: 3, row: 2 },
+  'KeyK': { col: 3, row: 3 }, 'KeyL': { col: 3, row: 4 },
+  'KeyM': { col: 3, row: 5 }, 'KeyN': { col: 3, row: 6 },
+  'KeyO': { col: 3, row: 7 }, 'KeyP': { col: 4, row: 0 },
+  'KeyQ': { col: 4, row: 1 }, 'KeyR': { col: 4, row: 2 },
+  'KeyS': { col: 4, row: 3 }, 'KeyT': { col: 4, row: 4 },
+  'KeyU': { col: 4, row: 5 }, 'KeyV': { col: 4, row: 6 },
+  'KeyW': { col: 4, row: 7 }, 'KeyX': { col: 5, row: 0 },
+  'KeyY': { col: 5, row: 1 }, 'KeyZ': { col: 5, row: 2 },
+
+  // Physical key positions (punctuation)
+  'Backquote': { col: 2, row: 0 },   // @ on HX-20
+  'HX_Colon': { col: 1, row: 2 },    // : on HX-20 (virtual keyboard only)
+  'Semicolon': { col: 1, row: 3 },
+  'Comma': { col: 1, row: 4 },
+  'Minus': { col: 1, row: 5 },
+  'Period': { col: 1, row: 6 },
+  'Slash': { col: 1, row: 7 },
+  'BracketLeft': { col: 5, row: 3 },
+  'BracketRight': { col: 5, row: 4 },
+  'Backslash': { col: 5, row: 5 },
+  'Space': { col: 6, row: 1 },
 };
 
 export class Keyboard {
@@ -188,28 +277,50 @@ export class Keyboard {
     return this.irqLatch;
   }
 
-  // Track synthetic shift state from ArrowUp/ArrowDown
+  // Track synthetic shift state from character mapping or ArrowUp/ArrowDown
   private syntheticShift = false;
+  // Track which matrix key was resolved for a given code (for keyUp matching)
+  private activeKeys = new Map<string, KeyMapping>();
 
-  // Process PC keyboard events
-  keyDown(code: string): void {
+  // Resolve a key event to an HX-20 matrix mapping.
+  // Tries CHAR_MAP (by e.key) first, then CODE_MAP (by e.code).
+  private resolve(key: string, code: string): KeyMapping | null {
+    return CHAR_MAP[key] || CODE_MAP[code] || null;
+  }
+
+  // Process PC keyboard events (key = e.key, code = e.code)
+  keyDown(code: string, key?: string): void {
+    const k = key ?? code;
+
     // ArrowUp = Shift + LEFT, ArrowDown = Shift + RIGHT
     if (code === 'ArrowUp' || code === 'ArrowDown') {
       this.syntheticShift = true;
       this.isShiftPressed = true;
-      const arrowCol = 5;
-      const arrowRow = code === 'ArrowUp' ? 7 : 6; // LEFT=row7, RIGHT=row6
-      this.matrix[arrowCol] &= ~(1 << arrowRow);
+      const arrowRow = code === 'ArrowUp' ? 7 : 6;
+      this.matrix[5] &= ~(1 << arrowRow);
       this.kbrequest = true;
       this.irqLatch = true;
       return;
     }
 
-    const mapping = KEY_MAP[code];
+    // Modifier keys
+    if (code === 'ShiftLeft' || code === 'ShiftRight') { this.isShiftPressed = true; this.kbrequest = true; this.irqLatch = true; return; }
+    if (code === 'ControlLeft' || code === 'ControlRight') { this.isCtrlPressed = true; this.kbrequest = true; this.irqLatch = true; return; }
+
+    const mapping = this.resolve(k, code);
     if (!mapping) return;
 
-    if (code === 'ShiftLeft' || code === 'ShiftRight') this.isShiftPressed = true;
-    if (code === 'ControlLeft' || code === 'ControlRight') this.isCtrlPressed = true;
+    // Apply HX-20 shift override if the character map specifies one
+    if (mapping.shift === true) {
+      this.syntheticShift = true;
+      this.isShiftPressed = true;
+    } else if (mapping.shift === false) {
+      this.syntheticShift = true;
+      this.isShiftPressed = false;
+    }
+
+    // Remember which matrix position this code activated (for keyUp)
+    this.activeKeys.set(code, mapping);
 
     if (mapping.row < 8) {
       this.matrix[mapping.col] &= ~(1 << mapping.row);
@@ -219,30 +330,29 @@ export class Keyboard {
       this.row8State[mapping.col] = true;
       this.kbrequest = true;
       this.irqLatch = true;
-    } else if (mapping.row === 9) {
-      // Handled via isShiftPressed/isCtrlPressed
-      this.kbrequest = true;
-      this.irqLatch = true;
     }
   }
 
-  keyUp(code: string): void {
+  keyUp(code: string, _key?: string): void {
     // ArrowUp = Shift + LEFT, ArrowDown = Shift + RIGHT
     if (code === 'ArrowUp' || code === 'ArrowDown') {
       const arrowRow = code === 'ArrowUp' ? 7 : 6;
       this.matrix[5] |= (1 << arrowRow);
-      if (this.syntheticShift) {
-        this.syntheticShift = false;
-        this.isShiftPressed = false;
-      }
+      if (this.syntheticShift) { this.syntheticShift = false; this.isShiftPressed = false; }
       return;
     }
 
-    const mapping = KEY_MAP[code];
-    if (!mapping) return;
+    // Modifier keys
+    if (code === 'ShiftLeft' || code === 'ShiftRight') { this.isShiftPressed = false; return; }
+    if (code === 'ControlLeft' || code === 'ControlRight') { this.isCtrlPressed = false; return; }
 
-    if (code === 'ShiftLeft' || code === 'ShiftRight') this.isShiftPressed = false;
-    if (code === 'ControlLeft' || code === 'ControlRight') this.isCtrlPressed = false;
+    // Use the mapping we stored on keyDown (since e.key may differ on keyUp)
+    const mapping = this.activeKeys.get(code);
+    if (!mapping) return;
+    this.activeKeys.delete(code);
+
+    // Release synthetic shift
+    if (this.syntheticShift) { this.syntheticShift = false; this.isShiftPressed = false; }
 
     if (mapping.row < 8) {
       this.matrix[mapping.col] |= (1 << mapping.row);
@@ -305,7 +415,7 @@ export class Keyboard {
         { label: '5', code: 'Digit5' }, { label: '6', code: 'Digit6' },
         { label: '7', code: 'Digit7' }, { label: '8', code: 'Digit8' },
         { label: '9', code: 'Digit9' }, { label: '0', code: 'Digit0' },
-        { label: ': *', code: 'Backquote' }, { label: '; +', code: 'Semicolon' },
+        { label: ': *', code: 'HX_Colon' }, { label: '; +', code: 'Semicolon' },
         { label: '- =', code: 'Minus' }, { label: 'RETURN', code: 'Enter', cls: 'wide' },
       ],
       [

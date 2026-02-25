@@ -34,8 +34,8 @@ hx20.lcd.attachCanvas(canvas);
 // Build on-screen keyboard
 hx20.keyboard.buildUI(keyboardEl);
 
-// Set DIP switches: English (unknown-012905 ROMs), no TF-20
-hx20.keyboard.setDipSwitches(7, false);
+// Set DIP switches: USA/English (country=0), no TF-20
+hx20.keyboard.setDipSwitches(0, false);
 
 // Status callbacks
 hx20.onStatusUpdate = (text: string) => {
@@ -48,13 +48,13 @@ hx20.onRegistersUpdate = (text: string) => {
 // Keyboard input from physical keyboard
 document.addEventListener('keydown', (e) => {
   if (e.target instanceof HTMLInputElement) return;
-  hx20.keyboard.keyDown(e.code);
+  hx20.keyboard.keyDown(e.code, e.key);
   e.preventDefault();
 });
 
 document.addEventListener('keyup', (e) => {
   if (e.target instanceof HTMLInputElement) return;
-  hx20.keyboard.keyUp(e.code);
+  hx20.keyboard.keyUp(e.code, e.key);
 });
 
 // Debug toggle
