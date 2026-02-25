@@ -129,6 +129,38 @@ btnPause.addEventListener('click', () => {
   updateDebugDisplay();
 });
 
+// Save/Load RAM
+const btnSave = document.getElementById('btn-save')!;
+const btnLoad = document.getElementById('btn-load')!;
+const RAM_STORAGE_KEY = 'hx20-ram';
+
+btnSave.addEventListener('click', () => {
+  if (!powered) {
+    statusText.textContent = 'Power on first';
+    return;
+  }
+  const binary = String.fromCharCode(...hx20.mainRAM);
+  localStorage.setItem(RAM_STORAGE_KEY, btoa(binary));
+  statusText.textContent = 'RAM saved';
+});
+
+btnLoad.addEventListener('click', () => {
+  if (!powered) {
+    statusText.textContent = 'Power on first';
+    return;
+  }
+  const data = localStorage.getItem(RAM_STORAGE_KEY);
+  if (!data) {
+    statusText.textContent = 'No saved RAM found';
+    return;
+  }
+  const binary = atob(data);
+  for (let i = 0; i < binary.length; i++) {
+    hx20.mainRAM[i] = binary.charCodeAt(i);
+  }
+  statusText.textContent = 'RAM loaded';
+});
+
 // Speed control
 speedSlider.addEventListener('input', () => {
   const val = parseInt(speedSlider.value);
