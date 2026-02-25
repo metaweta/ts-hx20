@@ -93,18 +93,39 @@ body {
 }
 
 #keyboard {
-  display: grid;
-  grid-template-columns: repeat(15, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: 3px;
-  padding: 8px;
+  padding: 8px 28px;
   background: #333;
   border-radius: 6px;
+  overflow: hidden;
+}
+
+.kb-row {
+  display: grid;
+  grid-template-columns: repeat(14, 1fr);
+  gap: 0 3px;
+}
+
+.kb-row-offset-left {
+  transform: translateX(calc((100% + 3px) / -28));
+}
+
+.kb-row-offset-right {
+  transform: translateX(calc((100% + 3px) / 28));
+}
+
+.kb-row-center {
+  display: flex;
+  justify-content: center;
+  gap: 3px;
 }
 
 .key {
-  background: #4a4a4a;
-  color: #ccc;
-  border: 1px solid #5a5a5a;
+  background: #6B4226;
+  color: #FFD54F;
+  border: 1px solid #7a5233;
   border-radius: 3px;
   padding: 6px 2px;
   text-align: center;
@@ -119,30 +140,58 @@ body {
 }
 
 .key:hover {
-  background: #5a5a5a;
+  background: #7a5233;
 }
 
 .key.pressed {
-  background: #6a8a6a;
-  border-color: #7aaa7a;
+  background: #8B6239;
+  border-color: #9a7348;
 }
 
 .key.wide {
   grid-column: span 2;
 }
 
-.key.fn-key {
-  background: #3a4a5a;
-  border-color: #4a5a6a;
+.key.key-light {
+  background: #A0845C;
+  border-color: #b0946c;
 }
 
-.key.fn-key:hover {
-  background: #4a5a6a;
+.key.key-light:hover {
+  background: #b0946c;
 }
 
-.key.mod-key {
-  background: #5a4a3a;
-  border-color: #6a5a4a;
+.key.key-light.pressed {
+  background: #c0a47c;
+  border-color: #d0b48c;
+}
+
+.key.key-red {
+  background: #C43C3C;
+  border-color: #d44c4c;
+}
+
+.key.key-red:hover {
+  background: #d44c4c;
+}
+
+.key.key-red.pressed {
+  background: #e45c5c;
+  border-color: #f46c6c;
+}
+
+.key.key-caps {
+  background: #A0845C;
+  color: #C43C3C;
+  border-color: #b0946c;
+}
+
+.key.key-caps:hover {
+  background: #b0946c;
+}
+
+.key.spacebar {
+  width: 60%;
 }
 
 #status-bar {

@@ -372,7 +372,7 @@ export class Keyboard {
   private stickyCtrl = false;
   private stickyShift = false;
   private stickyCtrlBtn: HTMLElement | null = null;
-  private stickyShiftBtn: HTMLElement | null = null;
+  private stickyShiftBtns: HTMLElement[] = [];
 
   // Release sticky modifiers after a non-modifier key is pressed on the virtual keyboard
   private releaseStickyModifiers(): void {
@@ -384,82 +384,101 @@ export class Keyboard {
     if (this.stickyShift) {
       this.stickyShift = false;
       this.isShiftPressed = false;
-      this.stickyShiftBtn?.classList.remove('pressed');
+      this.stickyShiftBtns.forEach(b => b.classList.remove('pressed'));
     }
   }
 
   // Build the on-screen keyboard
   buildUI(container: HTMLElement): void {
     container.innerHTML = '';
+    this.stickyShiftBtns = [];
     const rows = [
+      // Row 1: Function/special keys
       [
-        { label: 'PF1', code: 'F1', cls: 'fn-key' },
-        { label: 'PF2', code: 'F2', cls: 'fn-key' },
-        { label: 'PF3', code: 'F3', cls: 'fn-key' },
-        { label: 'PF4', code: 'F4', cls: 'fn-key' },
-        { label: 'PF5', code: 'F5', cls: 'fn-key' },
+        { label: 'PAUSE', code: 'Pause', cls: 'key-light' },
+        { label: 'MENU', code: 'End', cls: 'key-light' },
+        { label: 'BREAK', code: 'Escape', cls: 'key-red' },
+        { label: 'PF1', code: 'F1', cls: 'key-light' },
+        { label: 'PF2', code: 'F2', cls: 'key-light' },
+        { label: 'PF3', code: 'F3', cls: 'key-light' },
+        { label: 'PF4', code: 'F4', cls: 'key-light' },
+        { label: 'PF5', code: 'F5', cls: 'key-light' },
         null,
-        { label: 'NUM', code: 'F10', cls: 'fn-key' },
-        { label: 'GRPH', code: 'F11', cls: 'fn-key' },
-        { label: 'SCRN', code: 'F12', cls: 'fn-key' },
-        null,
-        { label: 'HOME', code: 'Home' },
-        { label: 'BRK', code: 'Escape' },
-        { label: 'PAUSE', code: 'Pause' },
-        { label: 'INS/DEL', code: 'Backspace' },
-        { label: 'MENU', code: 'End' },
+        { label: 'NUM', code: 'F10', cls: 'key-light' },
+        { label: 'HOME', code: 'Home', cls: 'key-light' },
+        { label: 'SCRN', code: 'F12', cls: 'key-light' },
+        { label: 'DEL', code: 'Backspace', cls: 'key-light' },
       ],
+      // Row 2: Number/symbol row
       [
-        { label: '1', code: 'Digit1' }, { label: '2', code: 'Digit2' },
-        { label: '3', code: 'Digit3' }, { label: '4', code: 'Digit4' },
-        { label: '5', code: 'Digit5' }, { label: '6', code: 'Digit6' },
-        { label: '7', code: 'Digit7' }, { label: '8', code: 'Digit8' },
-        { label: '9', code: 'Digit9' }, { label: '0', code: 'Digit0' },
-        { label: ': *', code: 'HX_Colon' }, { label: '; +', code: 'Semicolon' },
-        { label: '- =', code: 'Minus' }, { label: 'RETURN', code: 'Enter', cls: 'wide' },
+        { label: '1 !', code: 'Digit1' },
+        { label: '2 "', code: 'Digit2' },
+        { label: '3 #', code: 'Digit3' },
+        { label: '4 $', code: 'Digit4' },
+        { label: '5 %', code: 'Digit5' },
+        { label: '6 &', code: 'Digit6' },
+        { label: '7 \'', code: 'Digit7' },
+        { label: '8 (', code: 'Digit8' },
+        { label: '9 )', code: 'Digit9' },
+        { label: '0 _', code: 'Digit0' },
+        { label: '- =', code: 'Minus' },
+        { label: '[ {', code: 'BracketLeft' },
+        { label: '] }', code: 'BracketRight' },
+        { label: '\\ |', code: 'Backslash' },
       ],
+      // Row 3: QWERTY row (offset left)
       [
-        { label: 'TAB', code: 'Tab' },
+        { label: 'TAB', code: 'Tab', cls: 'key-light' },
         { label: 'Q', code: 'KeyQ' }, { label: 'W', code: 'KeyW' },
         { label: 'E', code: 'KeyE' }, { label: 'R', code: 'KeyR' },
         { label: 'T', code: 'KeyT' }, { label: 'Y', code: 'KeyY' },
         { label: 'U', code: 'KeyU' }, { label: 'I', code: 'KeyI' },
         { label: 'O', code: 'KeyO' }, { label: 'P', code: 'KeyP' },
         { label: '@ ^', code: 'Backquote' },
-        { label: '[ {', code: 'BracketLeft' },
-        { label: '] }', code: 'BracketRight' },
+        { label: '\u2190\u2191', code: 'ArrowLeft', cls: 'key-light' },
+        { label: '\u2192\u2193', code: 'ArrowRight', cls: 'key-light' },
       ],
+      // Row 4: Home row (CTRL=light, RETURN=red wide)
       [
-        { label: 'CTRL', code: 'ControlLeft', cls: 'mod-key' },
-        { label: 'CAPS', code: 'CapsLock' },
+        { label: 'CTRL', code: 'ControlLeft', cls: 'key-light' },
         { label: 'A', code: 'KeyA' }, { label: 'S', code: 'KeyS' },
         { label: 'D', code: 'KeyD' }, { label: 'F', code: 'KeyF' },
         { label: 'G', code: 'KeyG' }, { label: 'H', code: 'KeyH' },
         { label: 'J', code: 'KeyJ' }, { label: 'K', code: 'KeyK' },
         { label: 'L', code: 'KeyL' },
-        { label: ', <', code: 'Comma' }, { label: '. >', code: 'Period' },
-        { label: '/ ?', code: 'Slash' },
+        { label: '; +', code: 'Semicolon' },
+        { label: ': *', code: 'HX_Colon' },
+        { label: 'RETURN', code: 'Enter', cls: 'key-red wide' },
       ],
+      // Row 5: Bottom letter row (offset right)
       [
-        { label: 'SHIFT', code: 'ShiftLeft', cls: 'mod-key wide' },
+        { label: 'SHIFT', code: 'ShiftLeft', cls: 'key-light' },
         { label: 'Z', code: 'KeyZ' }, { label: 'X', code: 'KeyX' },
         { label: 'C', code: 'KeyC' }, { label: 'V', code: 'KeyV' },
         { label: 'B', code: 'KeyB' }, { label: 'N', code: 'KeyN' },
         { label: 'M', code: 'KeyM' },
-        { label: '\\ |', code: 'Backslash' },
-        null,
-        { label: 'SPACE', code: 'Space', cls: 'wide' },
-        null,
-        { label: '\u2190\u2191', code: 'ArrowLeft' },
-        { label: '\u2192\u2193', code: 'ArrowRight' },
+        { label: ', <', code: 'Comma' }, { label: '. >', code: 'Period' },
+        { label: '/ ?', code: 'Slash' },
+        { label: 'SHIFT', code: 'ShiftRight', cls: 'key-light' },
+        { label: 'GRPH', code: 'F11', cls: 'key-light' },
+      ],
+      // Row 6: Space row (centered)
+      [
+        { label: 'CAPS', code: 'CapsLock', cls: 'key-caps' },
+        { label: 'SPACE', code: 'Space', cls: 'key-dark spacebar' },
       ],
     ];
 
-    for (const row of rows) {
+    const rowClasses = ['', '', 'kb-row-offset-left', '', 'kb-row-offset-right', 'kb-row-center'];
+
+    rows.forEach((row, rowIndex) => {
+      const rowDiv = document.createElement('div');
+      rowDiv.className = 'kb-row' + (rowClasses[rowIndex] ? ' ' + rowClasses[rowIndex] : '');
+
       for (const key of row) {
         if (!key) {
           const spacer = document.createElement('div');
-          container.appendChild(spacer);
+          rowDiv.appendChild(spacer);
           continue;
         }
         const btn = document.createElement('div');
@@ -473,7 +492,7 @@ export class Keyboard {
         if (isModifier) {
           // Track button references for sticky visual feedback
           if (key.code === 'ControlLeft' || key.code === 'ControlRight') this.stickyCtrlBtn = btn;
-          if (key.code === 'ShiftLeft' || key.code === 'ShiftRight') this.stickyShiftBtn = btn;
+          if (key.code === 'ShiftLeft' || key.code === 'ShiftRight') this.stickyShiftBtns.push(btn);
 
           // Sticky toggle: click to activate, click again or press another key to release
           btn.addEventListener('mousedown', (e) => {
@@ -485,7 +504,7 @@ export class Keyboard {
             } else {
               this.stickyShift = !this.stickyShift;
               this.isShiftPressed = this.stickyShift;
-              btn.classList.toggle('pressed', this.stickyShift);
+              this.stickyShiftBtns.forEach(b => b.classList.toggle('pressed', this.stickyShift));
             }
             this.kbrequest = true;
             this.irqLatch = true;
@@ -508,8 +527,10 @@ export class Keyboard {
             btn.classList.remove('pressed');
           });
         }
-        container.appendChild(btn);
+        rowDiv.appendChild(btn);
       }
-    }
+
+      container.appendChild(rowDiv);
+    });
   }
 }
