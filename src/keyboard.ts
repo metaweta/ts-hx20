@@ -258,6 +258,26 @@ export class Keyboard {
     this.dipSwitches = ((tf20 ? 0 : 1) << 3) | (country & 0x07);
   }
 
+  // Sticky modifier state for on-screen keyboard
+  private stickyCtrl = false;
+  private stickyShift = false;
+  private stickyCtrlBtn: HTMLElement | null = null;
+  private stickyShiftBtn: HTMLElement | null = null;
+
+  // Release sticky modifiers after a non-modifier key is pressed on the virtual keyboard
+  private releaseStickyModifiers(): void {
+    if (this.stickyCtrl) {
+      this.stickyCtrl = false;
+      this.isCtrlPressed = false;
+      this.stickyCtrlBtn?.classList.remove('pressed');
+    }
+    if (this.stickyShift) {
+      this.stickyShift = false;
+      this.isShiftPressed = false;
+      this.stickyShiftBtn?.classList.remove('pressed');
+    }
+  }
+
   // Build the on-screen keyboard
   buildUI(container: HTMLElement): void {
     container.innerHTML = '';
@@ -336,19 +356,48 @@ export class Keyboard {
         btn.className = 'key' + (key.cls ? ' ' + key.cls : '');
         btn.textContent = key.label;
         btn.dataset.code = key.code;
-        btn.addEventListener('mousedown', (e) => {
-          e.preventDefault();
-          this.keyDown(key.code);
-          btn.classList.add('pressed');
-        });
-        btn.addEventListener('mouseup', () => {
-          this.keyUp(key.code);
-          btn.classList.remove('pressed');
-        });
-        btn.addEventListener('mouseleave', () => {
-          this.keyUp(key.code);
-          btn.classList.remove('pressed');
-        });
+
+        const isModifier = key.code === 'ControlLeft' || key.code === 'ControlRight' ||
+                           key.code === 'ShiftLeft' || key.code === 'ShiftRight';
+
+        if (isModifier) {
+          // Track button references for sticky visual feedback
+          if (key.code === 'ControlLeft' || key.code === 'ControlRight') this.stickyCtrlBtn = btn;
+          if (key.code === 'ShiftLeft' || key.code === 'ShiftRight') this.stickyShiftBtn = btn;
+
+          // Sticky toggle: click to activate, click again or press another key to release
+          btn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            if (key.code === 'ControlLeft' || key.code === 'ControlRight') {
+              this.stickyCtrl = !this.stickyCtrl;
+              this.isCtrlPressed = this.stickyCtrl;
+              btn.classList.toggle('pressed', this.stickyCtrl);
+            } else {
+              this.stickyShift = !this.stickyShift;
+              this.isShiftPressed = this.stickyShift;
+              btn.classList.toggle('pressed', this.stickyShift);
+            }
+            this.kbrequest = true;
+            this.irqLatch = true;
+          });
+        } else {
+          // Normal key: press on mousedown, release on mouseup/mouseleave,
+          // and release any sticky modifiers on mouseup
+          btn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            this.keyDown(key.code);
+            btn.classList.add('pressed');
+          });
+          btn.addEventListener('mouseup', () => {
+            this.keyUp(key.code);
+            btn.classList.remove('pressed');
+            this.releaseStickyModifiers();
+          });
+          btn.addEventListener('mouseleave', () => {
+            this.keyUp(key.code);
+            btn.classList.remove('pressed');
+          });
+        }
         container.appendChild(btn);
       }
     }
