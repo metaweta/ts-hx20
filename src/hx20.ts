@@ -1,66 +1,12 @@
 // Epson HX-20 System Integration
-// Wires together dual CPUs, memory, LCD, keyboard, RTC
+// Wires together dual CPUs, memory, LCD, keyboard, RTC, cassette
 
 import { HD6301 } from './cpu';
 import { LCDDisplay } from './lcd';
 import { Keyboard } from './keyboard';
 import { MC146818 } from './rtc';
+import { Cassette } from './cassette';
 import { loadIntelHexIntoBuffer, loadBinaryIntoBuffer } from './rom-loader';
-
-// FakeSecondary: responds to slave CPU boot protocol commands
-// This replaces the real slave CPU for serial communication during boot
-class FakeSecondary {
-  private inBuf: number[] = [];
-  private outBuf: number[] = [];
-  private state = 0;
-
-  reset(): void {
-    this.inBuf = [];
-    this.outBuf = [];
-    this.state = 0;
-  }
-
-  send(data: number): void {
-    this.inBuf.push(data & 0xFF);
-  }
-
-  recv(): number | undefined {
-    return this.outBuf.shift();
-  }
-
-  step(): void {
-    while (this.inBuf.length > 0) {
-      const c = this.inBuf.shift()!;
-      if (this.state === 0) {
-        if (c === 0x00 || c === 0x02 || c === 0x03 || c === 0x04) {
-          this.outBuf.push(0x01);
-        } else if (c === 0x0c) {
-          this.outBuf.push(0x02);
-        } else if (c === 0x0d) {
-          this.outBuf.push(0x01);
-          this.state = 1;
-        } else if (c === 0x50) {
-          this.outBuf.push(0x00);
-        } else if (c === 0x46) {
-          // Handshake ping - ROM sends this before some commands
-          this.outBuf.push(0x01);
-        } else {
-          // Unknown command - respond with 0x01 (ACK) to avoid hangs
-          console.warn(`FakeSecondary: unknown cmd 0x${c.toString(16).padStart(2, '0')}, responding 0x01`);
-          this.outBuf.push(0x01);
-        }
-      } else if (this.state === 1) {
-        this.state = 0;
-        if (c === 0xaa) {
-          this.outBuf.push(0x01);
-        } else {
-          console.warn(`FakeSecondary: state=1 unexpected 0x${c.toString(16).padStart(2, '0')}`);
-          this.outBuf.push(0x01);
-        }
-      }
-    }
-  }
-}
 
 export class HX20 {
   mainCPU: HD6301;
@@ -68,6 +14,7 @@ export class HX20 {
   lcd: LCDDisplay;
   keyboard: Keyboard;
   rtc: MC146818;
+  cassette: Cassette;
 
   // Main CPU memory
   mainRAM = new Uint8Array(0x4000);    // 16KB at 0x0100-0x3FFF
@@ -79,13 +26,10 @@ export class HX20 {
   slaveROM: Uint8Array | null = null;
 
   // Inter-CPU serial communication
-  private slaveTx = 1;   // slave → main
+  private slaveTx = 1;   // slave → main (Port 2 bit 4)
   private slaveRx = 1;   // main → slave
-  private slaveFlag = 1; // slave status flag
-  private slaveSio = 0;  // 0 = SIO bus, 1 = slave CPU
-
-  // FakeSecondary for SCI serial boot protocol
-  private fakeSecondary = new FakeSecondary();
+  private slaveFlag = 1;  // slave P34 → main P12
+  private slaveSio = 0;  // main P22: 0 = SIO bus, 1 = slave CPU
 
   // I/O state
   private ksc = 0;           // keyboard scan column
@@ -102,6 +46,9 @@ export class HX20 {
   static readonly FRAME_RATE = 60;
   static readonly CYCLES_PER_FRAME = Math.floor(HX20.E_CLOCK / HX20.FRAME_RATE);
 
+  // State format version (increment when save format changes)
+  static readonly STATE_VERSION = 3;
+
   onStatusUpdate: (text: string) => void = () => {};
   onRegistersUpdate: (text: string) => void = () => {};
 
@@ -111,6 +58,7 @@ export class HX20 {
     this.lcd = new LCDDisplay();
     this.keyboard = new Keyboard();
     this.rtc = new MC146818();
+    this.cassette = new Cassette();
 
     this.wireMainCPU();
     this.wireSlaveCPU();
@@ -187,11 +135,12 @@ export class HX20 {
     // Port 1 read: various status inputs
     cpu.onReadPort1 = (): number => {
       let val = 0x98; // defaults: bit 4 (PWA)=1, bit 3 (INT_EX)=1
-      // Bit 7: cartridge MI1 (1 = no cartridge/microcassette)
+      // Bit 7: cartridge MI1 (1 = microcassette present)
       val |= 0x80;
-      // Bit 6: serial PIN
       // Bit 5: keyboard request (active low: 0 = request pending)
       if (!this.keyboard.irqPending) val |= 0x20;
+      // Bit 2: slave flag (slave P34 → master P12)
+      if (this.slaveFlag) val |= 0x04;
       // Bits 1,0: RS-232 CTS, DSR (both high = ready)
       val |= 0x03;
       return val;
@@ -203,8 +152,6 @@ export class HX20 {
       // Bit 3: RX data (from slave or SIO)
       if (this.slaveSio) val |= (this.slaveTx ? 0x08 : 0);
       else val |= 0x08; // SIO RX default high
-      // Bit 2: slave flag (inverted)
-      if (!this.slaveFlag) val |= 0x04;
       return val;
     };
 
@@ -253,36 +200,49 @@ export class HX20 {
       this.slaveTx = (val >> 4) & 1;
     };
 
-    // Port 3
+    // Port 3: cassette I/O + slave flag
     cpu.onReadPort3 = (): number => {
-      return 0xFF; // cassette read data etc
+      let val = 0xFF;
+      // P32 (bit 2): cassette read data input
+      if (!this.cassette.readLevel) val &= ~0x04;
+      return val;
     };
 
     cpu.onWritePort3 = (val: number): void => {
-      // Bit 7: program power
-      // Bit 4: slave flag
+      // P30 (bit 0): motor remote (LOW = on)
+      this.cassette.setMotor(!(val & 0x01));
+      // P33 (bit 3): cassette write data output
+      this.cassette.setWriteData(!!(val & 0x08));
+      // P34 (bit 4): slave flag → master P12
       this.slaveFlag = (val >> 4) & 1;
     };
 
-    // Port 4
+    // Port 4: cassette power/command, RS-232 select
     cpu.onReadPort4 = (): number => {
       return 0x7F; // bit 7 (CD) high = no carrier
     };
-    cpu.onWritePort4 = () => {};
+    cpu.onWritePort4 = (_val: number): void => {
+      // P42: microcassette power
+      // P43: microcassette command
+      // P45: cassette/RS-232 select
+    };
   }
 
   private wireSerial(): void {
-    // When main CPU sends a byte via SCI TDR, route to FakeSecondary
+    // CPU-to-CPU SCI routing: main ↔ slave via SCI TDR/RDR
+    // Gated by slaveSio (main Port 2 bit 2): 1 = route to slave, 0 = SIO bus
+
     this.mainCPU.onSerialSend = (data: number) => {
-      console.log(`SCI TX: 0x${data.toString(16).padStart(2, '0')} (PC=${this.mainCPU.PC.toString(16).padStart(4, '0')})`);
-      this.fakeSecondary.send(data);
-      // Immediately process and feed responses back
-      this.fakeSecondary.step();
-      let response: number | undefined;
-      while ((response = this.fakeSecondary.recv()) !== undefined) {
-        console.log(`SCI RX: 0x${response.toString(16).padStart(2, '0')}`);
-        this.mainCPU.serialRecv(response);
+      if (this.slaveSio) {
+        // Main CPU TX → Slave CPU RX
+        this.slaveCPU.serialRecv(data);
       }
+      // else: data goes to external SIO bus (not implemented)
+    };
+
+    this.slaveCPU.onSerialSend = (data: number) => {
+      // Slave CPU TX → Main CPU RX (always)
+      this.mainCPU.serialRecv(data);
     };
   }
 
@@ -295,8 +255,6 @@ export class HX20 {
 
   private updateMainIRQ(): void {
     // Keyboard IRQ is latched: set on key press, cleared when firmware reads KRTN.
-    // Not gated by keyIntEnable — LCDCTL bit 4 controls the SLP wakeup circuit,
-    // but the keyboard always drives IRQ1 until acknowledged.
     const irq = this.rtcIrq || this.keyboard.irqPending;
     this.mainCPU.irq1Line = irq;
   }
@@ -333,12 +291,6 @@ export class HX20 {
     this.mainRAM.fill(0);
 
     // Pre-initialize battery-backed RAM values that the ROM expects.
-    // On real hardware, the RAM sizing routine (E19D) runs once during initial
-    // setup and stores the end-of-RAM address in $0134/$012C. This value
-    // persists in battery-backed RAM across power cycles. Since we clear RAM
-    // on reset, we must pre-initialize it here.
-    // $0134/$012C = end of RAM address (one past last byte)
-    // For 16KB: RAM extends from $004E to $3FFF, so end = $4000
     const ramEnd = 0x4000;
     this.mainRAM[0x0134 - 0x0100] = (ramEnd >> 8) & 0xFF;
     this.mainRAM[0x0135 - 0x0100] = ramEnd & 0xFF;
@@ -355,14 +307,13 @@ export class HX20 {
     this.lcd.reset();
     this.keyboard.reset();
     this.rtc.reset();
-    this.fakeSecondary.reset();
     this.mainCPU.reset();
     if (this.slaveROM) {
       this.slaveCPU.reset();
     }
   }
 
-  // Run one frame's worth of CPU cycles
+  // Run one frame's worth of CPU cycles — both CPUs interleaved
   runFrame(): void {
     const targetCycles = HX20.CYCLES_PER_FRAME * this.speedMultiplier;
 
@@ -372,17 +323,20 @@ export class HX20 {
     }
     this.updateMainIRQ();
 
-    // Run main CPU
-    let mainCyclesRun = 0;
-    while (mainCyclesRun < targetCycles) {
-      mainCyclesRun += this.mainCPU.step();
-    }
+    // Run both CPUs interleaved (like hex20: one instruction each, alternating)
+    let mainCycles = 0;
+    let slaveCycles = 0;
 
-    // Run slave CPU in lockstep (if ROM loaded)
-    if (this.slaveROM) {
-      let slaveCyclesRun = 0;
-      while (slaveCyclesRun < targetCycles) {
-        slaveCyclesRun += this.slaveCPU.step();
+    while (mainCycles < targetCycles) {
+      mainCycles += this.mainCPU.step();
+
+      // Run slave CPU to keep in sync with main
+      if (this.slaveROM) {
+        while (slaveCycles < mainCycles) {
+          const sc = this.slaveCPU.step();
+          slaveCycles += sc;
+          this.cassette.advance(sc);
+        }
       }
     }
 
@@ -421,7 +375,10 @@ export class HX20 {
 
   stepOne(): void {
     this.mainCPU.step();
-    if (this.slaveROM) this.slaveCPU.step();
+    if (this.slaveROM) {
+      const sc = this.slaveCPU.step();
+      this.cassette.advance(sc);
+    }
     this.lcd.render();
     this.onRegistersUpdate(this.mainCPU.dumpRegisters());
   }
@@ -433,9 +390,12 @@ export class HX20 {
       displayOn: c.displayOn,
     }));
     const state = {
+      version: HX20.STATE_VERSION,
       mainCPU: this.mainCPU.saveState(),
+      slaveCPU: this.slaveROM ? this.slaveCPU.saveState() : null,
       mainRAM: btoa(String.fromCharCode(...this.mainRAM)),
       mainROM: btoa(String.fromCharCode(...this.mainROM)),
+      slaveROM: this.slaveROM ? btoa(String.fromCharCode(...this.slaveROM)) : null,
       lcd: lcdControllers,
       rtc: this.rtc.saveState(),
       slaveTx: this.slaveTx,
@@ -451,6 +411,11 @@ export class HX20 {
   loadState(json: string): void {
     const s = JSON.parse(json);
 
+    // Version check — old states without slave CPU can't be resumed
+    if (!s.version || s.version < HX20.STATE_VERSION) {
+      throw new Error('Incompatible state format (pre-v2) — fresh boot required');
+    }
+
     // Restore ROMs
     const romStr = atob(s.mainROM);
     for (let i = 0; i < romStr.length; i++) this.mainROM[i] = romStr.charCodeAt(i);
@@ -459,8 +424,21 @@ export class HX20 {
     const ramStr = atob(s.mainRAM);
     for (let i = 0; i < ramStr.length; i++) this.mainRAM[i] = ramStr.charCodeAt(i);
 
-    // Restore CPU (wiring is already set up from constructor)
+    // Restore slave ROM (must happen before slave CPU restore)
+    if (s.slaveROM) {
+      const slaveStr = atob(s.slaveROM);
+      this.slaveROM = new Uint8Array(slaveStr.length);
+      for (let i = 0; i < slaveStr.length; i++) this.slaveROM[i] = slaveStr.charCodeAt(i);
+      this.slaveCPU.internalROM = this.slaveROM;
+    }
+
+    // Restore main CPU (wiring is already set up from constructor)
     this.mainCPU.loadState(s.mainCPU);
+
+    // Restore slave CPU
+    if (s.slaveCPU && this.slaveROM) {
+      this.slaveCPU.loadState(s.slaveCPU);
+    }
 
     // Restore LCD controller RAM
     for (let i = 0; i < s.lcd.length && i < this.lcd.controllers.length; i++) {
@@ -486,7 +464,6 @@ export class HX20 {
     }
 
     // Reset transient subsystems
-    this.fakeSecondary.reset();
     this.keyboard.reset();
   }
 }

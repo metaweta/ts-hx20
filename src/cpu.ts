@@ -162,7 +162,7 @@ export class HD6301 {
   private writeRegister(addr: number, val: number): void {
     switch (addr) {
       case 0x00: this.p1ddr = val; break;
-      case 0x01: this.p2ddr = val; break;
+      case 0x01: this.p2ddr = val; this.onWritePort2(this.p2out & val); break;
       case 0x02: this.p1out = val; this.onWritePort1(val & this.p1ddr); break;
       case 0x03: this.p2out = val; this.onWritePort2(val & this.p2ddr); break;
       case 0x04: this.p3ddr = val; break;

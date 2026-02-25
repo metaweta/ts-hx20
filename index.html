@@ -34,7 +34,22 @@
       <span id="cpu-info"></span>
     </div>
 
-    <button id="btn-debug-toggle">Show Debug</button>
+    <div id="bottom-buttons">
+      <button id="btn-cassette-toggle">CAS</button>
+      <button id="btn-debug-toggle">Show Debug</button>
+    </div>
+
+    <div id="cassette-panel" class="hidden">
+      <h3>Microcassette <span id="cassette-motor"></span></h3>
+      <div id="cassette-current">No tape loaded</div>
+      <div id="tape-list"></div>
+      <div id="cassette-controls">
+        <button id="btn-tape-eject">Eject</button>
+        <button id="btn-tape-import">Import</button>
+        <input type="file" id="tape-file-input" accept=".json" style="display:none">
+      </div>
+    </div>
+
     <div id="debug-panel" class="hidden">
       <h3>Debug</h3>
       <pre id="registers"></pre>

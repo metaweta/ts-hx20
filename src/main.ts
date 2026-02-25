@@ -27,6 +27,17 @@ const btnLoadRom = document.getElementById('btn-load-rom')!;
 const romFileInput = document.getElementById('rom-file-input') as HTMLInputElement;
 const speedSlider = document.getElementById('speed-slider') as HTMLInputElement;
 const speedDisplay = document.getElementById('speed-display')!;
+
+// Cassette panel elements
+const btnCassetteToggle = document.getElementById('btn-cassette-toggle')!;
+const cassettePanel = document.getElementById('cassette-panel')!;
+const cassetteMotor = document.getElementById('cassette-motor')!;
+const cassetteCurrent = document.getElementById('cassette-current')!;
+const tapeListEl = document.getElementById('tape-list')!;
+const btnTapeEject = document.getElementById('btn-tape-eject')!;
+const btnTapeImport = document.getElementById('btn-tape-import')!;
+const tapeFileInput = document.getElementById('tape-file-input') as HTMLInputElement;
+
 // Attach LCD canvas
 hx20.lcd.attachCanvas(canvas);
 
@@ -159,6 +170,89 @@ speedSlider.addEventListener('input', () => {
   hx20.speedMultiplier = val;
   speedDisplay.textContent = `${val}x`;
 });
+
+// --- Cassette UI ---
+
+btnCassetteToggle.addEventListener('click', () => {
+  cassettePanel.classList.toggle('hidden');
+});
+
+function updateTapeList(): void {
+  const names = hx20.cassette.getTapeNames();
+  const current = hx20.cassette.getCurrentTape();
+  cassetteCurrent.textContent = current ? `Loaded: ${current}` : 'No tape loaded';
+
+  tapeListEl.innerHTML = '';
+  for (const name of names) {
+    const row = document.createElement('div');
+    row.className = 'tape-entry';
+
+    const btn = document.createElement('button');
+    btn.textContent = name;
+    btn.className = 'tape-name' + (name === current ? ' tape-active' : '');
+    btn.addEventListener('click', () => {
+      hx20.cassette.insertTape(name);
+      updateTapeList();
+    });
+
+    const dlBtn = document.createElement('button');
+    dlBtn.textContent = 'DL';
+    dlBtn.className = 'tape-action';
+    dlBtn.title = 'Download tape';
+    dlBtn.addEventListener('click', () => {
+      const json = hx20.cassette.exportTape(name);
+      if (!json) return;
+      const blob = new Blob([json], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${name}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+
+    const delBtn = document.createElement('button');
+    delBtn.textContent = '\u00D7';
+    delBtn.className = 'tape-action tape-delete';
+    delBtn.title = 'Delete tape';
+    delBtn.addEventListener('click', () => {
+      hx20.cassette.deleteTape(name);
+    });
+
+    row.appendChild(btn);
+    row.appendChild(dlBtn);
+    row.appendChild(delBtn);
+    tapeListEl.appendChild(row);
+  }
+}
+
+hx20.cassette.onLibraryChange = updateTapeList;
+hx20.cassette.onMotorChange = (on: boolean) => {
+  cassetteMotor.textContent = on ? '[MOTOR]' : '';
+};
+
+btnTapeEject.addEventListener('click', () => {
+  hx20.cassette.ejectTape();
+  updateTapeList();
+});
+
+btnTapeImport.addEventListener('click', () => tapeFileInput.click());
+tapeFileInput.addEventListener('change', async () => {
+  const file = tapeFileInput.files?.[0];
+  if (!file) return;
+  const json = await file.text();
+  const name = hx20.cassette.importTape(json);
+  if (name) {
+    hx20.cassette.insertTape(name);
+    updateTapeList();
+    statusText.textContent = `Imported tape: ${name}`;
+  } else {
+    statusText.textContent = 'Failed to import tape';
+  }
+  tapeFileInput.value = '';
+});
+
+// Initialize tape list
+updateTapeList();
 
 // Power button — always cold boots (fresh start)
 btnPower.addEventListener('click', () => {
@@ -302,6 +396,20 @@ function updateDebugDisplay(): void {
   ).join('\n');
 }
 
+// Fresh boot: load ROMs and cold start
+function freshBoot(): void {
+  statusText.textContent = 'Loading ROMs...';
+  loadLocalROMs().then(() => {
+    hx20.reset();
+    hx20.start();
+    startAutoSave();
+    statusText.textContent = 'Running';
+    btnPower.classList.add('active');
+  }).catch(() => {
+    statusText.textContent = 'Click LOAD ROMs to fetch, or select ROM files manually';
+  });
+}
+
 // Startup: restore saved state if available, otherwise cold boot
 const savedState = localStorage.getItem(STATE_STORAGE_KEY);
 if (savedState) {
@@ -314,20 +422,10 @@ if (savedState) {
     statusText.textContent = 'Resumed';
     btnPower.classList.add('active');
   } catch (e) {
-    console.error('Failed to restore state:', e);
+    console.warn('State incompatible or corrupted, fresh boot:', e);
     localStorage.removeItem(STATE_STORAGE_KEY);
-    statusText.textContent = 'Saved state corrupted — click LOAD ROMs';
+    freshBoot();
   }
 } else {
-  // First boot — load ROMs and cold start
-  statusText.textContent = 'Loading ROMs...';
-  loadLocalROMs().then(() => {
-    hx20.reset();
-    hx20.start();
-    startAutoSave();
-    statusText.textContent = 'Running';
-    btnPower.classList.add('active');
-  }).catch(() => {
-    statusText.textContent = 'Click LOAD ROMs to fetch, or select ROM files manually';
-  });
+  freshBoot();
 }

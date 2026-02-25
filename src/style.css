@@ -270,8 +270,13 @@ body {
   width: 70px;
 }
 
-#btn-debug-toggle {
+#bottom-buttons {
+  display: flex;
+  gap: 6px;
   margin-top: 8px;
+}
+
+#bottom-buttons button {
   background: #444;
   color: #ccc;
   border: 1px solid #555;
@@ -282,7 +287,113 @@ body {
   font-size: 11px;
 }
 
-#btn-debug-toggle:hover {
+#bottom-buttons button:hover {
+  background: #555;
+}
+
+/* Cassette panel */
+
+#cassette-panel {
+  margin-top: 8px;
+  padding: 12px;
+  background: #222;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+#cassette-panel.hidden {
+  display: none;
+}
+
+#cassette-panel h3 {
+  margin-bottom: 8px;
+  color: #aaa;
+}
+
+#cassette-motor {
+  color: #f84;
+  font-size: 11px;
+}
+
+#cassette-current {
+  color: #8cf;
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+#tape-list {
+  max-height: 150px;
+  overflow-y: auto;
+  margin-bottom: 8px;
+}
+
+.tape-entry {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 3px;
+}
+
+.tape-name {
+  flex: 1;
+  background: #333;
+  color: #ccc;
+  border: 1px solid #555;
+  padding: 2px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  text-align: left;
+}
+
+.tape-name:hover {
+  background: #444;
+}
+
+.tape-name.tape-active {
+  background: #2a5a3a;
+  border-color: #3a7a4a;
+  color: #8f8;
+}
+
+.tape-action {
+  background: #333;
+  color: #999;
+  border: 1px solid #555;
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+}
+
+.tape-action:hover {
+  background: #444;
+  color: #ccc;
+}
+
+.tape-delete:hover {
+  background: #633;
+  color: #f88;
+}
+
+#cassette-controls {
+  display: flex;
+  gap: 6px;
+}
+
+#cassette-controls button {
+  background: #444;
+  color: #ccc;
+  border: 1px solid #555;
+  padding: 3px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+}
+
+#cassette-controls button:hover {
   background: #555;
 }
 
