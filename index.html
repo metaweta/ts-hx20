@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Epson HX-20 Emulator</title>
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <div id="emulator">
+    <div id="header">
+      <h1>EPSON HX-20</h1>
+      <div id="controls">
+        <button id="btn-power" title="Power On/Off">POWER</button>
+        <button id="btn-reset" title="Reset">RESET</button>
+        <button id="btn-load-rom" title="Load ROM files">LOAD ROMs</button>
+        <input type="file" id="rom-file-input" multiple accept=".hex,.bin,.rom" style="display:none">
+        <label id="speed-label">Speed: <span id="speed-display">1x</span></label>
+        <input type="range" id="speed-slider" min="1" max="10" value="1">
+      </div>
+    </div>
+
+    <div id="screen-bezel">
+      <canvas id="lcd" width="480" height="128"></canvas>
+    </div>
+
+    <div id="keyboard-area">
+      <div id="keyboard"></div>
+    </div>
+
+    <div id="status-bar">
+      <span id="status-text">Load ROMs to begin</span>
+      <span id="cpu-info"></span>
+    </div>
+
+    <button id="btn-debug-toggle">Show Debug</button>
+    <div id="debug-panel" class="hidden">
+      <h3>Debug</h3>
+      <pre id="registers"></pre>
+      <div id="debug-controls">
+        <button id="btn-step">Step 1</button>
+        <button id="btn-run">Run</button>
+        <button id="btn-pause">Pause</button>
+        <span class="debug-group">
+          <button id="btn-step-n">Step N</button>
+          <input id="step-n-input" type="text" value="1000" size="6" title="Number of steps">
+        </span>
+        <span class="debug-group">
+          <button id="btn-run-to-bp">Run to BP</button>
+          <input id="bp-input" type="text" placeholder="e44b" size="6" title="Breakpoint address (hex)">
+        </span>
+      </div>
+      <pre id="disasm"></pre>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
