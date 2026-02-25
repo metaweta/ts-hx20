@@ -71,11 +71,10 @@ const KEY_MAP: Record<string, KeyMapping> = {
   'Insert': { col: 7, row: 4 },    // INS/DEL
   'End': { col: 7, row: 5 },       // MENU
 
-  // Arrows
-  'ArrowLeft': { col: 5, row: 6 },
-  'ArrowUp': { col: 5, row: 6 },    // LEFT/UP share same key
-  'ArrowRight': { col: 5, row: 7 },
-  'ArrowDown': { col: 5, row: 7 },  // RIGHT/DOWN share same key
+  // Arrows (LEFT and RIGHT are physical HX-20 keys;
+  // UP = Shift+LEFT, DOWN = Shift+RIGHT on the real keyboard)
+  'ArrowLeft': { col: 5, row: 7 },
+  'ArrowRight': { col: 5, row: 6 },
 
   // Modifiers
   'ShiftLeft': { col: 5, row: 9 },
@@ -189,8 +188,23 @@ export class Keyboard {
     return this.irqLatch;
   }
 
+  // Track synthetic shift state from ArrowUp/ArrowDown
+  private syntheticShift = false;
+
   // Process PC keyboard events
   keyDown(code: string): void {
+    // ArrowUp = Shift + LEFT, ArrowDown = Shift + RIGHT
+    if (code === 'ArrowUp' || code === 'ArrowDown') {
+      this.syntheticShift = true;
+      this.isShiftPressed = true;
+      const arrowCol = 5;
+      const arrowRow = code === 'ArrowUp' ? 7 : 6; // LEFT=row7, RIGHT=row6
+      this.matrix[arrowCol] &= ~(1 << arrowRow);
+      this.kbrequest = true;
+      this.irqLatch = true;
+      return;
+    }
+
     const mapping = KEY_MAP[code];
     if (!mapping) return;
 
@@ -213,6 +227,17 @@ export class Keyboard {
   }
 
   keyUp(code: string): void {
+    // ArrowUp = Shift + LEFT, ArrowDown = Shift + RIGHT
+    if (code === 'ArrowUp' || code === 'ArrowDown') {
+      const arrowRow = code === 'ArrowUp' ? 7 : 6;
+      this.matrix[5] |= (1 << arrowRow);
+      if (this.syntheticShift) {
+        this.syntheticShift = false;
+        this.isShiftPressed = false;
+      }
+      return;
+    }
+
     const mapping = KEY_MAP[code];
     if (!mapping) return;
 
@@ -295,8 +320,8 @@ export class Keyboard {
         null,
         { label: 'SPACE', code: 'Space', cls: 'wide' },
         null,
-        { label: '\u2190', code: 'ArrowLeft' },
-        { label: '\u2192', code: 'ArrowRight' },
+        { label: '\u2190\u2191', code: 'ArrowLeft' },
+        { label: '\u2192\u2193', code: 'ArrowRight' },
       ],
     ];
 
