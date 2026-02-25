@@ -27,7 +27,6 @@ const btnLoadRom = document.getElementById('btn-load-rom')!;
 const romFileInput = document.getElementById('rom-file-input') as HTMLInputElement;
 const speedSlider = document.getElementById('speed-slider') as HTMLInputElement;
 const speedDisplay = document.getElementById('speed-display')!;
-
 // Attach LCD canvas
 hx20.lcd.attachCanvas(canvas);
 
@@ -119,6 +118,7 @@ btnRun.addEventListener('click', () => {
     return;
   }
   hx20.start();
+  startAutoSave();
   statusText.textContent = 'Running';
   btnPower.classList.add('active');
 });
@@ -129,60 +129,29 @@ btnPause.addEventListener('click', () => {
   updateDebugDisplay();
 });
 
-// Battery-backed RAM persistence
-const RAM_STORAGE_KEY = 'hx20-ram';
-let ramSaveTimer: ReturnType<typeof setInterval> | null = null;
+// Machine state persistence
+const STATE_STORAGE_KEY = 'hx20-state';
+let autoSaveTimer: ReturnType<typeof setInterval> | null = null;
 
-function saveRAM(): void {
-  const binary = String.fromCharCode(...hx20.mainRAM);
-  localStorage.setItem(RAM_STORAGE_KEY, btoa(binary));
-}
-
-function restoreRAM(): boolean {
-  const data = localStorage.getItem(RAM_STORAGE_KEY);
-  if (!data) return false;
-  const binary = atob(data);
-  for (let i = 0; i < binary.length; i++) {
-    hx20.mainRAM[i] = binary.charCodeAt(i);
+function saveSnapshot(): void {
+  try {
+    localStorage.setItem(STATE_STORAGE_KEY, hx20.saveState());
+  } catch (e) {
+    console.warn('Failed to save state:', e);
   }
-  return true;
 }
 
 function startAutoSave(): void {
-  if (ramSaveTimer) return;
-  ramSaveTimer = setInterval(saveRAM, 5000);
+  if (autoSaveTimer) return;
+  autoSaveTimer = setInterval(saveSnapshot, 5000);
 }
 
 function stopAutoSave(): void {
-  if (ramSaveTimer) {
-    clearInterval(ramSaveTimer);
-    ramSaveTimer = null;
+  if (autoSaveTimer) {
+    clearInterval(autoSaveTimer);
+    autoSaveTimer = null;
   }
 }
-
-const btnSave = document.getElementById('btn-save')!;
-const btnLoad = document.getElementById('btn-load')!;
-
-btnSave.addEventListener('click', () => {
-  if (!powered) {
-    statusText.textContent = 'Power on first';
-    return;
-  }
-  saveRAM();
-  statusText.textContent = 'RAM saved';
-});
-
-btnLoad.addEventListener('click', () => {
-  if (!powered) {
-    statusText.textContent = 'Power on first';
-    return;
-  }
-  if (restoreRAM()) {
-    statusText.textContent = 'RAM loaded';
-  } else {
-    statusText.textContent = 'No saved RAM found';
-  }
-});
 
 // Speed control
 speedSlider.addEventListener('input', () => {
@@ -191,40 +160,27 @@ speedSlider.addEventListener('input', () => {
   speedDisplay.textContent = `${val}x`;
 });
 
-// Power button
-let powered = false;
+// Power button — always cold boots (fresh start)
 btnPower.addEventListener('click', () => {
-  if (!powered) {
-    if (!hx20.isROMLoaded()) {
-      statusText.textContent = 'Load ROMs first!';
-      return;
-    }
-    powered = true;
-    // Warm boot if saved RAM exists (emulates battery-backed RAM)
-    const warm = restoreRAM();
-    hx20.reset(!warm);
-    hx20.start();
-    startAutoSave();
-    statusText.textContent = warm ? 'Running (RAM restored)' : 'Running';
-    btnPower.classList.add('active');
-  } else {
-    powered = false;
-    stopAutoSave();
-    saveRAM();
-    hx20.stop();
-    statusText.textContent = 'Power Off (RAM saved)';
-    btnPower.classList.remove('active');
+  if (!hx20.isROMLoaded()) {
+    statusText.textContent = 'Load ROMs first!';
+    return;
   }
+  hx20.stop();
+  hx20.reset();
+  hx20.start();
+  startAutoSave();
+  statusText.textContent = 'Running';
+  btnPower.classList.add('active');
 });
 
-// Reset button (warm reset — preserves RAM like real hardware)
+// Reset button
 btnReset.addEventListener('click', () => {
-  if (powered) {
-    hx20.stop();
-    hx20.reset(false);
-    hx20.start();
-    statusText.textContent = 'Reset - Running';
-  }
+  if (!hx20.isROMLoaded()) return;
+  hx20.stop();
+  hx20.reset();
+  hx20.start();
+  statusText.textContent = 'Reset - Running';
 });
 
 // Load ROM button
@@ -346,10 +302,32 @@ function updateDebugDisplay(): void {
   ).join('\n');
 }
 
-// Auto-load local ROMs on startup
-statusText.textContent = 'Loading ROMs...';
-loadLocalROMs().then(() => {
-  statusText.textContent = 'ROMs loaded! Press POWER to start';
-}).catch(() => {
-  statusText.textContent = 'Click LOAD ROMs to fetch, or select ROM files manually';
-});
+// Startup: restore saved state if available, otherwise cold boot
+const savedState = localStorage.getItem(STATE_STORAGE_KEY);
+if (savedState) {
+  // Resume from snapshot — no ROM loading or boot needed
+  try {
+    hx20.loadState(savedState);
+    hx20.lcd.render();
+    hx20.start();
+    startAutoSave();
+    statusText.textContent = 'Resumed';
+    btnPower.classList.add('active');
+  } catch (e) {
+    console.error('Failed to restore state:', e);
+    localStorage.removeItem(STATE_STORAGE_KEY);
+    statusText.textContent = 'Saved state corrupted — click LOAD ROMs';
+  }
+} else {
+  // First boot — load ROMs and cold start
+  statusText.textContent = 'Loading ROMs...';
+  loadLocalROMs().then(() => {
+    hx20.reset();
+    hx20.start();
+    startAutoSave();
+    statusText.textContent = 'Running';
+    btnPower.classList.add('active');
+  }).catch(() => {
+    statusText.textContent = 'Click LOAD ROMs to fetch, or select ROM files manually';
+  });
+}

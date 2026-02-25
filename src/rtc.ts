@@ -69,6 +69,18 @@ export class MC146818 {
     this.regs[9] = encode(now.getFullYear() % 100);
   }
 
+  saveState(): string {
+    return btoa(String.fromCharCode(...this.regs));
+  }
+
+  loadState(data: string): void {
+    const s = atob(data);
+    for (let i = 0; i < s.length; i++) this.regs[i] = s.charCodeAt(i);
+    // Refresh clock registers and ensure VRT is set
+    this.regs[0x0D] = 0x80;
+    this.updateTime();
+  }
+
   // Called periodically to check for alarms/periodic interrupts
   tick(): void {
     // Periodic flag: PF is set whenever periodic rate is non-zero,

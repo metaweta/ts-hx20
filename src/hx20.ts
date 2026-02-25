@@ -329,24 +329,21 @@ export class HX20 {
     return resetVec !== 0xFFFF && resetVec !== 0x0000;
   }
 
-  reset(cold = true): void {
-    if (cold) {
-      this.mainRAM.fill(0);
+  reset(): void {
+    this.mainRAM.fill(0);
 
-      // Pre-initialize battery-backed RAM values that the ROM expects.
-      // On real hardware, the RAM sizing routine (E19D) runs once during initial
-      // setup and stores the end-of-RAM address in $0134/$012C. This value
-      // persists in battery-backed RAM across power cycles. Since we clear RAM
-      // on reset, we must pre-initialize it here.
-      // $0134/$012C = end of RAM address (one past last byte)
-      // For 16KB: RAM extends from $004E to $3FFF, so end = $4000
-      const ramEnd = 0x4000;
-      this.mainRAM[0x0134 - 0x0100] = (ramEnd >> 8) & 0xFF;
-      this.mainRAM[0x0135 - 0x0100] = ramEnd & 0xFF;
-      this.mainRAM[0x012C - 0x0100] = (ramEnd >> 8) & 0xFF;
-      this.mainRAM[0x012D - 0x0100] = ramEnd & 0xFF;
-    }
-    // Warm boot: mainRAM is preserved (battery-backed), ROM handles the rest
+    // Pre-initialize battery-backed RAM values that the ROM expects.
+    // On real hardware, the RAM sizing routine (E19D) runs once during initial
+    // setup and stores the end-of-RAM address in $0134/$012C. This value
+    // persists in battery-backed RAM across power cycles. Since we clear RAM
+    // on reset, we must pre-initialize it here.
+    // $0134/$012C = end of RAM address (one past last byte)
+    // For 16KB: RAM extends from $004E to $3FFF, so end = $4000
+    const ramEnd = 0x4000;
+    this.mainRAM[0x0134 - 0x0100] = (ramEnd >> 8) & 0xFF;
+    this.mainRAM[0x0135 - 0x0100] = ramEnd & 0xFF;
+    this.mainRAM[0x012C - 0x0100] = (ramEnd >> 8) & 0xFF;
+    this.mainRAM[0x012D - 0x0100] = ramEnd & 0xFF;
 
     this.slaveTx = 1;
     this.slaveRx = 1;
@@ -427,5 +424,69 @@ export class HX20 {
     if (this.slaveROM) this.slaveCPU.step();
     this.lcd.render();
     this.onRegistersUpdate(this.mainCPU.dumpRegisters());
+  }
+
+  // Snapshot the entire machine state for persistence
+  saveState(): string {
+    const lcdControllers = this.lcd.controllers.map(c => ({
+      ram: btoa(String.fromCharCode(...c.ram)),
+      displayOn: c.displayOn,
+    }));
+    const state = {
+      mainCPU: this.mainCPU.saveState(),
+      mainRAM: btoa(String.fromCharCode(...this.mainRAM)),
+      mainROM: btoa(String.fromCharCode(...this.mainROM)),
+      lcd: lcdControllers,
+      rtc: this.rtc.saveState(),
+      slaveTx: this.slaveTx,
+      slaveRx: this.slaveRx,
+      slaveFlag: this.slaveFlag,
+      slaveSio: this.slaveSio,
+      ksc: this.ksc,
+    };
+    return JSON.stringify(state);
+  }
+
+  // Restore entire machine state from a snapshot
+  loadState(json: string): void {
+    const s = JSON.parse(json);
+
+    // Restore ROMs
+    const romStr = atob(s.mainROM);
+    for (let i = 0; i < romStr.length; i++) this.mainROM[i] = romStr.charCodeAt(i);
+
+    // Restore RAM
+    const ramStr = atob(s.mainRAM);
+    for (let i = 0; i < ramStr.length; i++) this.mainRAM[i] = ramStr.charCodeAt(i);
+
+    // Restore CPU (wiring is already set up from constructor)
+    this.mainCPU.loadState(s.mainCPU);
+
+    // Restore LCD controller RAM
+    for (let i = 0; i < s.lcd.length && i < this.lcd.controllers.length; i++) {
+      const ctrl = this.lcd.controllers[i];
+      const data = atob(s.lcd[i].ram);
+      for (let j = 0; j < data.length; j++) ctrl.ram[j] = data.charCodeAt(j);
+      ctrl.displayOn = s.lcd[i].displayOn;
+      ctrl.dirty = true;
+    }
+
+    // Restore I/O state
+    this.slaveTx = s.slaveTx;
+    this.slaveRx = s.slaveRx;
+    this.slaveFlag = s.slaveFlag;
+    this.slaveSio = s.slaveSio;
+    this.ksc = s.ksc;
+
+    // Restore RTC NVRAM (contains TITLE directory etc.), or reset if absent
+    if (s.rtc) {
+      this.rtc.loadState(s.rtc);
+    } else {
+      this.rtc.reset();
+    }
+
+    // Reset transient subsystems
+    this.fakeSecondary.reset();
+    this.keyboard.reset();
   }
 }

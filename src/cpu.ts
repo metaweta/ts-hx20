@@ -1040,6 +1040,50 @@ export class HD6301 {
 
   // --- Debug ---
 
+  saveState(): Record<string, unknown> {
+    return {
+      A: this.A, B: this.B, X: this.X, SP: this.SP, PC: this.PC, CC: this.CC,
+      halted: this.halted, sleeping: this.sleeping,
+      irq1Line: this.irq1Line, irq2Line: this.irq2Line,
+      nmiLine: this.nmiLine, nmiPending: this.nmiPending,
+      totalCycles: this.totalCycles,
+      p1ddr: this.p1ddr, p2ddr: this.p2ddr, p1out: this.p1out, p2out: this.p2out,
+      p3ddr: this.p3ddr, p4ddr: this.p4ddr, p3out: this.p3out, p4out: this.p4out,
+      tcsr: this.tcsr, frc: this.frc, frcLatch: this.frcLatch,
+      ocr: this.ocr, ocrH: this.ocrH, icr: this.icr,
+      p3csr: this.p3csr, rmcr: this.rmcr, trcsr: this.trcsr,
+      rdr: this.rdr, tdr: this.tdr, ramcr: this.ramcr, tcsrRead: this.tcsrRead,
+      sciRecvBuf: this.sciRecvBuf.slice(),
+      rdrfClearStep: this.rdrfClearStep,
+      ram: btoa(String.fromCharCode(...this.ram)),
+    };
+  }
+
+  loadState(s: Record<string, unknown>): void {
+    this.A = s.A as number; this.B = s.B as number;
+    this.X = s.X as number; this.SP = s.SP as number;
+    this.PC = s.PC as number; this.CC = s.CC as number;
+    this.halted = s.halted as boolean; this.sleeping = s.sleeping as boolean;
+    this.irq1Line = s.irq1Line as boolean; this.irq2Line = s.irq2Line as boolean;
+    this.nmiLine = s.nmiLine as boolean; this.nmiPending = s.nmiPending as boolean;
+    this.totalCycles = s.totalCycles as number;
+    this.p1ddr = s.p1ddr as number; this.p2ddr = s.p2ddr as number;
+    this.p1out = s.p1out as number; this.p2out = s.p2out as number;
+    this.p3ddr = s.p3ddr as number; this.p4ddr = s.p4ddr as number;
+    this.p3out = s.p3out as number; this.p4out = s.p4out as number;
+    this.tcsr = s.tcsr as number; this.frc = s.frc as number;
+    this.frcLatch = s.frcLatch as number;
+    this.ocr = s.ocr as number; this.ocrH = s.ocrH as number;
+    this.icr = s.icr as number; this.p3csr = s.p3csr as number;
+    this.rmcr = s.rmcr as number; this.trcsr = s.trcsr as number;
+    this.rdr = s.rdr as number; this.tdr = s.tdr as number;
+    this.ramcr = s.ramcr as number; this.tcsrRead = s.tcsrRead as boolean;
+    this.sciRecvBuf = (s.sciRecvBuf as number[]).slice();
+    this.rdrfClearStep = s.rdrfClearStep as number;
+    const ramStr = atob(s.ram as string);
+    for (let i = 0; i < ramStr.length; i++) this.ram[i] = ramStr.charCodeAt(i);
+  }
+
   dumpRegisters(): string {
     return `PC=${this.PC.toString(16).padStart(4,'0')} ` +
       `A=${this.A.toString(16).padStart(2,'0')} B=${this.B.toString(16).padStart(2,'0')} ` +
