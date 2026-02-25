@@ -329,21 +329,24 @@ export class HX20 {
     return resetVec !== 0xFFFF && resetVec !== 0x0000;
   }
 
-  reset(): void {
-    this.mainRAM.fill(0);
+  reset(cold = true): void {
+    if (cold) {
+      this.mainRAM.fill(0);
 
-    // Pre-initialize battery-backed RAM values that the ROM expects.
-    // On real hardware, the RAM sizing routine (E19D) runs once during initial
-    // setup and stores the end-of-RAM address in $0134/$012C. This value
-    // persists in battery-backed RAM across power cycles. Since we clear RAM
-    // on reset, we must pre-initialize it here.
-    // $0134/$012C = end of RAM address (one past last byte)
-    // For 16KB: RAM extends from $004E to $3FFF, so end = $4000
-    const ramEnd = 0x4000;
-    this.mainRAM[0x0134 - 0x0100] = (ramEnd >> 8) & 0xFF;
-    this.mainRAM[0x0135 - 0x0100] = ramEnd & 0xFF;
-    this.mainRAM[0x012C - 0x0100] = (ramEnd >> 8) & 0xFF;
-    this.mainRAM[0x012D - 0x0100] = ramEnd & 0xFF;
+      // Pre-initialize battery-backed RAM values that the ROM expects.
+      // On real hardware, the RAM sizing routine (E19D) runs once during initial
+      // setup and stores the end-of-RAM address in $0134/$012C. This value
+      // persists in battery-backed RAM across power cycles. Since we clear RAM
+      // on reset, we must pre-initialize it here.
+      // $0134/$012C = end of RAM address (one past last byte)
+      // For 16KB: RAM extends from $004E to $3FFF, so end = $4000
+      const ramEnd = 0x4000;
+      this.mainRAM[0x0134 - 0x0100] = (ramEnd >> 8) & 0xFF;
+      this.mainRAM[0x0135 - 0x0100] = ramEnd & 0xFF;
+      this.mainRAM[0x012C - 0x0100] = (ramEnd >> 8) & 0xFF;
+      this.mainRAM[0x012D - 0x0100] = ramEnd & 0xFF;
+    }
+    // Warm boot: mainRAM is preserved (battery-backed), ROM handles the rest
 
     this.slaveTx = 1;
     this.slaveRx = 1;

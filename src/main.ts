@@ -129,18 +129,46 @@ btnPause.addEventListener('click', () => {
   updateDebugDisplay();
 });
 
-// Save/Load RAM
+// Battery-backed RAM persistence
+const RAM_STORAGE_KEY = 'hx20-ram';
+let ramSaveTimer: ReturnType<typeof setInterval> | null = null;
+
+function saveRAM(): void {
+  const binary = String.fromCharCode(...hx20.mainRAM);
+  localStorage.setItem(RAM_STORAGE_KEY, btoa(binary));
+}
+
+function restoreRAM(): boolean {
+  const data = localStorage.getItem(RAM_STORAGE_KEY);
+  if (!data) return false;
+  const binary = atob(data);
+  for (let i = 0; i < binary.length; i++) {
+    hx20.mainRAM[i] = binary.charCodeAt(i);
+  }
+  return true;
+}
+
+function startAutoSave(): void {
+  if (ramSaveTimer) return;
+  ramSaveTimer = setInterval(saveRAM, 5000);
+}
+
+function stopAutoSave(): void {
+  if (ramSaveTimer) {
+    clearInterval(ramSaveTimer);
+    ramSaveTimer = null;
+  }
+}
+
 const btnSave = document.getElementById('btn-save')!;
 const btnLoad = document.getElementById('btn-load')!;
-const RAM_STORAGE_KEY = 'hx20-ram';
 
 btnSave.addEventListener('click', () => {
   if (!powered) {
     statusText.textContent = 'Power on first';
     return;
   }
-  const binary = String.fromCharCode(...hx20.mainRAM);
-  localStorage.setItem(RAM_STORAGE_KEY, btoa(binary));
+  saveRAM();
   statusText.textContent = 'RAM saved';
 });
 
@@ -149,16 +177,11 @@ btnLoad.addEventListener('click', () => {
     statusText.textContent = 'Power on first';
     return;
   }
-  const data = localStorage.getItem(RAM_STORAGE_KEY);
-  if (!data) {
+  if (restoreRAM()) {
+    statusText.textContent = 'RAM loaded';
+  } else {
     statusText.textContent = 'No saved RAM found';
-    return;
   }
-  const binary = atob(data);
-  for (let i = 0; i < binary.length; i++) {
-    hx20.mainRAM[i] = binary.charCodeAt(i);
-  }
-  statusText.textContent = 'RAM loaded';
 });
 
 // Speed control
@@ -177,23 +200,28 @@ btnPower.addEventListener('click', () => {
       return;
     }
     powered = true;
-    hx20.reset();
+    // Warm boot if saved RAM exists (emulates battery-backed RAM)
+    const warm = restoreRAM();
+    hx20.reset(!warm);
     hx20.start();
-    statusText.textContent = 'Running';
+    startAutoSave();
+    statusText.textContent = warm ? 'Running (RAM restored)' : 'Running';
     btnPower.classList.add('active');
   } else {
     powered = false;
+    stopAutoSave();
+    saveRAM();
     hx20.stop();
-    statusText.textContent = 'Power Off';
+    statusText.textContent = 'Power Off (RAM saved)';
     btnPower.classList.remove('active');
   }
 });
 
-// Reset button
+// Reset button (warm reset — preserves RAM like real hardware)
 btnReset.addEventListener('click', () => {
   if (powered) {
     hx20.stop();
-    hx20.reset();
+    hx20.reset(false);
     hx20.start();
     statusText.textContent = 'Reset - Running';
   }
