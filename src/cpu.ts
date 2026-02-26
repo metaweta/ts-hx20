@@ -44,6 +44,14 @@ export class HD6301 {
   private sciRecvBuf: number[] = [];
   private rdrfClearStep = 0;
 
+  // SCI TX timing: TDRE stays clear for sciTxTimer cycles after TDR write,
+  // modeling the real ~160-cycle transmission time at 38400 baud.
+  // The byte is delivered to the receiver only when the timer expires.
+  private sciTxTimer = 0;
+  private sciTxPending = false;
+  private sciTxByte = 0;
+  sciTxWritePC = 0;  // PC when TDR was written (for debug logging)
+
   // Internal RAM (128 bytes at 0x80-0xFF)
   private ram = new Uint8Array(128);
 
@@ -67,9 +75,23 @@ export class HD6301 {
   // SCI callback: called when CPU writes to TDR (sends a byte)
   onSerialSend: (data: number) => void = () => {};
 
-  // Queue incoming serial data (will be loaded into RDR when RDRF is clear)
+  // Debug callback: called when RDR is read (for tracing receive side)
+  onSerialRead: (data: number, pc: number) => void = () => {};
+
+  // Output compare callback: called when P21 changes due to OLVL/OCR match
+  onOCOutput: (level: boolean) => void = () => {};
+
+  // Receive a serial byte (models real SCI shift register + RDR double buffering)
+  // Real SCI has: shift register (1 byte receiving) + RDR (1 byte ready to read)
+  // sciRecvBuf models the shift register (max 1 byte).
+  // Overrun occurs when shift register already has a pending byte.
   serialRecv(data: number): void {
-    this.sciRecvBuf.push(data & 0xFF);
+    if (this.sciRecvBuf.length > 0) {
+      // Shift register already full — overrun, new byte lost
+      this.trcsr |= 0x40; // Set ORFE (bit 6)
+    } else {
+      this.sciRecvBuf.push(data & 0xFF);
+    }
   }
 
   constructor(public name: string = 'CPU') {}
@@ -85,6 +107,9 @@ export class HD6301 {
     this.rmcr = 0;
     this.sciRecvBuf = [];
     this.rdrfClearStep = 0;
+    this.sciTxTimer = 0;
+    this.sciTxPending = false;
+    this.sciTxByte = 0;
     this.p1ddr = 0; this.p2ddr = 0;
     this.p3ddr = 0; this.p4ddr = 0;
     this.p1out = 0; this.p2out = 0;
@@ -148,9 +173,11 @@ export class HD6301 {
         return this.trcsr;
       case 0x12:
         // RDRF two-step clearing: step 2 - read RDR after reading TRCSR with RDRF
+        // Clears both RDRF (bit 7) and ORFE (bit 6) per HD6301 handbook
         if (this.rdrfClearStep === 1) {
-          this.trcsr &= ~0x80; // Clear RDRF
+          this.trcsr &= ~0xC0; // Clear RDRF and ORFE
           this.rdrfClearStep = 0;
+          this.onSerialRead(this.rdr, this.PC);
         }
         return this.rdr;
       case 0x13: return this.tdr;
@@ -182,8 +209,11 @@ export class HD6301 {
       case 0x11: this.trcsr = (this.trcsr & 0xE0) | (val & 0x1F); break;
       case 0x13:
         this.tdr = val;
-        this.trcsr |= 0x20; // TDRE - instant transmit
-        this.onSerialSend(val);
+        this.trcsr &= ~0x20; // Clear TDRE (transmitting)
+        this.sciTxTimer = 160; // ~160 cycles per byte at 38400 baud (E/16)
+        this.sciTxPending = true;
+        this.sciTxByte = val;  // Byte delivered when timer expires (models real TX time)
+        this.sciTxWritePC = this.PC;
         break;
       case 0x14: this.ramcr = val; break;
     }
@@ -595,6 +625,13 @@ export class HD6301 {
         (this.frc < oldFrc && this.ocr >= oldFrc) ||
         (this.frc < oldFrc && this.ocr <= this.frc)) {
       this.tcsr |= 0x40; // OCF
+      // Drive P21 to OLVL level (output compare output)
+      const olvl = this.tcsr & 0x01;
+      const oldP21 = this.p2out & 0x02;
+      if (olvl) this.p2out |= 0x02; else this.p2out &= ~0x02;
+      if ((olvl ? 0x02 : 0) !== oldP21) {
+        this.onOCOutput(!!olvl);
+      }
     }
   }
 
@@ -615,11 +652,17 @@ export class HD6301 {
 
     // Check interrupts
     const irqCycles = this.checkInterrupts();
-    if (irqCycles) { this.updateTimer(irqCycles); this.totalCycles += irqCycles; return irqCycles; }
+    if (irqCycles) {
+      this.updateTimer(irqCycles);
+      this.totalCycles += irqCycles;
+      this.advanceSciTx(irqCycles);
+      return irqCycles;
+    }
 
     if (this.halted || this.sleeping) {
       this.updateTimer(1);
       this.totalCycles += 1;
+      this.advanceSciTx(1);
       return 1;
     }
 
@@ -1035,7 +1078,24 @@ export class HD6301 {
 
     this.updateTimer(cycles);
     this.totalCycles += cycles;
+
+    this.advanceSciTx(cycles);
     return cycles;
+  }
+
+  /** Advance the SCI TX timer by N cycles; delivers byte and sets TDRE when done */
+  private advanceSciTx(cycles: number): void {
+    if (this.sciTxTimer > 0) {
+      this.sciTxTimer -= cycles;
+      if (this.sciTxTimer <= 0) {
+        this.sciTxTimer = 0;
+        this.trcsr |= 0x20; // TDRE set — ready for next byte
+        if (this.sciTxPending) {
+          this.sciTxPending = false;
+          this.onSerialSend(this.sciTxByte);
+        }
+      }
+    }
   }
 
   // --- Debug ---
@@ -1055,6 +1115,9 @@ export class HD6301 {
       rdr: this.rdr, tdr: this.tdr, ramcr: this.ramcr, tcsrRead: this.tcsrRead,
       sciRecvBuf: this.sciRecvBuf.slice(),
       rdrfClearStep: this.rdrfClearStep,
+      sciTxTimer: this.sciTxTimer,
+      sciTxPending: this.sciTxPending,
+      sciTxByte: this.sciTxByte,
       ram: btoa(String.fromCharCode(...this.ram)),
     };
   }
@@ -1080,6 +1143,9 @@ export class HD6301 {
     this.ramcr = s.ramcr as number; this.tcsrRead = s.tcsrRead as boolean;
     this.sciRecvBuf = (s.sciRecvBuf as number[]).slice();
     this.rdrfClearStep = s.rdrfClearStep as number;
+    this.sciTxTimer = (s.sciTxTimer as number) || 0;
+    this.sciTxPending = (s.sciTxPending as boolean) || false;
+    this.sciTxByte = (s.sciTxByte as number) || 0;
     const ramStr = atob(s.ram as string);
     for (let i = 0; i < ramStr.length; i++) this.ram[i] = ramStr.charCodeAt(i);
   }

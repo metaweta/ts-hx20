@@ -1,24 +1,27 @@
 // Virtual microcassette drive for HX-20
-// Records/plays FSK signal at the Port 3 bit level
+// Records/plays FSK signal at the bit level
 //
-// P30: motor remote (LOW = on)
-// P32: read data input (tape → slave CPU)
-// P33: write data output (slave CPU → tape)
+// SAVE direction:
+//   Slave CPU outputs FSK via output compare (OLVL → P21)
+//   We record P21 transitions as interleaved [cycle, level, ...] arrays
 //
-// During SAVE: slave CPU outputs FSK on P33 — we record transitions
-// During LOAD: we replay stored transitions on P32 — slave CPU reads them
-// Tape data is stored as interleaved [cycle, level, cycle, level, ...] arrays
+// LOAD direction:
+//   We replay stored transitions on P32 — slave CPU reads them
+//
+// Motor control:
+//   Internal microcassette: P42 (microcassette power) from Port 4
+//   External cassette: P30 (motor remote) from Port 3
 
 export class Cassette {
   // Signal state
   motorOn = false;
   readLevel = true;   // P32 input, default HIGH (idle)
 
-  // Recording state (captures P33 transitions during SAVE)
+  // Recording state (captures P21 output compare transitions during SAVE)
   private recording = false;
   private recCycles = 0;
   private recData: number[] = [];  // interleaved [cycle, level, ...]
-  private lastP33 = true;
+  private lastOCLevel = false;
 
   // Playback state (generates P32 from stored data during LOAD)
   private playing = false;
@@ -58,15 +61,21 @@ export class Cassette {
     }
   }
 
-  /** Called when slave CPU writes P33 (FSK output to tape) */
-  setWriteData(level: boolean): void {
+  /** Called when P21 changes due to output compare (OLVL → P21) during SAVE */
+  setOCOutput(level: boolean): void {
     if (!this.recording) return;
-    if (level === this.lastP33) return;
+    if (level === this.lastOCLevel) return;
     this.recData.push(this.recCycles, level ? 1 : 0);
-    this.lastP33 = level;
+    this.lastOCLevel = level;
   }
 
-  /** Motor control — called when slave CPU drives P30 */
+  /** Called when slave CPU writes P33 (FSK output to tape) — legacy path */
+  setWriteData(level: boolean): void {
+    // P33 is used for external cassette; internal uses P21 via output compare
+    // Keep as fallback but primary recording is via setOCOutput
+  }
+
+  /** Motor control — called when slave CPU drives P30 or P42 */
   setMotor(on: boolean): void {
     if (on === this.motorOn) return;
     this.motorOn = on;
@@ -76,7 +85,7 @@ export class Cassette {
       this.recording = true;
       this.recCycles = 0;
       this.recData = [];
-      this.lastP33 = true;
+      this.lastOCLevel = false;
 
       if (this.currentTape && this.library.has(this.currentTape)) {
         // Tape loaded → start playback on P32
@@ -92,10 +101,16 @@ export class Cassette {
     } else {
       // Motor stopping — save recording if meaningful data was captured
       if (this.recording && this.recData.length > 20) {
-        this.tapeCounter++;
-        const name = `tape-${this.tapeCounter}`;
-        this.library.set(name, this.recData);
-        this.currentTape = name;  // auto-load for subsequent LOAD
+        if (this.currentTape) {
+          // Overwrite current tape with new recording
+          this.library.set(this.currentTape, this.recData);
+        } else {
+          // No tape inserted — auto-create one
+          this.tapeCounter++;
+          const name = `tape-${this.tapeCounter}`;
+          this.library.set(name, this.recData);
+          this.currentTape = name;
+        }
         this.saveToStorage();
         this.onLibraryChange();
       }
@@ -107,6 +122,17 @@ export class Cassette {
   }
 
   // --- Tape library API ---
+
+  /** Insert a blank tape for recording (SAVE) */
+  insertBlank(): string {
+    this.tapeCounter++;
+    const name = `tape-${this.tapeCounter}`;
+    this.library.set(name, []);
+    this.currentTape = name;
+    this.saveToStorage();
+    this.onLibraryChange();
+    return name;
+  }
 
   insertTape(name: string): void {
     if (this.library.has(name)) {

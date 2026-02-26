@@ -35,6 +35,17 @@ export class HX20 {
   private ksc = 0;           // keyboard scan column
   private rtcIrq = false;
 
+  // Cassette controller state (emulates the cassette mechanism controller IC)
+  // The slave CPU bit-bangs commands via P43 (data) and P44 (clock)
+  // The controller responds on P46 (LOW = acknowledged)
+  private casCtrlP46 = true;       // P46 status: HIGH=idle, LOW=acknowledged
+  private casCtrlTimer = 0;        // Slave cycles until P46 returns to HIGH
+  private casCtrlBitCount = 0;     // Bit counter for bit-bang receive
+  private casCtrlData = 0;         // Accumulated command byte
+  private casCtrlLastP44 = false;  // P44 state for rising-edge detection
+  private casCtrlArmed = false;    // true after AIM #$E3 clears P42/P43/P44 (bit-bang start)
+  private casCtrlMotorOn = false;  // Motor running (after 0x81 record command)
+
   // Running state
   running = false;
   private animFrameId = 0;
@@ -189,15 +200,21 @@ export class HX20 {
 
     // Port 2
     cpu.onReadPort2 = (): number => {
-      let val = 0xE0; // mode pins
-      // Bit 3: reads slaveTx (our own TX, for loopback check)
-      val |= (this.slaveRx ? 0 : 0) | 0x08; // Simplified: always high
+      let val = 0xE0; // mode pins (P25-P27)
+      val |= 0x08; // Bit 3: SCI RX line (high idle)
+      val |= 0x01; // Bit 0: cassette mechanism ready (checked by ROM before cassette ops)
       return val;
     };
 
     cpu.onWritePort2 = (val: number): void => {
       // Bit 4: RX line to main CPU
       this.slaveTx = (val >> 4) & 1;
+    };
+
+    // Output compare output: P21 driven by OLVL when OCR matches FRC
+    // This is the FSK waveform for cassette recording
+    cpu.onOCOutput = (level: boolean): void => {
+      this.cassette.setOCOutput(level);
     };
 
     // Port 3: cassette I/O + slave flag
@@ -209,30 +226,123 @@ export class HX20 {
     };
 
     cpu.onWritePort3 = (val: number): void => {
-      // P30 (bit 0): motor remote (LOW = on)
-      this.cassette.setMotor(!(val & 0x01));
-      // P33 (bit 3): cassette write data output
-      this.cassette.setWriteData(!!(val & 0x08));
+      // P30 (bit 0): motor remote — for external cassette (CAS1:), not used for internal
+      // P33 (bit 3): cassette write data — external cassette FSK output
+      // Internal microcassette uses P21 (output compare) for FSK and P42 for motor
       // P34 (bit 4): slave flag → master P12
       this.slaveFlag = (val >> 4) & 1;
     };
 
     // Port 4: cassette power/command, RS-232 select
     cpu.onReadPort4 = (): number => {
-      return 0x7F; // bit 7 (CD) high = no carrier
+      // P40 (bit 0): tape running indicator (1 = motor on and tape moving)
+      // P46 (bit 6): cassette controller status (LOW = command acknowledged)
+      // P47 (bit 7): CD (carrier detect) — HIGH = no carrier
+      let val = 0x80; // P47 high (no carrier)
+      if (this.casCtrlMotorOn) val |= 0x01;   // P40: tape running
+      if (this.casCtrlP46) val |= 0x40;        // P46: HIGH = idle
+      return val;
     };
-    cpu.onWritePort4 = (_val: number): void => {
-      // P42: microcassette power
-      // P43: microcassette command
-      // P45: cassette/RS-232 select
+    cpu.onWritePort4 = (val: number): void => {
+      // P42 (bit 2): microcassette power
+      // P43 (bit 3): cassette controller data (bit-bang serial)
+      // P44 (bit 4): cassette controller clock (bit-bang serial)
+      // P45 (bit 5): cassette/RS-232 select
+      const p44 = !!(val & 0x10);
+
+      // The bit-bang routine (FBFA) starts each iteration with AIM #$E3, $07
+      // which clears P42, P43, P44 simultaneously. Detect this pattern to
+      // distinguish real bit-bang clocks from other P44 writes (e.g. OIM #$30).
+      if ((val & 0x1C) === 0) {
+        // P42/P43/P44 all low — this is the AIM #$E3 pattern
+        this.casCtrlArmed = true;
+      }
+
+      // Only count P44 rising edges that follow the AIM #$E3 clear pattern
+      if (p44 && !this.casCtrlLastP44 && this.casCtrlArmed) {
+        this.casCtrlArmed = false;
+        const dataBit = (val >> 3) & 1;
+        this.casCtrlData = (this.casCtrlData << 1) | dataBit;
+        this.casCtrlBitCount++;
+
+        if (this.sciDebug) {
+          console.log(`[CAS] P44↑ bit${this.casCtrlBitCount}: d=${dataBit} acc=0x${(this.casCtrlData & 0xFF).toString(16)} sPC=${this.slaveCPU.PC.toString(16)}`);
+        }
+
+        if (this.casCtrlBitCount >= 8) {
+          // Complete command byte received
+          const cmd = this.casCtrlData & 0xFF;
+          if (this.sciDebug) {
+            console.log(`[CAS] Controller cmd: 0x${cmd.toString(16).padStart(2,'0')} sPC=${this.slaveCPU.PC.toString(16)}`);
+          }
+          this.processCasCtrlCommand(cmd);
+          this.casCtrlBitCount = 0;
+          this.casCtrlData = 0;
+        }
+      }
+      this.casCtrlLastP44 = p44;
     };
   }
+
+  /** Process a complete command byte received by the cassette controller IC */
+  private processCasCtrlCommand(cmd: number): void {
+    // Pull P46 LOW to acknowledge receipt
+    this.casCtrlP46 = false;
+
+    // Timer: how long P46 stays LOW before returning to HIGH (idle).
+    // The ROM's retry loop checks P46 every ~614 cycles (1ms OCF) and needs
+    // 4 consecutive matches. Use 5000 cycles (~8ms) so the first check succeeds,
+    // and the retry mechanism handles edge cases.
+    this.casCtrlTimer = 5000;
+
+    switch (cmd) {
+      case 0x00: // Stop
+      case 0x18: // Stop (alternate)
+        if (this.casCtrlMotorOn) {
+          this.casCtrlMotorOn = false;
+          this.cassette.setMotor(false);
+        }
+        break;
+      case 0x81: // Record
+        this.casCtrlMotorOn = true;
+        this.cassette.setMotor(true);
+        break;
+      case 0x82: // Play (for LOAD)
+        this.casCtrlMotorOn = true;
+        this.cassette.setMotor(true);
+        break;
+      case 0x84: // Fast forward
+      case 0x88: // Rewind
+        this.casCtrlMotorOn = true;
+        break;
+      default:
+        // Unknown command — still acknowledge
+        break;
+    }
+  }
+
+  /** Advance cassette controller timer (called each slave CPU step) */
+  advanceCasCtrlTimer(cycles: number): void {
+    if (this.casCtrlTimer > 0) {
+      this.casCtrlTimer -= cycles;
+      if (this.casCtrlTimer <= 0) {
+        this.casCtrlTimer = 0;
+        this.casCtrlP46 = true; // Return P46 to HIGH (idle)
+      }
+    }
+  }
+
+  // Debug: set to true to log SCI traffic
+  sciDebug = false;
 
   private wireSerial(): void {
     // CPU-to-CPU SCI routing: main ↔ slave via SCI TDR/RDR
     // Gated by slaveSio (main Port 2 bit 2): 1 = route to slave, 0 = SIO bus
 
     this.mainCPU.onSerialSend = (data: number) => {
+      if (this.sciDebug) {
+        console.log(`[SCI] M→S: 0x${data.toString(16).padStart(2,'0')} sio=${this.slaveSio} mPC=${this.mainCPU.PC.toString(16)} writePC=${this.mainCPU.sciTxWritePC.toString(16)}`);
+      }
       if (this.slaveSio) {
         // Main CPU TX → Slave CPU RX
         this.slaveCPU.serialRecv(data);
@@ -241,8 +351,18 @@ export class HX20 {
     };
 
     this.slaveCPU.onSerialSend = (data: number) => {
+      if (this.sciDebug) {
+        console.log(`[SCI] S→M: 0x${data.toString(16).padStart(2,'0')} sPC=${this.slaveCPU.PC.toString(16)} writePC=${this.slaveCPU.sciTxWritePC.toString(16)}`);
+      }
       // Slave CPU TX → Main CPU RX (always)
       this.mainCPU.serialRecv(data);
+    };
+
+    // Debug: log when master reads RDR (clears RDRF)
+    this.mainCPU.onSerialRead = (data: number, pc: number) => {
+      if (this.sciDebug) {
+        console.log(`[SCI] M←RDR: 0x${data.toString(16).padStart(2,'0')} mPC=${pc.toString(16)}`);
+      }
     };
   }
 
@@ -304,6 +424,15 @@ export class HX20 {
     this.ksc = 0;
     this.rtcIrq = false;
 
+    // Reset cassette controller state
+    this.casCtrlP46 = true;
+    this.casCtrlTimer = 0;
+    this.casCtrlBitCount = 0;
+    this.casCtrlData = 0;
+    this.casCtrlLastP44 = false;
+    this.casCtrlArmed = false;
+    this.casCtrlMotorOn = false;
+
     this.lcd.reset();
     this.keyboard.reset();
     this.rtc.reset();
@@ -336,6 +465,7 @@ export class HX20 {
           const sc = this.slaveCPU.step();
           slaveCycles += sc;
           this.cassette.advance(sc);
+          this.advanceCasCtrlTimer(sc);
         }
       }
     }
@@ -378,6 +508,7 @@ export class HX20 {
     if (this.slaveROM) {
       const sc = this.slaveCPU.step();
       this.cassette.advance(sc);
+      this.advanceCasCtrlTimer(sc);
     }
     this.lcd.render();
     this.onRegistersUpdate(this.mainCPU.dumpRegisters());

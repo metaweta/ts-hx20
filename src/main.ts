@@ -34,6 +34,7 @@ const cassettePanel = document.getElementById('cassette-panel')!;
 const cassetteMotor = document.getElementById('cassette-motor')!;
 const cassetteCurrent = document.getElementById('cassette-current')!;
 const tapeListEl = document.getElementById('tape-list')!;
+const btnTapeNew = document.getElementById('btn-tape-new')!;
 const btnTapeEject = document.getElementById('btn-tape-eject')!;
 const btnTapeImport = document.getElementById('btn-tape-import')!;
 const tapeFileInput = document.getElementById('tape-file-input') as HTMLInputElement;
@@ -230,6 +231,12 @@ hx20.cassette.onMotorChange = (on: boolean) => {
   cassetteMotor.textContent = on ? '[MOTOR]' : '';
 };
 
+btnTapeNew.addEventListener('click', () => {
+  const name = hx20.cassette.insertBlank();
+  updateTapeList();
+  statusText.textContent = `Blank tape: ${name}`;
+});
+
 btnTapeEject.addEventListener('click', () => {
   hx20.cassette.ejectTape();
   updateTapeList();
@@ -253,6 +260,9 @@ tapeFileInput.addEventListener('change', async () => {
 
 // Initialize tape list
 updateTapeList();
+
+// Debug: expose hx20 for console access
+(window as any).hx20 = hx20;
 
 // Power button — always cold boots (fresh start)
 btnPower.addEventListener('click', () => {
