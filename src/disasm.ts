@@ -134,6 +134,7 @@ const OPS: Record<number, OpInfo> = {
   0x84: { name: 'ANDA', mode: 'IMM8' },
   0x85: { name: 'BITA', mode: 'IMM8' },
   0x86: { name: 'LDAA', mode: 'IMM8' },
+  0x87: { name: 'STAA', mode: 'IMM8' },  // undocumented store-immediate
   0x88: { name: 'EORA', mode: 'IMM8' },
   0x89: { name: 'ADCA', mode: 'IMM8' },
   0x8A: { name: 'ORAA', mode: 'IMM8' },
@@ -141,6 +142,7 @@ const OPS: Record<number, OpInfo> = {
   0x8C: { name: 'CPX',  mode: 'IMM16' },
   0x8D: { name: 'BSR',  mode: 'REL' },
   0x8E: { name: 'LDS',  mode: 'IMM16' },
+  0x8F: { name: 'STS',  mode: 'IMM16' },  // undocumented store-immediate
   // 0x9_ Direct A / 16-bit
   0x90: { name: 'SUBA', mode: 'DIR' },
   0x91: { name: 'CMPA', mode: 'DIR' },
@@ -200,12 +202,15 @@ const OPS: Record<number, OpInfo> = {
   0xC4: { name: 'ANDB', mode: 'IMM8' },
   0xC5: { name: 'BITB', mode: 'IMM8' },
   0xC6: { name: 'LDAB', mode: 'IMM8' },
+  0xC7: { name: 'STAB', mode: 'IMM8' },  // undocumented store-immediate
   0xC8: { name: 'EORB', mode: 'IMM8' },
   0xC9: { name: 'ADCB', mode: 'IMM8' },
   0xCA: { name: 'ORAB', mode: 'IMM8' },
   0xCB: { name: 'ADDB', mode: 'IMM8' },
   0xCC: { name: 'LDD',  mode: 'IMM16' },
+  0xCD: { name: 'STD',  mode: 'IMM16' },  // undocumented store-immediate
   0xCE: { name: 'LDX',  mode: 'IMM16' },
+  0xCF: { name: 'STX',  mode: 'IMM16' },  // undocumented store-immediate
   // 0xD_ Direct B / 16-bit
   0xD0: { name: 'SUBB', mode: 'DIR' },
   0xD1: { name: 'CMPB', mode: 'DIR' },

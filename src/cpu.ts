@@ -89,12 +89,21 @@ export class HD6301 {
     if (this.sciRecvBuf.length > 0) {
       // Shift register already full — overrun, new byte lost
       this.trcsr |= 0x40; // Set ORFE (bit 6)
+      console.warn(`${this.name}: SCI OVERRUN (ORFE) at PC=0x${this.PC.toString(16).padStart(4,'0')}, ` +
+        `lost byte=0x${(data & 0xFF).toString(16).padStart(2,'0')}, ` +
+        `pending=0x${this.sciRecvBuf[0].toString(16).padStart(2,'0')}`);
     } else {
       this.sciRecvBuf.push(data & 0xFF);
     }
   }
 
   constructor(public name: string = 'CPU') {}
+
+  /** Read internal RAM (0x80-0xFF) for diagnostics. Returns value at given address. */
+  readRAM = (addr: number): number => {
+    if (addr >= 0x80 && addr < 0x100) return this.ram[addr - 0x80];
+    return this.read(addr);
+  };
 
   reset(): void {
     this.CC = 0xD0; // I flag set, bits 6-7 set
@@ -931,6 +940,9 @@ export class HD6301 {
         cycles = 6; break;
       }
       case 0x8E: this.SP = this.opLD16(this.fetchWord()); cycles = 3; break;
+      // Undocumented: STAA/STS immediate — consume operand bytes, set flags, no write
+      case 0x87: { this.fetchByte(); this.opST8(this.A); cycles = 2; break; }
+      case 0x8F: { this.fetchWord(); this.opST16(this.SP); cycles = 2; break; }
 
       // --- Row 0x9_: Direct A + 16-bit ---
       case 0x90: this.A = this.opSUB(this.A, this.read(this.addrDir())); cycles = 3; break;
@@ -1015,6 +1027,10 @@ export class HD6301 {
       case 0xCB: this.B = this.opADD(this.B, this.fetchByte()); cycles = 2; break;
       case 0xCC: this.D = this.opLD16(this.fetchWord()); cycles = 3; break;
       case 0xCE: this.X = this.opLD16(this.fetchWord()); cycles = 3; break;
+      // Undocumented: STAB/STD/STX immediate — consume operand bytes, set flags, no write
+      case 0xC7: { this.fetchByte(); this.opST8(this.B); cycles = 2; break; }
+      case 0xCD: { this.fetchWord(); this.opST16(this.D); cycles = 2; break; }
+      case 0xCF: { this.fetchWord(); this.opST16(this.X); cycles = 2; break; }
 
       // --- Row 0xD_: Direct B + 16-bit ---
       case 0xD0: this.B = this.opSUB(this.B, this.read(this.addrDir())); cycles = 3; break;

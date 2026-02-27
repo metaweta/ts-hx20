@@ -134,6 +134,9 @@ export class LCDDisplay {
     this.imageData = this.ctx.createImageData(120, 32);
   }
 
+  // Callback: fired when SIO bus byte is dispatched to slave (sel=7 or sel=0)
+  onSIODispatch: (data: number) => void = () => {};
+
   // LCD I/O state
   private lcdCS = 0;        // control register (0x0026)
   private lcdData = 0;      // data latch (0x002A)
@@ -160,6 +163,9 @@ export class LCDDisplay {
         } else {
           ctrl.writeData(this.lcdData);
         }
+      } else if (sel === 7) {
+        // SIO bus: sel=7 routes to slave CPU
+        this.onSIODispatch(this.lcdData);
       }
     }
   }

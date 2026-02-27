@@ -45,6 +45,7 @@ export class HX20 {
   private casCtrlLastP44 = false;  // P44 state for rising-edge detection
   private casCtrlArmed = false;    // true after AIM #$E3 clears P42/P43/P44 (bit-bang start)
   private casCtrlMotorOn = false;  // Motor running (after 0x81 record command)
+  private extMotorOn = false;      // External cassette motor (P30, active low)
 
   // Running state
   running = false;
@@ -75,6 +76,7 @@ export class HX20 {
     this.wireSlaveCPU();
     this.wireRTC();
     this.wireSerial();
+    this.wireSIO();
   }
 
   private wireMainCPU(): void {
@@ -226,9 +228,20 @@ export class HX20 {
     };
 
     cpu.onWritePort3 = (val: number): void => {
-      // P30 (bit 0): motor remote — for external cassette (CAS1:), not used for internal
+      // P30 (bit 0): motor remote — for external cassette (CAS1:)
+      // LOW = motor on, HIGH = motor off (active low)
+      const motorOn = !(val & 0x01);
+      if (motorOn !== this.extMotorOn) {
+        this.extMotorOn = motorOn;
+        if (this.sciDebug) {
+          console.log(`[CAS] External motor P30: ${motorOn ? 'ON' : 'OFF'} sPC=${this.slaveCPU.PC.toString(16)}`);
+        }
+        this.cassette.setMotor(motorOn);
+      }
       // P33 (bit 3): cassette write data — external cassette FSK output
-      // Internal microcassette uses P21 (output compare) for FSK and P42 for motor
+      // CAS1: FSK encoding (F709) toggles P33 for the tape signal, timed by OCR
+      const p33 = !!(val & 0x08);
+      this.cassette.setWriteData(p33);
       // P34 (bit 4): slave flag → master P12
       this.slaveFlag = (val >> 4) & 1;
     };
@@ -239,7 +252,7 @@ export class HX20 {
       // P46 (bit 6): cassette controller status (LOW = command acknowledged)
       // P47 (bit 7): CD (carrier detect) — HIGH = no carrier
       let val = 0x80; // P47 high (no carrier)
-      if (this.casCtrlMotorOn) val |= 0x01;   // P40: tape running
+      if (this.casCtrlMotorOn || this.extMotorOn) val |= 0x01;   // P40: tape running (either motor)
       if (this.casCtrlP46) val |= 0x40;        // P46: HIGH = idle
       return val;
     };
@@ -341,7 +354,11 @@ export class HX20 {
 
     this.mainCPU.onSerialSend = (data: number) => {
       if (this.sciDebug) {
-        console.log(`[SCI] M→S: 0x${data.toString(16).padStart(2,'0')} sio=${this.slaveSio} mPC=${this.mainCPU.PC.toString(16)} writePC=${this.mainCPU.sciTxWritePC.toString(16)}`);
+        const phase = (this as any)._leaderStarted && !(this as any)._dataLoopLogged ? ' [DURING LEADER]' : '';
+        console.log(`[SCI] M→S: 0x${data.toString(16).padStart(2,'0')} sio=${this.slaveSio} mPC=${this.mainCPU.PC.toString(16)} writePC=${this.mainCPU.sciTxWritePC.toString(16)}${phase}`);
+        if (phase) {
+          (this as any)._leaderByteCount = ((this as any)._leaderByteCount || 0) + 1;
+        }
       }
       if (this.slaveSio) {
         // Main CPU TX → Slave CPU RX
@@ -363,6 +380,18 @@ export class HX20 {
       if (this.sciDebug) {
         console.log(`[SCI] M←RDR: 0x${data.toString(16).padStart(2,'0')} mPC=${pc.toString(16)}`);
       }
+    };
+  }
+
+  private wireSIO(): void {
+    // SIO bus: when the LCD clock counter completes 8 clocks with sel=7 or sel=0
+    // (no LCD controller selected), the byte is destined for the slave CPU.
+    // The real HX-20 routes SIO bus output to the slave's SCI RX.
+    this.lcd.onSIODispatch = (data: number) => {
+      if (this.sciDebug) {
+        console.log(`[SIO] M→S: 0x${data.toString(16).padStart(2,'0')} mPC=${this.mainCPU.PC.toString(16)}`);
+      }
+      this.slaveCPU.serialRecv(data);
     };
   }
 
@@ -432,6 +461,7 @@ export class HX20 {
     this.casCtrlLastP44 = false;
     this.casCtrlArmed = false;
     this.casCtrlMotorOn = false;
+    this.extMotorOn = false;
 
     this.lcd.reset();
     this.keyboard.reset();
@@ -457,11 +487,121 @@ export class HX20 {
     let slaveCycles = 0;
 
     while (mainCycles < targetCycles) {
+      // Master-side diagnostics (before step)
+      if (this.sciDebug) {
+        const mPC = this.mainCPU.PC;
+        if (mPC === 0xEE6A) {
+          // IRQ handler ACK mismatch check
+          const expected = this.mainCPU.A;
+          const rdr = this.mainCPU.readRAM(0x12);
+          console.log(`[MASTER] EE6A: IRQ ACK check expected=0x${expected.toString(16).padStart(2,'0')} got=0x${rdr.toString(16).padStart(2,'0')} ${expected !== rdr ? '*** MISMATCH ***' : 'OK'}`);
+        } else if (mPC === 0xEE7E) {
+          console.log(`[MASTER] EE7E: IRQ error flag SET (ACK mismatch)`);
+        } else if (mPC === 0xEE81) {
+          console.log(`[MASTER] EE81: IRQ block completion`);
+        } else if (mPC === 0xEF15) {
+          console.log(`[MASTER] EF15: Sending 0x7B (more blocks) via E403`);
+        } else if (mPC === 0xEF1A) {
+          console.log(`[MASTER] EF1A: Sending cleanup cmd=0x${this.mainCPU.A.toString(16).padStart(2,'0')} via E403`);
+        } else if (mPC === 0xE4F5) {
+          console.log(`[MASTER] E4F5: Enabling RIE (IRQ-driven data transfer starts)`);
+        }
+      }
       mainCycles += this.mainCPU.step();
 
       // Run slave CPU to keep in sync with main
       if (this.slaveROM) {
         while (slaveCycles < mainCycles) {
+          // Diagnostic breakpoints for SAVE debugging (only when sciDebug is on)
+          if (this.sciDebug) {
+            const sPC = this.slaveCPU.PC;
+            if (sPC === 0xFA5C) {
+              console.log('[SAVE] Slave entered FA5C (0x61 timing init handler)');
+            } else if (sPC === 0xFCE8) {
+              // Dump FSK timing values when SAVE handler starts
+              const ram = this.slaveCPU.readRAM;
+              console.log(`[SAVE] Slave entered FCE8 (SAVE handler). FSK timing: ` +
+                `$A6=${(ram(0xA6)<<8|ram(0xA7)).toString(16)} ` +
+                `$A8=${(ram(0xA8)<<8|ram(0xA9)).toString(16)} ` +
+                `$AA=${(ram(0xAA)<<8|ram(0xAB)).toString(16)}`);
+              (this as any)._saveStartCycles = this.slaveCPU.totalCycles;
+              (this as any)._fskLogged = false;
+              (this as any)._dataLoopLogged = false;
+              (this as any)._leaderStarted = false;
+              (this as any)._leaderByteCount = 0;
+            } else if (sPC === 0xFDC4) {
+              const elapsed = this.slaveCPU.totalCycles - ((this as any)._saveStartCycles || 0);
+              const seconds = elapsed / 614400;
+              const ss = this.slaveCPU.saveState();
+              console.log(`[SAVE] Slave at FDC4 — SAVE success! elapsed=${elapsed} cycles (${seconds.toFixed(2)}s)`);
+              console.log(`[SAVE] FRC=${(ss.frc as number).toString(16)} OCR=${(ss.ocr as number).toString(16)} TCSR=${(ss.tcsr as number).toString(16)}`);
+            } else if (sPC === 0xFD6C) {
+              // First entry to data receive loop — log byte count (X register)
+              if (!(this as any)._dataLoopLogged) {
+                (this as any)._dataLoopLogged = true;
+                (this as any)._dataLoopByteNum = 0;
+                const ss = this.slaveCPU.saveState();
+                const trcsr = ss.trcsr as number;
+                const recvBuf = ss.sciRecvBuf as number[];
+                console.log(`[SAVE] Data loop entry at FD6C: X=${this.slaveCPU.X} (0x${this.slaveCPU.X.toString(16)}) bytes to receive` +
+                  ` RDRF=${(trcsr & 0x80) ? 'SET' : 'clear'} RDR=0x${(ss.rdr as number).toString(16).padStart(2,'0')}` +
+                  ` sciRecvBuf=[${recvBuf.map((b: number) => '0x'+b.toString(16).padStart(2,'0')).join(',')}]` +
+                  ` cycles=${this.slaveCPU.totalCycles}`);
+              }
+            } else if (sPC === 0xFD85) {
+              // Byte received in data loop — log first 10 + any non-data
+              const byteNum = ((this as any)._dataLoopByteNum || 0);
+              (this as any)._dataLoopByteNum = byteNum + 1;
+              const ss = this.slaveCPU.saveState();
+              if (byteNum < 10 || byteNum >= (this.slaveCPU.X + byteNum - 3)) {
+                console.log(`[SAVE] FD85 byte #${byteNum}: RDR=0x${(ss.rdr as number).toString(16).padStart(2,'0')} X=${this.slaveCPU.X} cycles=${this.slaveCPU.totalCycles}`);
+              }
+            } else if (sPC === 0xFD90) {
+              // Post-data loop — slave exited the data loop
+              const byteNum = (this as any)._dataLoopByteNum || 0;
+              console.log(`[SAVE] Data loop exited at FD90: processed ${byteNum} bytes, cycles=${this.slaveCPU.totalCycles}`);
+            } else if (sPC === 0xFE00) {
+              // First entry to FSK inner loop — log FRC/OCR/OCF state
+              if (!(this as any)._fskLogged) {
+                (this as any)._fskLogged = true;
+                const ss = this.slaveCPU.saveState();
+                const tcsr = ss.tcsr as number;
+                console.log(`[FSK] First FE00 entry: FRC=${(ss.frc as number).toString(16)} ` +
+                  `OCR=${(ss.ocr as number).toString(16)} TCSR=${tcsr.toString(16)} ` +
+                  `OCF=${(tcsr & 0x40) ? 'SET' : 'clear'} ` +
+                  `totalCycles=${this.slaveCPU.totalCycles}`);
+              }
+            } else if (sPC === 0xFD2B && !(this as any)._leaderStarted) {
+              (this as any)._leaderStarted = true;
+              console.log(`[SAVE] Leader started at FD2B: cycles=${this.slaveCPU.totalCycles}`);
+            } else if (sPC === 0xF061) {
+              // Command dispatch: slave reads RDR at F061 (LDAA $12)
+              // At this point TRCSR was already read at F059 (RDRF check passed)
+              // The next instruction reads RDR, so let's peek at what's coming
+              const ss = this.slaveCPU.saveState();
+              const rdr = ss.rdr as number;
+              console.log(`[SLAVE] F061: Command dispatch, RDR=0x${rdr.toString(16).padStart(2,'0')} cycles=${this.slaveCPU.totalCycles}`);
+            } else if (sPC === 0xFD0C) {
+              // After first F10A: STD $84 — log the byte count parameters
+              console.log(`[SAVE] FD0C: F10A#1 result: A=0x${this.slaveCPU.A.toString(16).padStart(2,'0')} B=0x${this.slaveCPU.B.toString(16).padStart(2,'0')} → $84/$85`);
+            } else if (sPC === 0xFD13) {
+              // After second F10A: STD $b8 — this is the DATA BYTE COUNT
+              const count = (this.slaveCPU.A << 8) | this.slaveCPU.B;
+              console.log(`[SAVE] FD13: F10A#2 result: A=0x${this.slaveCPU.A.toString(16).padStart(2,'0')} B=0x${this.slaveCPU.B.toString(16).padStart(2,'0')} → $b8/$b9 = byte count ${count} (0x${count.toString(16)})`);
+            } else if (sPC === 0xFDD2) {
+              // Data loop exit via P40=LOW (motor stopped)
+              const byteNum = (this as any)._dataLoopByteNum || 0;
+              console.log(`[SAVE] FDD2: Data loop exit via P40=LOW after ${byteNum} bytes, mode=$81=${this.slaveCPU.readRAM(0x81)}`);
+            } else if (sPC === 0xFD7C) {
+              console.log(`[SAVE] FD7C: Error path (ORFE during trailer OR abort)`);
+            } else if (sPC === 0xF09D) {
+              console.log(`[SAVE] Slave entered F09D (ERROR exit — sends 0x02)`);
+            } else if (sPC === 0xFDC6) {
+              console.log(`[SAVE] Slave entered FDC6 (OCF timeout — sends 0x6F)`);
+            } else if (sPC === 0xFDE1) {
+              console.log(`[SAVE] Slave at FDE1 — cleanup path`);
+            }
+          }
           const sc = this.slaveCPU.step();
           slaveCycles += sc;
           this.cassette.advance(sc);

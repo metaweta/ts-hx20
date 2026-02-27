@@ -101,10 +101,45 @@ for (const [addr, name] of vectors) {
   console.log(`  ${name}: $${vec.toString(16).toUpperCase().padStart(4, '0')}`);
 }
 
-// Check the hex20 reference for command table structure
-// Look for the master ROM's SAVE handler too
-console.log('\n=== Key FSK timing values ===');
-// Check what's at RAM addresses $9D, $9F, $A6, $A8, $AA used by FSK loops
-// These are set up during init. Let's check what the F6F0 area uses.
-console.log('FSK loop uses: $A6 (1KHz half), $A8 (low period?), $AA (2KHz half)');
-console.log('F709 routine uses: $9D, $9F for period values');
+// Group 7 dispatch table (raw bytes for sub-command addresses)
+hexDump(0xFA39, 48, 'FA39 - Group 7 sub-command table (raw)');
+
+// Group 4 dispatch (for 0x48 command)
+hexDump(0xF8C9, 48, 'F8C9 - Group 4 dispatch table');
+disasmRange(0xF8C9, 0xF920, 'F8C9 - Group 4 handlers');
+
+// Slave init (reset vector → F000)
+disasmRange(0xF000, 0xF040, 'F000 - Slave init');
+
+// Look for FSK timing init — search for writes to $A6, $A8, $AA
+// These are typically set by a subroutine called during cassette setup
+disasmRange(0xF700, 0xF780, 'F700 - FSK timing setup (candidate)');
+disasmRange(0xFCA0, 0xFCE8, 'FCA0 - Pre-SAVE setup (candidate)');
+
+// F4AC - called from FDC6 error path
+disasmRange(0xF4A0, 0xF4C0, 'F4A0 - Error handler (called at FDC6)');
+
+// F09D - SCI error exit
+disasmRange(0xF09D, 0xF0AA, 'F09D - SCI error/overrun exit');
+
+// F00C - reinit jump target
+disasmRange(0xF00C, 0xF040, 'F00C - Reinit after error');
+
+// FC17 - wait subroutine used by cassette controller
+disasmRange(0xFC17, 0xFC2D, 'FC17 - Wait subroutine');
+
+// Search ROM for writes to $A6, $A8, $AA (FSK timing constants)
+console.log('\n=== Searching for FSK timing constant writes ===');
+for (let addr = 0xF000; addr < 0xFFF0; addr++) {
+  const b0 = rom[addr - BASE];
+  const b1 = rom[addr - BASE + 1];
+  // Look for STAA/STAB/STD to $A6, $A8, $AA (direct addressing)
+  if ((b0 === 0x97 || b0 === 0xD7 || b0 === 0xDD) &&
+      (b1 === 0xA6 || b1 === 0xA7 || b1 === 0xA8 || b1 === 0xA9 || b1 === 0xAA || b1 === 0xAB)) {
+    const mnemonic = b0 === 0x97 ? 'STAA' : b0 === 0xD7 ? 'STAB' : 'STD';
+    console.log(`  ${addr.toString(16)}: ${mnemonic} $${b1.toString(16)} — context:`);
+    // Show surrounding code
+    const lines = disassemble(read, addr - 4, 5);
+    for (const l of lines) console.log('    ' + formatDisasmLine(l));
+  }
+}

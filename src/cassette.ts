@@ -1,16 +1,17 @@
-// Virtual microcassette drive for HX-20
+// Virtual cassette drive for HX-20
 // Records/plays FSK signal at the bit level
 //
 // SAVE direction:
-//   Slave CPU outputs FSK via output compare (OLVL → P21)
-//   We record P21 transitions as interleaved [cycle, level, ...] arrays
+//   CAS0: (internal) — FSK via output compare (OLVL → P21), recorded by setOCOutput()
+//   CAS1: (external) — FSK via Port 3 bit 3 (P33), recorded by setWriteData()
+//   Both record transitions as interleaved [cycle, level, ...] arrays
 //
 // LOAD direction:
 //   We replay stored transitions on P32 — slave CPU reads them
 //
 // Motor control:
-//   Internal microcassette: P42 (microcassette power) from Port 4
-//   External cassette: P30 (motor remote) from Port 3
+//   Internal microcassette: P42 (cassette controller bit-bang) from Port 4
+//   External cassette: P30 (motor remote, active low) from Port 3
 
 export class Cassette {
   // Signal state
@@ -69,10 +70,12 @@ export class Cassette {
     this.lastOCLevel = level;
   }
 
-  /** Called when slave CPU writes P33 (FSK output to tape) — legacy path */
+  /** Called when slave CPU writes P33 (FSK output to tape) — CAS1: external cassette */
   setWriteData(level: boolean): void {
-    // P33 is used for external cassette; internal uses P21 via output compare
-    // Keep as fallback but primary recording is via setOCOutput
+    if (!this.recording) return;
+    if (level === this.lastOCLevel) return;
+    this.recData.push(this.recCycles, level ? 1 : 0);
+    this.lastOCLevel = level;
   }
 
   /** Motor control — called when slave CPU drives P30 or P42 */
@@ -83,18 +86,31 @@ export class Cassette {
     if (on) {
       // Motor starting — begin recording and optionally playback
       this.recording = true;
-      this.recCycles = 0;
-      this.recData = [];
-      this.lastOCLevel = false;
 
       if (this.currentTape && this.library.has(this.currentTape)) {
-        // Tape loaded → start playback on P32
+        // Continue recording onto existing tape (multi-segment: motor may stop
+        // between blocks, each block has its own leader for re-sync)
+        const existing = this.library.get(this.currentTape)!;
+        if (existing.length > 0) {
+          this.recData = [...existing];
+          this.recCycles = existing[existing.length - 2] + 1;
+          this.lastOCLevel = existing[existing.length - 1] !== 0;
+        } else {
+          this.recData = [];
+          this.recCycles = 0;
+          this.lastOCLevel = false;
+        }
+        // Also start playback on P32 (for LOAD)
         this.playing = true;
-        this.playData = this.library.get(this.currentTape)!;
+        this.playData = existing;
         this.playIdx = 0;
         this.playCycles = 0;
         this.readLevel = true;
       } else {
+        // Fresh recording (no tape inserted yet)
+        this.recData = [];
+        this.recCycles = 0;
+        this.lastOCLevel = false;
         this.playing = false;
         this.readLevel = true;
       }
