@@ -1,0 +1,714 @@
+* f9dasm info file for HX-20 main ROM (HD6303R, 32KB)
+* rom3=8000, rom2=A000, rom1=C000, rom0=E000
+
+* ============================================================
+* HD6303R Internal I/O Registers (00-1F)
+* ============================================================
+label 00 P1DDR
+label 01 P2DDR
+label 02 PORT1
+label 03 PORT2
+label 04 P3DDR
+label 05 P4DDR
+label 06 PORT3
+label 07 PORT4
+label 08 TCSR
+label 09 FRC_H
+label 0A FRC_L
+label 0B OCR_H
+label 0C OCR_L
+label 0D ICR_H
+label 0E ICR_L
+label 0F P3CSR
+label 10 RMCR
+label 11 TRCSR
+label 12 RDR
+label 13 TDR
+label 14 RAMCR
+
+* ============================================================
+* HX-20 External I/O (20-7F)
+* ============================================================
+label 20 KSC
+label 22 KRTN07
+label 24 KRTN_AUX
+label 26 LCDCTL
+label 28 KRTN89
+label 2A LCDDATA
+label 2B LCD_CLK
+label 2C INTMASK
+label 30 BANK0
+label 31 BANK1
+label 32 BANK2
+label 33 BANK3
+
+* ============================================================
+* RTC Registers (MC146818 at $40-$4D)
+* ============================================================
+label 40 rtc_seconds
+label 41 rtc_sec_alarm
+label 42 rtc_minutes
+label 43 rtc_min_alarm
+label 44 rtc_hours
+label 45 rtc_hr_alarm
+label 46 rtc_day_of_week
+label 47 rtc_date
+label 48 rtc_month
+label 49 rtc_year
+label 4A rtc_reg_a
+label 4B rtc_reg_b
+label 4C rtc_reg_c
+label 4D rtc_reg_d
+
+* ============================================================
+* CMOS NVRAM / System Variables ($4E-$7F)
+* ============================================================
+label 4E nvram_boot_flags
+label 4F lcdctl_shadow
+label 50 lcdctl_prev
+label 51 lcd_send_row
+label 52 io_device_cmd
+label 53 slave_cmd
+label 54 ctrl_block_ptr
+label 57 device_channel
+label 58 io_desc_ptr
+label 5A tape_buf_base
+label 5F checksum_accum
+
+label 70 kbd_change_count
+label 72 kbd_krtn89_acc_h
+label 73 kbd_krtn89_acc_l
+label 74 irq_ctrl_ptr
+label 76 irq_xfer_count
+label 79 port1_shadow
+label 7A sci_xfer_flags
+label 7B system_mode
+label 7C session_flags
+label 7D irq_abort_flags
+label 7E dip_switches
+label 7F sys_config2
+
+* ============================================================
+* Internal RAM ($80-$FF) - BASIC workspace
+* ============================================================
+label 8F ptr_temp
+label 90 ptr_temp_lo
+label 91 ptr_temp2
+label 9A sp_save
+label 9C prog_start
+label A2 var_start
+label A4 stack_base
+label AC line_num
+label AE prog_ptr
+label B0 text_ptr
+label B2 data_ptr
+label B4 cont_ptr
+label BF search_ptr
+label C1 op_precedence
+label C4 mem_top
+label C6 src_ptr
+label C8 dst_ptr
+label CA end_ptr
+label F0 save_x
+label F2 aux_stack_ptr
+label F4 error_mode
+label F5 direct_flag
+label FB input_ptr
+
+* ============================================================
+* RAM Interrupt Vectors (JMP instructions at boot)
+* Each is a 3-byte JMP: $7E + 16-bit address
+* $0100-$0108: IRQ1 sub-dispatch vectors
+* $0109-$011B: Hardware interrupt vectors
+* ============================================================
+label 0100 ram_sub_rtc
+label 0103 ram_sub_p14
+label 0106 ram_sub_ocf_user
+label 0109 ram_vec_sci_jmp
+label 010C ram_vec_tof_jmp
+label 010F ram_vec_ocf_jmp
+label 0112 ram_vec_icf_jmp
+label 0115 ram_vec_irq1_jmp
+label 0118 ram_vec_swi_jmp
+label 011B ram_vec_nmi_jmp
+label 011E ram_vec_irq2_jmp
+
+* ============================================================
+* Keyboard Control Block ($0120-$018F)
+* ============================================================
+label 0120 kbd_vec_init
+label 0122 kbd_vec_ext
+label 0124 kbd_fkey1_handler
+label 0126 kbd_fkey2_handler
+label 0128 kbd_fkey3_handler
+label 012A kbd_fkey4_handler
+label 012C ram_top
+label 0130 warm_restart_vec
+label 0132 periph_handler_vec
+label 0134 ram_top2
+label 0140 kbd_buf_max
+label 0141 kbd_repeat_delay
+label 0142 kbd_repeat_rate
+label 0143 kbd_timer_period
+label 0145 kbd_scan_cur
+label 014B kbd_scan_cur6
+label 014D kbd_krtn89_prev
+label 014E kbd_row89_status
+label 014F kbd_scan_prev
+label 0159 kbd_scan_debounced
+label 0163 kbd_fkey_buf_ptr
+label 0165 kbd_fkey_mode
+label 0166 kbd_fkey_rd_ptr
+label 0167 kbd_fkey_wr_ptr
+label 0168 kbd_buf_count
+label 0169 kbd_modifier_flags
+label 016A kbd_repeat_state
+label 016B kbd_repeat_counter
+label 016C kbd_raw_scancode
+label 016D kbd_translated_code
+label 016E kbd_last_fkey_code
+label 016F kbd_fkey_expansion
+label 0181 kbd_fifo
+
+* ============================================================
+* SCI Circular Buffer ($01AF-$01C5)
+* ============================================================
+label 01AF sci_baud_period
+label 01B5 sci_params_lo
+label 01B6 sci_params_hi
+label 01B7 sci_buf_flags
+label 01B8 sci_buf_base
+label 01BA sci_buf_limit
+label 01BC sci_buf_size
+label 01BE sci_write_ptr
+label 01C0 sci_read_ptr
+label 01C2 sci_count
+label 01C5 sci_session_flag
+
+* ============================================================
+* Control Block at $01D5 (CAS1/printer, 23 bytes)
+* Offsets: +0=status, +1=byte_count(16), +3=response(16),
+*   +7=error, +8=flags, +9=src_ptr(16), +B=end_addr(16),
+*   +D=buf_limit(16), +F=write_ptr(16), +11=read_ptr(16),
+*   +13=xfer_count(16), +15=retry_max, +16=retry_count
+* ============================================================
+label 01D5 cb_cas1
+
+* ============================================================
+* Control Block at $01EC (CAS0, same structure)
+* Note: $01EC-$01F0 overlaps cb_cas1 offsets +17..+1B
+* ============================================================
+label 01EC cb_cas0
+
+* ============================================================
+* SAVE Protocol Variables ($0200-$021F)
+* ============================================================
+label 0200 tape_header_buf
+label 0203 block_byte_count
+label 0205 last_cmd_sent
+label 0206 timer_redirect_flag
+label 0207 device_mode_resp
+label 0208 slave_status_byte
+label 020F data_read_ptr
+label 0211 data_end_ptr
+label 0217 io_type_code
+label 0219 io_context_ptr
+label 021B active_session_mask
+
+* ============================================================
+* BASIC Interpreter RAM
+* ============================================================
+label 0270 bas_workspace
+label 0324 cas0_tape_buffer
+label 02D0 cas1_tape_buffer
+label 04AF stack_init
+label 04B2 mem_size
+label 04E4 kw_table_ptr
+label 04E6 cmd_ext_ptr
+label 04FE var_end
+label 05A9 stmt_dispatch_ptr
+label 0689 sys_flag_689
+label 069A init_flag
+label 0754 text_save
+label 089A auto_flag
+label 08A6 trace_flag
+label 08A9 error_code
+label 08AA on_err_line
+label 08AC stack_save
+
+* ============================================================
+* Interrupt Vector Table (FFF0-FFFF)
+* All point to RAM JMP vectors except RESET -> E000
+* ============================================================
+cvector FFF0-FFFF
+label FFF0 vec_SCI
+label FFF2 vec_TOF
+label FFF4 vec_OCF
+label FFF6 vec_ICF
+label FFF8 vec_IRQ1
+label FFFA vec_SWI
+label FFFC vec_NMI
+label FFFE vec_RESET
+
+* ============================================================
+* Major Code Entry Points
+* f9dasm needs these to trace code flow since vectors -> RAM
+* ============================================================
+
+* --- System Init / Boot ---
+label E000 reset_entry
+label E022 sci_slave_sync
+label E034 ram_vec_init
+label E045 nvram_config_init
+label E086 warm_boot
+label E091 warm_reset
+label E095 system_init
+label E099 kbd_lcd_init
+label E0A0 kbd_lcd_post_init
+label E0AB session_init
+label E0BE session_close
+label E0C9 boot_menu_exit
+label E0D5 sci_reinit
+label E0E9 sci_sync_loop
+label E114 sci_post_sync
+label E122 session_cleanup
+label E143 delay_500
+label E14A kbd_wait_slp
+label E161 rtc_set_dialog
+label E185 rtc_input_loop
+label E19D rtc_apply
+label E1A7 ram_size_detect
+label E1C4 rtc_write_datetime
+label E1DB rtc_read_datetime
+label E1F7 rtc_reg_lookup
+
+* --- LCD Control ---
+label E314 lcdctl_write
+
+* --- SCI Communication (Master -> Slave) ---
+label E3EF sci_raw_send
+label E3F8 sci_two_byte
+label E403 sci_polled_transact
+label E45A sci_check_abort
+label E466 sci_fire_forget
+label E47C sci_post_transact
+label E48E sci_baud_setup
+label E4BB sci_buf_init
+label E4E8 sci_start_irq_xfer
+
+* --- Block Transfer ---
+label E777 block_xfer_start
+label EA01 xfer_setup
+label EA23 load_cas0_entry
+label EA3E load_cas1_entry
+label EA57 xfer_common
+label EAD0 block_xfer_init
+
+* --- SAVE/LOAD Protocol ---
+label EB0A set_timer_vec_ef85
+label EB16 slave_status_query
+label EB47 save_device_setup
+label EB54 save_setup_7c
+label EB6F tape_seek_fwd
+label EBA9 send_6d_pos
+label EBB4 send_6e6f_negotiate
+label EBCB save_block_loop
+label EBD7 save_send_6d
+label EBD9 save_send_7b
+label EBDB save_send_cmd
+label EBE1 save_negotiate
+label EC1D save_response_loop
+label EC48 save_done
+label EC54 save_cleanup
+label EC5C decimal_convert
+
+* --- SCI IRQ Handler ---
+label EE26 sci_irq_handler
+label EE32 sci_irq_buf_mode
+label EE50 sci_irq_buf_overflow
+label EE57 sci_irq_xfer_mode
+label EE68 sci_irq_check_ack
+label EE7E sci_irq_ack_mismatch
+label EE81 sci_irq_block_done
+label EE8B sci_irq_recv_data
+label EEBE sci_irq_xfer_complete
+label EEE6 sci_irq_verify_count
+label EF07 sci_irq_post_block
+label EF15 sci_irq_send_7b
+label EF1A sci_irq_send_final
+label EF1E sci_irq_retry
+label EF26 sci_irq_restart
+
+* --- IRQ1 Multiplexer ---
+label EF2C irq1_handler
+label EF85 p17_debounce_handler
+label EFE9 low_battery_check
+
+* --- SIO Bus ---
+label F493 sio_cas0_save_cmd
+label F503 sio_lcdctl_setup
+label F50D sio_send_byte
+label F53F sio_multi_send
+
+* --- Timer / Keyboard ---
+label F580 ocf_timer_handler
+label F592 ocf_change_detect_loop
+label F5CA ocf_key_pressed
+label F629 ocf_auto_repeat
+label F66B ocf_rearm_exit
+label F66E ocf_rearm_timer
+label F67C ocf_special_key
+label F6F0 ocf_rearm_and_call
+label F706 kbd_matrix_scan
+label F769 kbd_debounce_init
+label F76D kbd_debounce_edges
+label F7AD kbd_copy_cur_to_prev
+label F7BB kbd_update_modifiers
+label F7EA kbd_scancode_to_ascii
+label F804 kbd_lookup_pair
+label F813 kbd_translate_normal
+label F87A kbd_case_convert
+label F88B kbd_shift_convert
+label F8C2 kbd_ctrl_convert
+label F963 kbd_timer_init
+label F9AA kbd_check_buffer
+label F9B5 kbd_input
+label F9DC kbd_read_fkey_buf
+label F9F9 kbd_fkey_expand
+label FA2E kbd_fifo_dequeue
+label FA4A kbd_fifo_enqueue
+label FA6F kbd_fkey_dispatch
+
+* --- BASIC Interpreter ---
+label 8394 bas_find_line
+label 83BC bas_check_mem_free
+label 83CE bas_check_mem_need
+label 83D5 bas_check_and_move
+label 83F6 bas_check_stack
+label 8404 bas_add_offset_b
+label 8410 bas_push_byte
+label 841C bas_pop_byte
+label 8428 bas_error_oom
+label 8433 bas_error_b
+label 8469 bas_warm_restart
+label 8472 bas_main_loop_body
+label 8494 bas_ready
+label 84EF bas_command_loop
+label 851F bas_direct_exec
+
+* --- BASIC Statements/Functions (selected) ---
+label 866B bas_tick_comment
+label 86AC bas_go
+label 86C2 bas_let
+label 86FC bas_restore
+label 8721 bas_next
+label 8724 bas_return_rem_stop
+label 8750 bas_run
+label 87E6 bas_read
+label 8AC7 bas_data
+label 8D56 bas_clear
+label 90B5 bas_poke
+label 9071 bas_def
+label 912C bas_crlf
+label 917E bas_print_string
+label 9518 bas_else
+label 9722 bas_end
+label 97EA bas_for
+label A4FF bas_cont
+label A560 bas_savem
+label A5E2 bas_open
+label A618 bas_merge
+label A6A7 bas_load_stmt
+label A6AF bas_save_stmt
+
+* --- Boot Menu ---
+label D00E boot_menu_entry
+
+* --- Monitor ---
+label D604 mon_assemble
+label D4C5 mon_kill
+label D4DB mon_registers
+label D5A6 mon_set
+label D61B mon_examine
+
+* ============================================================
+* Data Regions
+* ============================================================
+
+* --- BASIC Module Header & Tables ---
+data 8000-8014
+data 8015-80B0
+data 80B1-8304
+data 8305-8358
+data 8359-837C
+data 837D-8393
+
+* --- Code sections after BASIC tables ---
+code 8394-9965
+
+* --- BASIC Error Code Table ---
+data 9966-99E3
+code 99E4-A132
+
+* --- "?Redo" string ---
+data A133-A13A
+code A13B-ACFC
+
+* --- Cassette device type bytes ---
+data ACFD-AD00
+code AD01-AFBA
+
+* --- File operation strings ---
+data AFBB-AFD4
+code AFD5-B3EA
+
+* --- Version/Copyright string ---
+data B3EB-B424
+
+* --- Device control block table ---
+data B425-B4DA
+code B4DB-BE56
+
+* --- Boot menu format data and strings ---
+data BE57-BEAA
+code BEAB-CC37
+
+* --- Floating-point constant tables ---
+data CC38-CCC3
+code CCC4-CFDE
+
+* --- Trig FP constants ---
+data CFDF-D004
+
+* --- Monitor mode string ---
+data D005-D00D
+code D00E-D738
+
+* --- Monitor status strings ---
+data D739-D75E
+
+* --- Monitor display format ---
+data D75F-D768
+
+* --- Monitor command dispatch table ---
+data D769-D77E
+
+* --- Monitor register display table ---
+data D77F-D7AE
+code D7AF-D810
+
+* --- Monitor opcode size table ---
+data D811-D84F
+code D850-DF63
+
+* --- Display command dispatch tables ---
+data DF64-DFEA
+code DFEB-E1F6
+
+* --- RTC register lookup table ---
+data E1F7-E207
+
+* --- Boot prompt strings ---
+data E208-E23E
+code E23F-E4AA
+
+* --- Baud rate table ---
+data E4AB-E4BA
+code E4BB-EC5B
+
+* --- Decimal conversion divisor table ---
+data EC5C-EC91
+code EC92-ECED
+
+* --- Device descriptor table ---
+data ECEE-ED21
+code ED22-F016
+
+* --- Battery warning string ---
+data F017-F027
+code F028-F83F
+
+* --- Keyboard translation tables ---
+data F840-F877
+code F878-F8D2
+
+* --- Keyboard remap tables ---
+data F8D3-F906
+
+* --- Scan-to-ASCII lookup table ---
+data F907-F962
+code F963-FAED
+
+* --- Character set pointer table ---
+data FAEE-FAFD
+
+* --- Country character substitution data ---
+data FAFE-FB67
+
+* --- ASCII font bitmaps (96 chars x 5 bytes) ---
+data FB68-FD47
+
+* --- Extended font bitmaps (32 chars x 5 bytes) ---
+data FD48-FDE7
+
+* --- Alternate character bitmaps ---
+data FDE8-FEA7
+
+* --- Unused padding ---
+data FEA8-FED0
+
+* --- System API JMP vector table ---
+data FED1-FFEF
+
+* --- CPU interrupt vectors ---
+cvector FFF0-FFFF
+
+* ============================================================
+* Inline Comments
+* ============================================================
+
+* --- Reset / Boot ---
+lcomment E000 cold boot: SEI, SP=$04AF, init ports/SCI/RTC
+lcomment E022 slave sync: wait TDRE, send $00, expect $01 back
+lcomment E034 copy 24 bytes from FFB5 to RAM 0100 (int vector JMPs)
+lcomment E045 clear NVRAM config: $7F &= $CF, $7E &= $7F
+lcomment E086 warm boot: SP=$04AF, init system, JMP boot_menu_entry
+lcomment E091 warm reset: kbd/LCD init + CLI + RTS
+lcomment E095 call session_init + CLI + RTS
+lcomment E099 SEI, kbd_timer_init, LCD init, slave cmd $02, status query
+lcomment E0AB clear session/device flags, init buffers at $01D5/$01EC/$0208
+lcomment E0BE close session: clear flags, CLI
+lcomment E0C9 SCI reinit, session init, send CR/LF to slave, main loop
+lcomment E0D5 disable EOCI/RIE, set P22=1, RMCR=$04 (38400 baud)
+lcomment E0E9 send $0C to slave, wait for $02 response (sync)
+lcomment E114 after slave ACK: send $00 polled, check pending cleanup
+lcomment E122 if cassette active: send $7B then $77 to slave
+lcomment E143 delay loop: X=$01F4 (500), DEX until 0
+lcomment E14A SEI, enable key wakeup (LCDCTL bit 4), SLP, CLI
+lcomment E161 display date/time prompt, accept 6 hex fields
+lcomment E19D write date/time: RTC Reg A=$20, call rtc_write_datetime
+lcomment E1A7 RAM size detect: write/readback loop from $004E up
+lcomment E1C4 set RTC Reg B SET bit, write 6 fields, clear SET
+lcomment E1DB poll UIP clear in Reg A, read 6 RTC fields into buffer
+lcomment E1F7 table lookup: B(0-5) -> RTC register address via table
+
+* --- LCD ---
+lcomment E314 interrupt-safe LCD control write (shadow regs $4F/$50)
+
+* --- SCI Communication ---
+lcomment E3EF disable RIE, set P22=1, wait TDRE, write TDR
+lcomment E3F8 send A then B via sci_polled_transact
+lcomment E403 set P22=1, send 0x46 header + data, wait ACK
+lcomment E45A check $7C.7 and $7D bits 4+5 for abort condition
+lcomment E466 send byte via SCI without waiting for response
+lcomment E47C check $7A.2, may call sci_start_irq_xfer to restart
+lcomment E48E configure SCI baud rate from table at E4AB
+lcomment E4BB init circular buffer pointers in control block
+lcomment E4E8 clear/set $7A flags, send $45 raw, enable RIE
+
+* --- Block Transfer ---
+lcomment E777 send cmd, set $7A bit 7 (send mode), enable RIE
+lcomment EA01 set up xfer: src_ptr, write_ptr, end_addr, byte_count
+lcomment EA23 LOAD entry for CAS0: set cmd=$66-$68, channel=$04
+lcomment EA3E LOAD entry for CAS1: set cmd=$26-$28, channel=$02
+lcomment EAD0 disable RIE, reset ptrs, send device cmd, enable RIE
+lcomment EB0A redirect OCF vector to EF85, set debounce counter=9
+lcomment EB16 send $50 status query, read PORT1, update $79
+
+* --- SAVE Protocol ---
+lcomment EB47 slave_status_query + check bit 2 (tape ready)
+lcomment EB54 save_device_setup + send $7C (set device mode)
+lcomment EB6F compute tape seek distance, send $72 or $73 to slave
+lcomment EBA9 send $6D + tape position ($0203) via sci_two_byte
+lcomment EBB4 send $6E+$6F, receive block size, verify with $6E
+lcomment EBCB SAVE main loop: setup, 6D, 7B, negotiate, wait response
+lcomment EBD7 send $6D + position, fall into send_7b
+lcomment EBD9 send $7B (start block), store to $0205
+lcomment EBDB store cmd A to $0205, send to slave, then negotiate
+lcomment EBE1 call negotiate, check block count, display progress
+lcomment EC1D wait for $FE+status via kbd_input, dispatch on status
+lcomment EC48 block count=0, check error, call success handler
+lcomment EC54 clear $7C bit 2, exit via sci_post_transact
+lcomment EC5C convert D to decimal ASCII digits
+
+* --- SCI IRQ Handler ---
+lcomment EE26 SCI IRQ: read TRCSR+RDR, route by $7A mode bits
+lcomment EE32 buffer mode ($7A[7:5]=010): store to circular buffer
+lcomment EE50 buffer overflow: set $01B7 bit 7
+lcomment EE57 xfer mode: select ctrl block by $7A bit 5
+lcomment EE68 compare expected ACK with RDR (SAVE data path)
+lcomment EE7E ACK mismatch: set error flag bit 6 in cb_flags
+lcomment EE81 block done or error: disable RIE
+lcomment EE8B receive mode ($7A.7=0): store incoming byte to buffer
+lcomment EEBE xfer complete: send $4A+$4B completion handshake
+lcomment EEE6 verify byte count ($52 low nibble == 8)
+lcomment EF07 post-block: send $7B if no error, then $77 (cleanup)
+lcomment EF15 send $7B via sci_polled_transact (inside IRQ)
+lcomment EF1A send final cmd ($77 or $23) via sci_polled_transact
+
+* --- IRQ1 Multiplexer ---
+lcomment EF2C IRQ1: route by PWSW, P14, P13, RTC, timer, keyboard
+lcomment EF85 Port 1 bit 7 debounce: sample 5x with delay
+lcomment EFE9 low battery: flash "CHARGE BATTERY" on LCD
+
+* --- SIO Bus ---
+lcomment F493 SIO bus: LDAA #$64, BSR sio_send_byte (CAS0: SAVE)
+lcomment F503 set LCDCTL sel=7 via lcdctl_write
+lcomment F50D write LCDDATA, 4x LDX LCDDATA for 8 clocks
+lcomment F53F 6-iteration SIO send loop with LCDCTL setup
+
+* --- Timer / Keyboard ---
+lcomment F580 OCF: clear OCF, set kbd scan mode, CLI, scan matrix
+lcomment F592 change detect: loop 9 cols checking held keys
+lcomment F5CA key pressed: identify col/row, compute scancode
+lcomment F629 auto-repeat: decrement counter, re-enqueue on zero
+lcomment F66B copy scan->prev, re-arm OCF timer, RTI
+lcomment F66E SEI, read FRC, add $3000, write OCR, set EOCI
+lcomment F67C special key dispatch: BREAK=$3A, F1-F5=$F1-$F5
+lcomment F6F0 re-arm timer then call handler via JMP ,X
+lcomment F706 8-column keyboard matrix scan with debounce retry
+lcomment F769 init debounce state with "all released"
+lcomment F76D detect new key edges, update debounced state
+lcomment F7AD copy 10 bytes $0145->$014F (current -> previous)
+lcomment F7BB update modifier flags $0169 from $014E and scancode
+lcomment F7EA translate scancode via tables at F907/F935
+lcomment F804 search pair table (key,value) for match
+lcomment F813 translate non-special key using modifier tables
+lcomment F87A case convert for letters (upper/lower)
+lcomment F88B shifted character conversion
+lcomment F8C2 CTRL/GRAPH character conversion
+lcomment F963 init kbd block at $0120: vectors, timer=$3000, buf=8
+lcomment F9AA check if kbd buffer has data (no wait)
+lcomment F9B5 read kbd buffer, SLP if empty, return char in A
+lcomment F9DC read from function key expansion buffer
+lcomment F9F9 expand fkey definition into expansion buffer
+lcomment FA2E SEI, dequeue from FIFO at $0181, shift bytes down
+lcomment FA4A enqueue byte (or $FE+byte pair) into FIFO at $0181
+lcomment FA6F function key dispatch: lookup in FAEE table
+
+* --- BASIC Interpreter ---
+lcomment 8394 search BASIC line list for target line number
+lcomment 83BC check available memory vs $04FE - $00C4 - stack
+lcomment 83CE check memory for N bytes (D + $12)
+lcomment 83D5 memory check + block move from $C6 to $F2
+lcomment 83F6 stack overflow check: D + $4E vs SP
+lcomment 8404 X = X + B (table index helper)
+lcomment 8410 push byte A to auxiliary stack at $F2
+lcomment 841C pop byte from auxiliary stack $F2 into A
+lcomment 8428 error: B=7 (Out of Memory), set $F4=$11
+lcomment 8433 error handler: B=error code, display message, restart
+lcomment 8469 warm restart: restore stack from $08AC, JMP $8645
+lcomment 8472 main loop: save/restore ptrs, handle ON ERROR context
+lcomment 8494 display "Ready", enter command input loop
+lcomment 84EF command loop: read line, tokenize, execute
+lcomment 851F execute direct mode command
+
+* --- Boot Menu ---
+lcomment D00E boot menu ($7B=0x01)
+
+* --- Monitor ---
+lcomment D604 assembler command
+lcomment D4C5 kill (breakpoint) command
+lcomment D4DB register display command
+lcomment D5A6 set memory command
+lcomment D61B examine memory command
