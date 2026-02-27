@@ -1,0 +1,1071 @@
+* f9dasm info file for HX-20 slave ROM (secondary.bin, HD6301V1)
+* Load at F000, 4KB ROM
+
+* ============================================================
+* HD6301V1 I/O Registers (00-15)
+* ============================================================
+label 00 DDR1
+label 01 DDR2
+label 02 PORT1
+label 03 PORT2
+label 04 DDR3
+label 05 DDR4
+label 06 PORT3
+label 07 PORT4
+label 08 TCSR
+label 09 FRC_H
+label 0A FRC_L
+label 0B OCR_H
+label 0C OCR_L
+label 0D ICR_H
+label 0E ICR_L
+label 0F P3CSR
+label 10 RMCR
+label 11 TRCSR
+label 12 RDR
+label 13 TDR
+label 14 RP5CR
+label 15 PORT5
+
+* ============================================================
+* RAM Variables (80-BF)
+* ============================================================
+label 80 frc_ref
+label 81 cas0_mode
+label 82 fsk_byte
+label 83 bit_counter
+label 84 param1_hi
+label 85 param1_lo
+label 86 ctrl_state
+label 87 cas1_mode
+label 88 sci_vec_ram
+label 89 return_addr
+label 8B ring_write_ptr
+label 8D ring_read_ptr
+label 8F ring_count
+label 90 cmd_byte
+label 91 queued_cmd
+label 92 cmd_state
+label 93 crc_poly_hi
+label 94 crc_poly_lo
+label 95 crc_hi
+label 96 crc_lo
+label 97 icr_period_hi
+label 98 icr_period_lo
+label 99 icr_config_hi
+label 9A icr_config_lo
+label 9B key_status
+label 9C access_key
+label 9D cas1_short_hi
+label 9E cas1_short_lo
+label 9F cas1_long_hi
+label A0 cas1_long_lo
+label A1 fsk_thresh_hi
+label A2 fsk_thresh_lo
+label A3 fsk_param3_hi
+label A4 fsk_param3_lo
+label A5 fsk_flags
+label A6 cas0_1bit_ph2_hi
+label A7 cas0_1bit_ph2_lo
+label A8 cas0_1bit_ph1_hi
+label A9 cas0_1bit_ph1_lo
+label AA cas0_0bit_hi
+label AB cas0_0bit_lo
+label AC cas0_icr_adj_hi
+label AD cas0_icr_adj_lo
+label AE leader_count
+label B0 tape_pos_hi
+label B1 tape_pos_lo
+label B4 cas_status
+label B5 cas1_leader_ct
+label B6 cas1_trailer_ct
+label B7 load_byte_ct
+label B8 save_byte_ct_hi
+label B9 save_byte_ct_lo
+label BA icr_prev_hi
+label BB icr_prev_lo
+label BE p46_state
+label BF save_mode_7b
+
+* ============================================================
+* Code and Data Sections
+* ============================================================
+
+code F000-F0A9
+
+* Group dispatch table: 9 x 2-byte pointers to sub-tables
+* Groups 0-8 (upper nibble of command byte)
+cvector F0AA-F0BB
+label F0AA grp_table
+
+* RAM init table: ram_init copies F0BC-F0E8 -> RAM $88-$B4 (bottom-up)
+* F0E8->$B4, F0E7->$B3, ... F0BC->$88
+data F0BC-F0E8
+label F0BC ram_init_table
+
+* Group 0 sub-table at F0E9: max=0x0D, 14 handlers (cmds 0x00-0x0D)
+data F0E9-F0E9
+cvector F0EA-F105
+label F0E9 grp0_subtable
+
+code F106-F1E8
+
+* Group 8 sub-table at F1E9: max=0x01, 2 handlers (cmds 0x80-0x81)
+data F1E9-F1E9
+cvector F1EA-F1ED
+label F1E9 grp8_subtable
+
+code F1EE-F22D
+
+* Group 1 sub-table at F22E: max=0x02, 3 handlers (cmds 0x10-0x12)
+data F22E-F22E
+cvector F22F-F234
+label F22E grp1_subtable
+
+code F235-F471
+
+* Group 3 sub-table at F472: max=0x05, 6 handlers (cmds 0x30-0x35)
+data F472-F472
+cvector F473-F47E
+label F472 grp3_subtable
+
+code F47F-F52D
+
+* Printer/serial configuration data tables
+* Pointers to device config blocks + baud rate/param tables
+data F52E-F59F
+label F52E printer_config_table
+label F53A print_err_ptr
+label F53E print_err2_ptr
+label F548 print_timeout_ptr
+label F556 print_init_ptr
+label F564 print_serial_ptr
+
+code F5A0-F5E1
+
+* Group 2 sub-table at F5E2: max=0x0B, 12 handlers (cmds 0x20-0x2B)
+data F5E2-F5E2
+cvector F5E3-F5FA
+label F5E2 grp2_subtable
+
+code F5FB-F8C8
+
+* Group 4 sub-table at F8C9: max=0x0D, 14 handlers (cmds 0x40-0x4D)
+data F8C9-F8C9
+cvector F8CA-F8E5
+label F8C9 grp4_subtable
+
+code F8E6-F9EA
+
+* Group 5 sub-table at F9EB: max=0x02, 3 handlers (cmds 0x50-0x52)
+data F9EB-F9EB
+cvector F9EC-F9F1
+label F9EB grp5_subtable
+
+code F9F2-FA17
+
+* Group 6 sub-table at FA18: max=0x0F, 16 handlers (cmds 0x60-0x6F)
+data FA18-FA18
+cvector FA19-FA38
+label FA18 grp6_subtable
+
+* Group 7 sub-table at FA39: max=0x0D, 14 handlers (cmds 0x70-0x7D)
+data FA39-FA39
+cvector FA3A-FA55
+label FA39 grp7_subtable
+
+code FA56-FFE2
+
+* End-of-ROM version string and padding
+data FFE3-FFEF
+comment FFE3 padding/version: "5722KA" + data
+
+* Interrupt Vectors (SCI=0088 in RAM, all others=F000)
+cvector FFF0-FFFF
+label FFF0 vec_SCI
+label FFF2 vec_TOF
+label FFF4 vec_OCF
+label FFF6 vec_ICF
+label FFF8 vec_IRQ1
+label FFFA vec_SWI
+label FFFC vec_NMI
+label FFFE vec_RESET
+
+* ============================================================
+* Subroutine Labels
+* ============================================================
+
+* --- Init / Main Loop ---
+label F000 slave_reset
+label F040 main_loop
+label F059 cmd_dispatch
+label F08B cmd_dispatch_done
+label F096 cmd_unknown
+label F09D sci_error_exit
+
+* --- SCI Communication ---
+label F106 sci_transact_1
+label F10A sci_transact_2
+label F12E sci_recv_byte
+label F13D sci_recv_raw
+label F148 send_ack
+label F14B sci_send_byte
+
+* --- Group 0: System commands (0x00-0x0D) ---
+* 0x00=ACK, 0x01=unused(sci_err), 0x02=ram_init, 0x03=reset,
+* 0x04=set_access(01), 0x05=clear_access, 0x06=read_mem,
+* 0x07=write_mem, 0x08=or_mem, 0x09=and_mem, 0x0A=P35_low,
+* 0x0B=P35_high, 0x0C=jump_to_addr, 0x0D=unused, 0x0E=set_port3
+label F153 cmd_02_handler
+label F155 ram_init
+label F16B cmd_03_handler
+label F170 cmd_04_handler
+label F178 cmd_05_handler
+label F17E cmd_06_read_mem
+label F192 cmd_07_write_mem
+label F198 cmd_08_or_mem
+label F1A0 cmd_09_and_mem
+label F1A9 cmd_helper_check_aa
+label F1BC cmd_0A_p35_low
+label F1C1 cmd_0B_p35_high
+label F1C7 cmd_0C_jump
+label F1D5 cmd_0E_set_port3
+label F1E3 cmd_error_0f
+
+* --- Group 8: Port I/O (0x80-0x81) ---
+* 0x80=read port bit to P34, 0x81=write port with mask
+label F1EE cmd_81_write_port
+label F210 cmd_error_jmp
+label F213 cmd_80_read_port
+
+* --- Group 1: Printer output (0x10-0x12) ---
+* 0x10=0x11=print_data, 0x12=timed_pulse
+label F235 cmd_12_timed_pulse
+label F257 check_b4_p44
+label F260 cmd_10_print_data
+label F2F4 port1_edge_init
+label F305 cmd_helper_reset_modes
+
+* --- Printer internal routines ---
+label F387 printer_output_data
+label F3F2 ring_buf_init
+label F3FD cmd_state_handler
+label F455 ring_buf_read
+
+* --- Group 3: Printer/Serial config (0x30-0x35) ---
+* 0x30=set_baud, 0x31=set_params, 0x32=print_error,
+* 0x33=print_init_str, 0x34=recv_config, 0x35=send_config
+label F47F grp3_cmd_31
+label F48C grp3_cmd_32
+label F497 grp3_cmd_33
+label F4A2 cmd_error_report
+label F4B6 cold_init
+label F4BE grp3_cmd_30
+label F4D4 printer_timed_send
+label F5A0 grp3_cmd_34
+label F5C1 grp3_cmd_35
+
+* --- CAS1: External Cassette (Group 2, cmds 0x20-0x2B) ---
+* 0x20=status, 0x21=fsk_timing, 0x22=motor_on, 0x23=motor_off,
+* 0x24=save_all, 0x25=save_hdr, 0x26=load_hdr, 0x27=load_end,
+* 0x28=load_all, 0x29=load_skip_crc, 0x2A=save_crc, 0x2B=set_flags
+label F5FB cmd_20_status
+label F600 cmd_2B_set_flags
+label F613 cas1_setup
+label F61A cas1_cleanup
+label F61D cas1_motor_off
+label F624 fsk_timing_init
+label F637 cas1_save_hdr
+label F63F cas1_save_crc
+label F643 cas1_save_all
+label F646 cas1_save_body
+label F660 cas1_save_leader
+label F682 cas1_save_sync
+label F69B cas1_save_data
+label F6BC cas1_save_err
+label F6D2 cas1_save_trail
+label F6F0 cas1_save_hdr_exit
+label F704 cas1_save_done
+label F709 cas1_fsk_encode_8
+label F70E cas1_fsk_encode_9
+label F718 cas1_fsk_loop
+
+* --- CAS1 LOAD ---
+label F766 cas1_load_end
+label F76A cas1_load_hdr
+label F76E cas1_load_skip_crc
+label F772 cas1_load_all
+label F773 cas1_load_body
+label F78F cas1_load_leader_search
+label F793 cas1_load_restart
+label F7A1 cas1_load_scan_zero
+label F7D2 cas1_load_sync_7bit
+label F7D9 cas1_load_sync_8bit
+label F7E1 cas1_load_sync_found
+label F7E6 cas1_load_data_loop
+label F812 cas1_load_post_data
+
+* --- CAS1 FSK Decode (P32 polling, inverts bits) ---
+label F833 fsk_decode_7bit
+label F838 fsk_decode_8bit
+label F84E fsk_edge_detect
+label F85F fsk_measure_period
+label F86B fsk_bit_decode
+label F872 fsk_crc_update
+label F886 fsk_dec_counter
+label F890 fsk_timeout
+label F894 fsk_decode_1bit
+
+* --- Group 4: Keyboard/Display (0x40-0x4D) ---
+* 0x40=P33_low+P36_high, 0x41=P36_low, 0x42=set_icr_params,
+* 0x43=read_key_status, 0x44=P34_low+clr_status, 0x45=irq_scan,
+* 0x46=ACK, 0x47=0x4A=read_crc_hi, 0x48=set_crc_poly,
+* 0x49=set_crc_init, 0x4B=read_crc_lo, 0x4C=P36_high,
+* 0x4D=set_p31
+label F8E6 cmd_48_set_crc_poly
+label F8EE cmd_49_set_crc_init
+label F8F6 cmd_47_4A_read_crc
+label F8FB cmd_4B_read_crc_lo
+label F8FF cmd_40_p33_low
+label F902 cmd_4C_p36_high
+label F907 cmd_41_p36_low
+label F90D cmd_42_set_icr
+label F928 cmd_43_read_status
+label F92C cmd_44_clr_status
+label F934 cmd_4D_set_p31
+label F941 cmd_45_irq_scan
+
+* --- Group 5: Status queries (0x50-0x52) ---
+* 0x50=read_status(P20+P46), 0x51=set_port4_bits, 0x52=clear_port4
+label F9F2 cmd_50_status
+label FA06 cmd_51_set_port4
+label FA12 cmd_52_clear_port4
+
+* --- Group 6: CAS0 commands (0x60-0x6F) ---
+* 0x60=ACK_61, 0x61=cas0_fsk_timing, 0x62=set_leader_count,
+* 0x63=cas0_load_cmd, 0x64=cas0_save, 0x65=cas0_save_hdr_only,
+* 0x66-0x69=same_cas0, 0x6A=cas1_save_mode1, 0x6B=cas_ctrl_stop,
+* 0x6C=same_cas0, 0x6D=set_tape_pos, 0x6E=read_tape_pos_hi,
+* 0x6F=read_tape_pos_lo
+label FA56 cmd_60_ack61
+label FA5C cmd_61_cas0_fsk_timing
+label FA6E cmd_62_set_leader
+label FA76 cmd_74_read_cas_status
+label FA7B cmd_75_clear_cas_status
+label FA82 cmd_6D_set_tape_pos
+label FA8A cmd_6E_read_pos_hi
+label FA8E cmd_6F_read_pos_lo
+label FA92 cmd_70_motor_check
+label FAA0 cmd_71_motor_fwd
+label FAA4 cmd_72_motor_stop
+
+* --- Group 7: Protocol (0x70-0x7D) ---
+* 0x70=motor_check, 0x71=motor_fwd, 0x72=motor_stop,
+* 0x73=motor_rew, 0x74=read_status, 0x75=clear_status,
+* 0x76=cas_ctrl_init, 0x77=cleanup, 0x78=search_fwd,
+* 0x79=search_rew, 0x7A=search_tape, 0x7B=save_begin,
+* 0x7C=set_mode, 0x7D=detect_tape
+label FB13 cmd_73_motor_rew
+label FB2C cmd_76_cas_ctrl_init
+label FB31 cmd_77_cleanup
+label FB3E cmd_7C_set_mode
+label FB45 cmd_7D_detect_tape
+label FB4B cas_detect_helper
+label FB62 cmd_7B_save_begin
+label FB6B cmd_78_search_fwd
+label FB74 cmd_79_search_rew
+label FB79 cmd_7A_search_tape
+
+* --- Cassette Controller IC (bit-bang on P43/P44) ---
+label FBEA cas_ctrl_cmd
+label FBD3 cas_ctrl_stop
+label FBE6 cas_ctrl_reset
+label FC0B cas_ctrl_arm_ocr
+label FC17 cas_ctrl_wait
+label FC2D cas_ctrl_init
+label FC31 cas_ctrl_check
+label FC87 cas_ctrl_poll_p46
+
+* --- CAS0: SAVE ---
+label FCDC cas0_save_mode1
+label FCE0 cmd_65_save
+label FCE8 cas0_save
+label FCE9 cas0_save_set_mode
+label FD07 cas0_save_params
+label FD15 cas0_save_motor
+label FD2B cas0_save_leader
+label FD48 cas0_save_sync
+label FD6C cas0_save_data
+label FD7C cas0_save_overrun
+label FD90 cas0_save_exit
+label FDB5 cas0_save_hdr_only
+label FDC4 cas0_save_success
+label FDC6 cas0_save_ocf_err
+label FDD2 cas0_save_p40_exit
+label FDE6 cas0_save_no_tape
+
+* --- CAS0: FSK Encode (P21 output compare) ---
+label FDF1 cmd_6B_handler
+label FDF6 cas0_fsk_encode_7
+label FDFB cas0_fsk_encode_8
+label FE00 cas0_fsk_loop
+
+* --- CAS0: LOAD (P20 input capture) ---
+label FE48 cas0_load_hdr
+label FE4C cas0_load_end
+label FE50 cas0_load_skip_crc
+label FE54 cas0_load_all
+label FE5F cas0_load_setup
+label FEA1 cas0_load_leader
+label FF0F cas0_load_data_loop
+label FF20 cas0_load_data_next
+label FF40 cas0_load_exit
+label FF4A cas0_load_err_crc
+label FF4F cas0_load_err_timeout
+label FF57 cas0_load_no_tape
+label FF5C cas0_load_cmd63
+label FF8D cas0_fsk_decode_7
+label FF92 cas0_fsk_decode_8
+label FF95 cas0_fsk_decode_body
+label FFA2 cas0_fsk_edge_loop
+label FFAE cas0_fsk_period_meas
+label FFC0 cas0_fsk_bit_rotate
+label FFC5 cas0_fsk_bit_tpa
+label FFD9 cas0_fsk_dec_counter
+
+* ============================================================
+* Inline Comments (lcomment = right side of instruction)
+* ============================================================
+
+* --- Slave Reset / Init ---
+lcomment F000 disable interrupts during init
+lcomment F001 P30=1 (motor off), P35=1
+lcomment F003 write initial port 3
+lcomment F005 stack at top of internal RAM
+lcomment F008 init RAM variables from table
+lcomment F00B B=0 (cold boot flag)
+lcomment F00C P3DDR=FB: P32 is only input
+lcomment F010 P30=1, P35=1 (motor off)
+lcomment F013 P33=0, P34=0
+lcomment F016 P14=1 (output)
+lcomment F018 Port 1 DDR: bits 0-5 output
+lcomment F01E Port 4 all 0
+lcomment F022 DDR4=3E: bits 1-5 output
+lcomment F026 Port 2=12: P21=1, P24=1
+lcomment F028 DDR2=12: P21, P24 output
+lcomment F02E RMCR: baud rate select
+lcomment F030 TCSR: OLVL=1
+lcomment F032 TRCSR=1A: TE+RE (SCI on)
+lcomment F03A test cold boot flag
+lcomment F03B nonzero: skip cold init
+lcomment F03D cold boot initialization
+
+* --- Main Loop ---
+lcomment F040 B=0 (clear error)
+lcomment F041 P34=0 (slave flag clear)
+lcomment F044 save main_loop addr for recovery
+lcomment F049 TCSR: OLVL=1
+lcomment F04D TRCSR=1A: TE+RE
+lcomment F051 reset stack
+lcomment F054 SEI
+lcomment F055 test B
+lcomment F056 B!=0: skip SLP
+lcomment F058 sleep until interrupt
+
+* --- Command Dispatch ---
+lcomment F059 read TRCSR
+lcomment F05B RDRF not set: loop
+lcomment F05D test ORFE (overrun/framing)
+lcomment F05F error: sci_error_exit
+lcomment F061 read command byte from RDR
+lcomment F063 clear command state
+lcomment F066 save command byte
+lcomment F068 copy to B
+lcomment F069 command >= 90?
+lcomment F06B yes: unknown command
+lcomment F06D upper nibble mask
+lcomment F06F shift right 3x = nibble*2
+lcomment F072 group table base
+lcomment F075 index into table
+lcomment F076 B = original command
+lcomment F077 lower nibble
+lcomment F079 load sub-table pointer
+lcomment F07B compare with max valid
+lcomment F07D too large: error
+lcomment F07F lower_nibble * 2
+lcomment F080 index into sub-table
+lcomment F081 clear carry (success default)
+lcomment F082 load handler address
+lcomment F084 JSR to handler
+lcomment F086 C=0: done
+lcomment F088 C=1: error report
+lcomment F08B clear B
+lcomment F08C check command state
+lcomment F08E state 2 = queued command
+lcomment F090 not 2: back to dispatch
+lcomment F092 load queued command
+lcomment F094 process queued command
+lcomment F096 unknown cmd: send 0F error
+lcomment F09D SEI
+lcomment F09E send 02 error code
+lcomment F0A3 read+clear TRCSR+RDR
+lcomment F0A5 B=1 (warm boot flag)
+lcomment F0A7 restart from DDR3 init
+
+* --- SCI Communication ---
+lcomment F106 send ACK first, then do transact_2
+lcomment F10A B = ACK value (from A)
+lcomment F10B wait RDRF
+lcomment F10F check ORFE
+lcomment F111 error: sci_error_exit
+lcomment F113 A = byte1 from RDR
+lcomment F115 wait TDRE
+lcomment F118 not ready: loop
+lcomment F11A send ACK #1
+lcomment F11C check RDRF again
+lcomment F121 check ORFE on 2nd byte
+lcomment F124 error: sci_error_exit
+lcomment F129 send ACK #2
+lcomment F12B B = byte2 from RDR
+lcomment F12D return: A=byte1, B=byte2
+lcomment F12E recv: wait RDRF, send A as ACK, return RDR
+lcomment F13D recv_raw: wait RDRF, return RDR (no ACK send)
+lcomment F148 ACK = 01
+lcomment F14A CLC (no error)
+lcomment F14B wait TDRE
+lcomment F150 send byte
+lcomment F155 init 2D RAM bytes from F0E8 table
+
+* --- Group 0: System Commands ---
+lcomment F153 cmd 0x02: ACK + reinit RAM
+lcomment F16B cmd 0x03: ACK + full reset (stack + ram_init)
+lcomment F170 cmd 0x04: ACK + set access_key=01
+lcomment F178 cmd 0x05: ACK + clear access_key
+lcomment F17E cmd 0x06: read [addr] if key=AA
+lcomment F192 cmd 0x07: write A to [addr] if key=AA
+lcomment F198 cmd 0x08: OR A into [addr] if key=AA
+lcomment F1A0 cmd 0x09: AND A into [addr] if key=AA
+lcomment F1A9 check access_key==AA; if so, recv addr+data
+lcomment F1BC cmd 0x0A: P35=low (AIM &DF on PORT3)
+lcomment F1C1 cmd 0x0B: P35=high (OIM $20 on PORT3)
+lcomment F1C7 cmd 0x0C: jump to addr (if key=AA)
+lcomment F1D5 cmd 0x0E: set PORT3=E1 (if key=AA)
+
+* --- Group 8: Port I/O ---
+lcomment F1EE cmd 0x81: write masked bits to port
+lcomment F213 cmd 0x80: read port bit, output to P34
+lcomment F1F7 loop: read port, mask, write to target
+lcomment F20A check RDRF: new cmd ends loop
+lcomment F21A loop: test bit, set/clear P34 accordingly
+lcomment F228 check RDRF: new cmd ends loop
+
+* --- Group 1: Printer ---
+lcomment F235 cmd 0x12: timed pulse train on PORT1
+lcomment F240 arm OCR with period=$8CA0
+lcomment F260 cmd 0x10: serial print data output
+lcomment F265 parse sub-command nibbles
+lcomment F273 sub-cmd 0x10: print mode, ACK, init buf
+lcomment F293 init Port 1 edge timing for FSK
+lcomment F2F4 init Port1 for edge-based data output
+lcomment F305 reset cas0_mode=0, cas1_mode=1
+
+* --- Printer Data Path ---
+lcomment F387 output buffered data to Port 1 serially
+lcomment F393 6 columns of display data
+lcomment F397 shift 4 rows of 6-byte blocks LSR
+lcomment F3A7 wait for edge, output bit to PORT1
+lcomment F3F2 init ring buffer ptrs at $B5
+lcomment F3FD handle cmd_state: queue or process next byte
+lcomment F455 read one byte from ring buffer
+
+* --- Group 3: Printer/Serial ---
+lcomment F47F cmd 0x31: set printer params (4-byte transact)
+lcomment F48C cmd 0x32: print error report
+lcomment F497 cmd 0x33: print init string
+lcomment F4A2 error report: lookup table + timed send
+lcomment F4B6 cold init: print init string at baud=256
+lcomment F4BE cmd 0x30: set baud rate (table lookup)
+lcomment F4D4 timed character send loop
+lcomment F5A0 cmd 0x34: receive 48 config bytes from master
+lcomment F5C1 cmd 0x35: send config table to printer
+
+* --- CAS1: External Cassette ---
+lcomment F5FB cmd 0x20: send status byte $21
+lcomment F600 cmd 0x2B: set FSK flags from master byte
+lcomment F613 cas1 setup: ACK + P30=low(motor),P33=low
+lcomment F616 P30=0(motor on),P33=0,P34=0
+lcomment F61A cas1 cleanup: ACK + motor off
+lcomment F61D motor off: P33=0,P34=0 then P30=1
+lcomment F624 cmd 0x21: receive FSK timing params
+lcomment F629 X=FFF8, loop receives 4x2-byte params
+lcomment F637 save header: leader_ct=0, mode=FF
+lcomment F63F save with CRC: mode=01
+lcomment F643 save all: mode=00
+lcomment F646 setup: motor ON via cas1_setup
+lcomment F660 leader loop: N * FF bytes
+lcomment F682 sync phase: 9x $00 bytes
+lcomment F68C sync marker: 00
+lcomment F68F sync marker: FF
+lcomment F693 sync marker: AA
+lcomment F697 clear CRC
+lcomment F69B data loop: poll RDRF, ACK $21, FSK-encode
+lcomment F69F check P40 (cas ctrl motor status)
+lcomment F6A4 mode!=0: write trailer on motor stop
+lcomment F6AA check OCF timeout
+lcomment F6BF RDRF set: ACK $21, read data byte
+lcomment F6C7 decrement byte count
+lcomment F6CE mode!=0: done (no trailer)
+lcomment F6D2 trailer: CRC_lo x2, AA, 00
+lcomment F6E4 check trailer_ct for leader count
+lcomment F6F0 trailing leader FF bytes
+lcomment F6FC P33=low after leader
+lcomment F704 done: motor off
+
+* --- CAS1 FSK Encode ---
+lcomment F709 8-bit encode: start bit always 1 (B=FF)
+lcomment F70E 9-bit encode: start bit=0 (B=0)
+lcomment F712 store byte to encode
+lcomment F714 8 data bits
+lcomment F718 loop: LSR fsk_byte, time via OCR
+lcomment F71D bit=0: long period (cas1_long)
+lcomment F722 bit=1: short period (cas1_short)
+lcomment F726 first half: add period to OCR
+lcomment F72A wait OCF
+lcomment F730 P33=low (FSK output low)
+lcomment F735 second half: add period to OCR
+lcomment F73A counter==0: done
+lcomment F73E CRC update on data bits
+lcomment F74D wait OCF for second half
+lcomment F752 P33=high (FSK output high)
+lcomment F755 dec bit counter
+lcomment F75C last bit: set bit 0 for stop bit
+lcomment F75F check if 8-bit mode: extra stop bit
+
+* --- CAS1 LOAD ---
+lcomment F773 store mode byte (cas1_mode)
+lcomment F775 setup: motor on (P30 low)
+lcomment F778 transact: get leader count
+lcomment F781 transact: get byte count
+lcomment F786 CLI: enable interrupts for FSK decode
+lcomment F787 check fsk_flags bit 1
+lcomment F78F search for 50 consecutive "1" bits
+lcomment F793 restart: 50 "1" bits required
+lcomment F7A1 search for first "0" bit (max 51 tries)
+lcomment F7AD check fsk_flags for edge polarity mode
+lcomment F7B2 get period as D register
+lcomment F7BB check if period within tolerance
+lcomment F7C1 set fsk_flags bit 2 (polarity found)
+lcomment F7C4 wait for P32 stable
+lcomment F7D2 7-bit sync decode (expect FF)
+lcomment F7D6 FF + 1 = 00: Z=1 passes
+lcomment F7D9 8-bit sync decode (expect AA)
+lcomment F7DD check: decoded == AA? (EORA #AA)
+lcomment F7E1 sync found: init CRC, load byte count
+lcomment F7E6 data loop: decode 8-bit + send to master
+lcomment F7EA check mode byte
+lcomment F7EC looking for 0x48 sync marker
+lcomment F7F0 looking for 0x45 sync marker
+lcomment F808 decode next byte in block
+lcomment F80C send decoded byte to master
+lcomment F812 post data: check mode for CRC verify
+lcomment F817 decode CRC byte 1
+lcomment F81B decode CRC byte 2
+lcomment F81F SEI after CRC
+lcomment F820 send $22 completion status
+lcomment F825 check trailer count
+lcomment F829 motor off if no trailer
+lcomment F82E error: set P34 high (flag to master)
+
+* --- CAS1 FSK Decode (P32 polling) ---
+lcomment F833 entry: 7-bit (counter=7, 8 edge reads)
+lcomment F838 entry: 8-bit (counter=8, 9 edge reads)
+lcomment F83D read FRC as initial reference
+lcomment F842 arm OCR for timeout
+lcomment F848 clear edge state
+lcomment F849 check OCF timeout
+lcomment F84E read P32, debounce (read twice)
+lcomment F854 XOR with fsk_flags for polarity
+lcomment F856 mask bit 2 (P32)
+lcomment F858 compare with previous edge state
+lcomment F85B toggle edge state, check for full cycle
+lcomment F85F D = FRC (current time)
+lcomment F861 save FRC high on stack
+lcomment F862 save FRC low on stack
+lcomment F863 D = FRC - prev_ref = period
+lcomment F865 D = period - threshold; C=1 short, C=0 long
+lcomment F867 restore B (PULB: no flag change)
+lcomment F868 restore A (PULA: no flag change)
+lcomment F869 save current FRC as new reference
+lcomment F86B carry from SUBD -> A[0] via ROLA
+lcomment F86C A=~A, C=1 always (COMA)
+lcomment F86D B=A (C stays 1 after TAB)
+lcomment F86E C(=1)->A[7], old A[0](=~carry_in)->C via RORA
+lcomment F86F C(=~carry_in)->fsk_byte[7]: INVERTS bit!
+lcomment F872 CRC update: skip if counter has bit 3
+lcomment F877 XOR bit with CRC[0]
+lcomment F87D LSRD: shift CRC right
+lcomment F880 if carry: XOR with polynomial
+lcomment F886 dec bit_counter
+lcomment F88B CLC: no error
+lcomment F88C return decoded byte in A
+lcomment F890 timeout: return C=1 (error)
+lcomment F894 decode single bit: arm timeout OCR
+
+* --- Group 4: Keyboard/Display ---
+lcomment F8E6 cmd 0x48: set CRC polynomial from master
+lcomment F8EE cmd 0x49: set CRC init value from master
+lcomment F8F6 cmd 0x47/0x4A: read CRC high byte
+lcomment F8FB cmd 0x4B: read CRC low byte
+lcomment F8FF cmd 0x40: P33=0,P34=0 then P36=high
+lcomment F902 cmd 0x4C: P36=high (OIM $40 on PORT3)
+lcomment F907 cmd 0x41: P36=low (AIM &BF on PORT3)
+lcomment F90D cmd 0x42: set ICR params (4 bytes)
+lcomment F91B bit 3 of config: P31 control
+lcomment F928 cmd 0x43: read key_status byte
+lcomment F92C cmd 0x44: P34=low, clear key_status
+lcomment F934 cmd 0x4D: set P31 from master byte bit 0
+lcomment F941 cmd 0x45: IRQ ACK + keyboard/ICR scan loop
+lcomment F944 clear OLVL in TCSR
+lcomment F947 clear P45 in PORT4
+lcomment F94A clear key_status
+lcomment F94D P34=low
+lcomment F950 CLI: enable interrupts
+lcomment F951 main scan loop: clear fsk_byte, load config
+lcomment F959 negative config: INCA for bit count
+lcomment F95F read TCSR to arm ICR
+lcomment F961 read ICR to clear flag
+lcomment F963 check PORT4 bit 7 (key pressed)
+lcomment F96D set key_status bit 0 (key event)
+lcomment F970 P34=high (flag to master)
+lcomment F975 wait for ICF (input capture flag)
+lcomment F979 add half-period offset to ICR
+lcomment F97E arm OCR for sampling
+lcomment F982 wait OCF
+lcomment F986 check P20 (PORT2 bit 0): tape mechanism
+lcomment F989 P20=1: restart scan (tape inserted)
+lcomment F98B ICR-timed data sampling loop
+lcomment F997 read PORT2
+lcomment F99A ASRA: shift P20 into carry
+lcomment F99B carry -> fsk_byte[7] via ROR
+lcomment F99E XOR with previous for edge detect
+lcomment F9A2 CRC update (same as FSK decode)
+lcomment F9B1 dec bit_counter
+lcomment F9B6 adjust fsk_byte alignment
+lcomment F9C2 send decoded byte to master
+lcomment F9CD check config flags
+lcomment F9D5 set key_status bit 1 (edge change)
+lcomment F9D8 wait OCF
+lcomment F9DD check P20 again
+lcomment F9E2 set key_status bit 3 (tape removed)
+lcomment F9E5 P34=high (flag to master)
+lcomment F9E8 loop back to scan
+
+* --- Group 5: Status ---
+lcomment F9F2 clear PORT4 bits 2,3; set bit 5
+lcomment F9F8 read PORT2 bit 0 (P20: tape detect)
+lcomment F9FC shift left for status format
+lcomment F9FD check PORT4 bit 6 (P46: cas ctrl ack)
+lcomment FA02 add P46 status to result
+lcomment FA06 cmd 0x51: set PORT4 bits 3,4; clr bit 2; toggle bits 2,4
+lcomment FA12 cmd 0x52: clear PORT4 bits 2,3
+
+* --- Group 6: CAS0 commands ---
+lcomment FA56 cmd 0x60: send ACK byte $61
+lcomment FA5C cmd 0x61: receive CAS0 FSK timing params
+lcomment FA61 X=FFF8, loop: 4x2-byte params -> $AE+
+lcomment FA6E cmd 0x62: set leader count from master
+lcomment FA76 cmd 0x74: read cas_status byte
+lcomment FA7B cmd 0x75: clear cas_status
+lcomment FA82 cmd 0x6D: set tape position from master
+lcomment FA8A cmd 0x6E: read tape_pos_hi
+lcomment FA8E cmd 0x6F: read tape_pos_lo
+
+* --- Group 6: CAS0 motor/tape commands ---
+lcomment FA92 cmd 0x70: init cas ctrl + check P20
+lcomment FA96 P20=0: tape not present -> FF
+lcomment FAA0 cmd 0x71: motor forward (cas1_mode=FF)
+lcomment FAA4 cmd 0x72: motor stop (cas1_mode=0)
+lcomment FAA7 cas_ctrl_check
+lcomment FAAC transact: get loop count
+lcomment FAB4 mode=0: calculate adjusted count
+lcomment FAC7 mode!=0: use count=10 directly
+lcomment FAC9 send cmd to cassette controller
+lcomment FACF polling loop: wait for cas ctrl P46
+lcomment FAD9 loop done: read tape position
+lcomment FADF JSR cas_ctrl_stop
+lcomment FAE6 check mode for position adjustment
+lcomment FAF0 start recording: init cas ctrl
+lcomment FAFB send cmd 0x01 (play/record)
+lcomment FB01 inner polling loop
+lcomment FB0D done: cas_ctrl_stop + check
+
+* --- Group 7: Protocol ---
+lcomment FB13 cmd 0x73: motor rewind
+lcomment FB19 send rewind cmd ($0A) to cas ctrl
+lcomment FB21 cas1_mode=FF (rewind mode)
+lcomment FB25 poll until cas ctrl signals done
+lcomment FB2C cmd 0x76: cas_ctrl_init
+lcomment FB31 cmd 0x77: cleanup (cas_ctrl_check)
+lcomment FB3E cmd 0x7C: detect tape + send mode byte
+lcomment FB40 shift left for status format
+lcomment FB45 cmd 0x7D: init cas ctrl + ACK
+lcomment FB4B detect helper: init + check P46 state
+lcomment FB54 delay loop ($0640 iterations)
+lcomment FB5C read P46 state for tape detect
+lcomment FB62 cmd 0x7B: start SAVE block
+lcomment FB64 save mode from save_mode_7b
+lcomment FB6B cmd 0x78: search forward
+lcomment FB6D set expected match byte
+lcomment FB74 cmd 0x79: search reverse
+lcomment FB79 cmd 0x7A: search for tape mark
+lcomment FB82 cas_ctrl_check
+lcomment FB8E call detect helper
+lcomment FB91 send cmd to cassette controller
+lcomment FB97 timeout counter = 10000
+lcomment FB9C poll loop: check RDRF for master cmds
+lcomment FBA0 read master command byte
+lcomment FBA4 check for 0x6E (read pos hi)
+lcomment FBAA check for 0x6F (read pos lo)
+lcomment FBB0 check for expected match byte
+lcomment FBB9 check for 0x7B (save begin: loop back)
+lcomment FBBD not expected: queue as pending cmd
+lcomment FBC5 no RDRF: decrement timeout
+lcomment FBCC poll cas ctrl P46
+
+* --- Cassette Controller IC ---
+lcomment FBD3 stop: send $18 cmd to cas ctrl
+lcomment FBD7 wait for P46 transitions (21 ticks)
+lcomment FBE6 reset: clear A, clear B5 bit 7
+lcomment FBEA bit-bang 8 bits on P43(data)/P44(clock)
+lcomment FBED save cmd byte
+lcomment FBF0 arm OCR for first clock edge
+lcomment FBF8 8-bit loop
+lcomment FBFA clear P43+P44 (data=0, clock=0)
+lcomment FBFD shift bit into carry
+lcomment FC00 bit=1: set P43 (data=1)
+lcomment FC03 set P44 (clock high)
+lcomment FC09 CLC: success
+lcomment FC0B arm OCR from current FRC
+lcomment FC17 wait P46: check OCF timeout
+lcomment FC1A timeout: advance OCR, DEX, SEC, RTS
+lcomment FC21 advance OCR by $0266 cycles
+lcomment FC2D cas_ctrl_init: check P46 matches expected
+lcomment FC31 cas_ctrl_check: expected P46=0
+lcomment FC34 clear B4 bit 5
+lcomment FC37 set P44 high
+lcomment FC3A debounce: read PORT4 twice
+lcomment FC40 mask P46 (bit 6)
+lcomment FC42 compare with expected state
+lcomment FC46 send $20 cmd (query status)
+lcomment FC50 arm OCR + wait initial delay
+lcomment FC52 check P46 transitions (4 expected)
+lcomment FC56 wait P46 with OCR timeout
+lcomment FC5C debounce PORT4 for P46
+lcomment FC66 P46 changed: count down
+lcomment FC6D send $40 cmd (confirm)
+lcomment FC74 wait for $0258 P46 ticks
+lcomment FC7D timeout: set B4 bit 5, send $40, SEC
+lcomment FC87 poll: wait for P46 transitions after cmd
+lcomment FC8D wait 5 P46 ticks
+lcomment FC91 clear P44
+lcomment FC94 read 11 data bits from P46
+lcomment FC98 check SCI overrun
+lcomment FCA0 check TOF (timer overflow)
+lcomment FCA5 dec counter, done when 0
+lcomment FCAD debounce + read P46
+lcomment FCB8 compare with prev state
+lcomment FCBA mask P46
+lcomment FCC1 toggle expected P46 state
+lcomment FCC4 update tape position (B0/B1)
+
+* --- CAS0 SAVE ---
+lcomment FCE8 mode 81=0 (CAS0: internal)
+lcomment FCDC mode 81=1 (CAS1: external via CAS0 path)
+lcomment FCE0 cmd 0x65: header-only save
+lcomment FCEB set P44,P45 high
+lcomment FCF0 check P20 (tape present)
+lcomment FCF3 present: continue
+lcomment FCF5 not present: error
+lcomment FCF8 init cassette controller
+lcomment FCFF ACK to master
+lcomment FD02 check mode: FF=skip param recv
+lcomment FD07 transact: get 2 param bytes -> $84,$85
+lcomment FD0E transact: get 2 bytes -> byte count $B8,$B9
+lcomment FD15 motor RECORD cmd ($81)
+lcomment FD1A set P44=high, cas1_leader_ct bit 7
+lcomment FD20 set OLVL=1, arm OC from FRC
+lcomment FD2B leader: 625x FF via cas0_fsk_encode_7
+lcomment FD3B FF byte for leader
+lcomment FD40 check SCI overrun during leader
+lcomment FD48 sync: 9x00, then 00/FF/AA markers
+lcomment FD58 sync marker: 00
+lcomment FD5C sync marker: FF
+lcomment FD61 sync marker: AA
+lcomment FD66 clear CRC
+lcomment FD6A reload byte count
+lcomment FD6C data loop: poll P40+RDRF+OCF
+lcomment FD6F P40=0: motor stopped
+lcomment FD71 read TRCSR for RDRF
+lcomment FD73 RDRF: data byte ready
+lcomment FD75 check OCF timeout
+lcomment FD78 OCF: timeout error
+lcomment FD7C SCI overrun: stop + reset + error
+lcomment FD85 ACK with $61, read data byte
+lcomment FD8B FSK encode the data byte
+lcomment FD8D DEX byte counter
+lcomment FD90 all bytes sent: check mode
+lcomment FD92 B=2 for error exit check
+lcomment FD95 mode>0: cas0_save_no_tape (CAS1 mode)
+lcomment FD97 write trailer: CRC_lo, CRC_lo, AA, 00
+lcomment FDA6 trailing leader
+lcomment FDB5 leader FF byte loop
+lcomment FDB9 check SCI overrun during trailer
+lcomment FDC1 TSTB: check if more blocks
+lcomment FDC4 CLC + RTS: SAVE success
+lcomment FDC6 OCF timeout during data: send error
+lcomment FDCC send $6F error code
+lcomment FDD2 P40=low exit: check mode
+lcomment FDD4 mode==1: CAS1 external, send ACK
+lcomment FDD8 ACK $61 for CAS1 mode
+lcomment FDDC jump to trailer
+lcomment FDDE non-CAS1: error report
+lcomment FDE1 stop cassette controller
+lcomment FDE6 no tape: OR B into cas_status
+
+* --- CAS0 FSK Encode (P21 output compare) ---
+lcomment FDF1 cmd 0x6B: ACK + stop cas ctrl
+lcomment FDF6 7-bit entry: 8 FSK half-cycles
+lcomment FDFB 8-bit entry: 9 FSK half-cycles
+lcomment FDFE store byte + counter
+lcomment FE00 wait OCF (output compare match)
+lcomment FE05 toggle OLVL (P21 output level)
+lcomment FE08 bit=1: phase 1 timing
+lcomment FE0A check LSB of fsk_byte
+lcomment FE0F bit=0: zero-bit timing
+lcomment FE11 add period to OCR
+lcomment FE15 check bit counter
+lcomment FE17 counter=0: skip CRC on stop bit
+lcomment FE19 CRC update
+lcomment FE2A wait OCF for second half-cycle
+lcomment FE2F set OLVL=1 (OIM $01)
+lcomment FE32 SEC + ROR: shift 1 into fsk_byte[7]
+lcomment FE36 bit was 1: phase 2 timing
+lcomment FE3A bit was 0: zero-bit timing
+lcomment FE3C add period to OCR
+lcomment FE40 dec bit counter
+lcomment FE43 loop if >= 0
+
+* --- CAS0 LOAD (P20 input capture) ---
+lcomment FE48 mode=FF (header only)
+lcomment FE4C mode=FE (end only)
+lcomment FE50 mode=01 (skip CRC)
+lcomment FE54 mode=00 (all + CRC check)
+lcomment FE55 store mode in cas0_mode
+lcomment FE57 cassette controller init
+lcomment FE5F ACK to master
+lcomment FE62 motor PLAY cmd ($01)
+lcomment FE67 set cas1_leader_ct bit 7
+lcomment FE6A set PORT4 bits 2,5
+lcomment FE6D clear PORT4 bit 4
+lcomment FE70 clear IEDG in TCSR (falling edge)
+lcomment FE73 clear fsk_flags bit 0
+lcomment FE76 check fsk_flags bit 3
+lcomment FE80 set IEDG=1 (rising edge capture)
+lcomment FE83 set fsk_flags bit 0
+lcomment FE86 transact: get 2 param bytes
+lcomment FE8D DDR3=FB: P32 input
+lcomment FE91 P34=low
+lcomment FE94 transact: get byte count
+lcomment FE99 store byte count
+lcomment FE9B set error recovery vector
+lcomment FEA0 CLI: enable interrupts
+lcomment FEA1 outer leader search loop
+lcomment FEA4 wait for ICF (input capture flag)
+lcomment FEA8 D = prev ICR value
+lcomment FEAA wait for next ICF
+lcomment FEAF D = prev - current ICR (period)
+lcomment FEB2 read PORT2 for edge polarity
+lcomment FEB4 XOR with flags for expected polarity
+lcomment FEB6 ASRA: polarity bit into carry
+lcomment FEB8 wrong polarity: wait again
+lcomment FEBA add ICR adjustment offset
+lcomment FEBC ASLA: shift sign into carry
+lcomment FEBD save ICR for next iteration
+lcomment FEC1 carry set: restart leader search
+lcomment FEC3 DEX leader counter
+lcomment FEC6 leader found: enter sync phase
+lcomment FEC9 sync: look for short periods
+lcomment FECE wait for ICF
+lcomment FED3 same period measurement
+lcomment FEE0 ASLA: check period threshold
+lcomment FEE7 7-bit decode (leader byte = FF?)
+lcomment FEEC INCA: FF+1=0 means leader byte
+lcomment FEED not FF: back to leader search
+lcomment FEEF 8-bit decode (sync marker = AA?)
+lcomment FEF4 EORA #AA: should be zero
+lcomment FEF8 init CRC
+lcomment FEFB load byte count into X
+lcomment FEFD decode first data byte
+lcomment FF02 check mode
+lcomment FF04 check for $48 marker
+lcomment FF08 check for $45 marker
+lcomment FF0C set short count ($54)
+lcomment FF0F TSTB: check mode for header search
+lcomment FF20 decode next data byte
+lcomment FF24 wait TDRE
+lcomment FF29 send byte to master
+lcomment FF2B DEX byte counter
+lcomment FF2E check mode for CRC verify
+lcomment FF33 decode CRC byte 1
+lcomment FF37 decode CRC byte 2
+lcomment FF3B send $62 (block complete, CRC OK)
+lcomment FF40 SEI, check param for cleanup
+lcomment FF45 stop cassette controller
+lcomment FF4A CRC error: set cas_status bit 0
+lcomment FF4F timeout error: set cas_status bit 1
+lcomment FF52 P34=high (error flag to master)
+lcomment FF57 no tape: send $20 error
+
+* --- CAS0 Load Helper (cmd 0x63 entry) ---
+lcomment FF5C cas_ctrl_init + motor play
+lcomment FF66 transact: get delay count
+lcomment FF6C read TCSR for timer state
+lcomment FF6E arm OCR with initial period
+lcomment FF74 outer loop: 9 ticks per iteration
+lcomment FF78 inner loop: add period to OCR
+lcomment FF7E wait OCF
+lcomment FF83 dec inner counter
+lcomment FF88 DEX outer counter
+lcomment FF8B done: stop cassette controller
+
+* --- CAS0 FSK Decode (P20 input capture, NO inversion) ---
+lcomment FF8D 7-bit decode: 8 edge measurements
+lcomment FF92 8-bit decode: 9 edge measurements
+lcomment FF95 init bit_counter, arm OCR timeout
+lcomment FF9C read TCSR for timer
+lcomment FFA0 write OCR_H to arm
+lcomment FFA2 D = prev ICR value
+lcomment FFA4 check both ICF and OCF
+lcomment FFA7 ICF set (bit 7): process edge
+lcomment FFA9 neither: wait
+lcomment FFAB OCF only: timeout, SEC+RTS
+lcomment FFAE D = prev - current (period)
+lcomment FFB1 read PORT2 for polarity
+lcomment FFB3 XOR with fsk_flags
+lcomment FFB5 ASRA: polarity into carry
+lcomment FFB7 wrong polarity: measure again
+lcomment FFB9 add ICR adjustment
+lcomment FFBB ASLA: threshold comparison
+lcomment FFBC save ICR for next
+lcomment FFC0 check bit 3 of counter (skip CRC first)
+lcomment FFC5 TPA: carry(=threshold result)->CCR
+lcomment FFC6 ROR: C -> fsk_byte[7] DIRECTLY (no invert!)
+lcomment FFC9 CLRB: clear B
+lcomment FFCA TAP: restore CCR (with original carry)
+lcomment FFCB ROLB: carry -> B[0] for CRC
+lcomment FFCC CRC update
+lcomment FFD7 store CRC
+lcomment FFD9 dec bit_counter
+lcomment FFDC loop if >= 0
+lcomment FFDE CLC: success
+lcomment FFDF return decoded byte in A
