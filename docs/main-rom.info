@@ -593,9 +593,114 @@ label 8AAA bas_and_op
 label 8AB4 bas_xor_op
 label 8ABB bas_complement
 
-* --- BASIC I/O ---
+* --- Variable lookup and assignment ($8ACF-$8BA5) ---
+label 8ACF bas_parse_varname
+label 8AFE bas_is_alpha
+label 8B07 bas_var_lookup
+label 8B0E bas_var_store_bank
+label 8B10 bas_var_parse_type
+label 8B39 bas_var_store_type
+label 8B50 bas_var_search_simple
+label 8B6B bas_var_not_in_table
+label 8BA3 bas_var_found
+label 8BA8 bas_var_compare_name
+label 8BBF bas_var_setup_compare
+
+* --- Array / DIM handling ($8BE5-$8D10) ---
+label 8BD4 bas_eval_subscript
+label 8BDA bas_eval_byte
+label 8BE5 bas_array_subscript
+label 8C48 bas_dim_entry
+label 8C6D bas_error_subscript
+label 8C75 bas_dim_create_new
+label 8C8E bas_dim_alloc_loop
+label 8CD2 bas_dim_existing
+label 8D11 bas_array_load_bounds
+label 8D13 bas_multiply_16x16
+
+* --- Memory / FRE / CLEAR ($8D36-$8D7F) ---
+label 8D36 bas_fre
+label 8D7F bas_clear_exec
+label 8D8D bas_scan_string
+
+* --- String space management ($8DC0-$8F2C) ---
+label 8DC0 str_alloc_store_ptr
+label 8DC2 str_alloc_set_info
+label 8DC9 str_setup_quoted
+label 8DCA str_scan_quoted
+label 8DCD str_scan_delim
+label 8DD3 str_alloc_copy
+label 8DDA str_push_descriptor
+label 8E00 str_space_alloc
+label 8E2C str_garbage_collect
+label 8E97 str_gc_check_range
+label 8EBE str_gc_compact
+label 8EDD str_concat
+label 8F17 str_get_data_ptr
+label 8F19 str_copy_to_pool
+label 8F2D str_eval_string
+label 8F30 str_get_checked
+label 8F33 str_get_descriptor
+label 8F35 str_read_descriptor
+label 8F4D str_check_temp_top
+label 8F5F str_get_len_test
+
+* --- String functions ($8F63-$8FC9) ---
+label 8F63 bas_chr_fn
+label 8F77 bas_asc_fn
+label 8F82 bas_left_fn
+label 8F9F bas_right_fn
+label 8FA6 bas_mid_fn
+label 8FC9 str_fn_get_args
+
+* --- Numeric eval helpers ($8FE3-$8FF5) ---
+label 8FE3 bas_eval_advance
+label 8FE6 bas_eval_byte_expr
+label 8FE9 bas_eval_to_byte
+label 8FF5 bas_error_funcall
+label 8FF8 bas_len_fn
+
+* --- DEF / POKE helpers ($902C-$90BF) ---
+label 902C bas_def_helper
+label 9038 bas_eval_address
+label 9055 bas_check_addr_range
+label 907A bas_spc_fn
+
+* --- PRINT ($90C0-$9196) ---
+label 90C0 bas_print_dispatch
 label 912C bas_crlf
+label 9135 bas_send_cr
+label 9145 bas_print_comma
+label 9152 bas_print_semi
+label 915D bas_tab_fn
+label 9167 bas_tab_to_col
+label 9171 bas_print_next_item
+label 917A bas_print_spaces
 label 917E bas_print_string
+label 9181 bas_print_str_desc
+label 9191 bas_print_space
+label 9196 bas_char_output
+
+* --- INSTR / STRING$ / SPACE$ ($9199-$9253) ---
+label 9199 bas_instr_fn
+label 9221 bas_string_fn
+label 923F bas_space_fn
+label 9254 bas_mid_assign
+
+* --- HEX$/OCT$ / number parsing ($92F0-$9395) ---
+label 92F0 bas_hex_oct_fn
+label 9341 bas_parse_hex_oct
+label 9383 bas_hex_oct_accum
+
+* --- LIST output helpers ($939D-$9442) ---
+label 939D bas_list_line
+label 93E7 bas_list_setup
+label 9442 bas_parse_linenum
+
+* --- PRINT USING ($9585-$9721) ---
+label 9585 bas_print_using
+
+* --- END / FOR ---
 label 9722 bas_end
 label 97EA bas_for
 
@@ -1341,7 +1446,67 @@ lcomment 8A5B string comparison (lexicographic)
 lcomment 8AAA bitwise AND: D &= $E5/$E6
 lcomment 8AB4 bitwise XOR: D ^= $E5/$E6
 lcomment 8ABB complement: COM A, COM B
+lcomment 8ACF parse variable name from input into $085C buffer
+lcomment 8AFE test if A is letter A-Z: CY clear=yes, CY set=no
+lcomment 8B07 variable lookup: parse name, determine type, search/create
+lcomment 8B10 determine variable type from suffix (%$!#) or DEFTYPE table
+lcomment 8B50 search simple variable table ($9E-$A0) for matching name
+lcomment 8BA8 compare variable name at X with parsed name; Z=1 if match
+lcomment 8BBF set up aux_stack and compute name hash from type+length
+lcomment 8BD4 evaluate array subscript expression (get integer)
+lcomment 8BE5 array subscript handler: eval dimensions, search/create array
+lcomment 8C48 DIM entry: search table for array, create with dimensions
+lcomment 8C6D error: Subscript out of range (LDAB #$09)
+lcomment 8D11 load array dimension bounds from descriptor at +3,X
+lcomment 8D13 16x16 bit multiply D * $EE/$EF via shift-and-add
+lcomment 8D36 FRE function: compute free memory (var_start - string_top)
 lcomment 8D56 CLEAR statement
+lcomment 8D7F execute CLEAR: reset variables and string space
+lcomment 8D8D scan string at X for delimiters in $80/$81, return length
+lcomment 8DC0 allocate string space, store X to $CE
+lcomment 8DCA scan quoted string: set A=$22 (double quote)
+lcomment 8DD3 allocate string space, copy from source, push descriptor
+lcomment 8DDA push 3-byte string descriptor ($DF/$E0/$E1) onto temp stack
+lcomment 8E00 allocate B bytes of string space below $A6; GC if needed
+lcomment 8E2C compact string space: scan descriptors, move live strings up
+lcomment 8EDD string concatenation: eval next term, combine, copy both
+lcomment 8F17 load string data pointer from descriptor offset +1,X
+lcomment 8F19 copy B+1 bytes from aux_stack_ptr to string space at $A8
+lcomment 8F33 load string descriptor address from $D7 into X
+lcomment 8F35 read descriptor at X: B=length; free temp if at stack top
+lcomment 8F5F get string info, test length (Z=1 if empty string)
+lcomment 8F63 CHR$ function: eval byte, allocate 1-char string
+lcomment 8F77 ASC function: get string, return first byte as integer
+lcomment 8F82 LEFT$ function: return leftmost N chars
+lcomment 8F9F RIGHT$ function: return rightmost N chars
+lcomment 8FA6 MID$ function: return substring from position
+lcomment 8FC9 common string fn arg parser: expect ), restore descriptor
+lcomment 8FE6 backup input, eval expression, ensure single-byte result
+lcomment 8FF5 JMP error: Illegal function call (error $05)
+lcomment 8FF8 LEN function: get string length, return as integer
+lcomment 902C DEF helper: parse target expression
+lcomment 9038 evaluate expression and convert to address in X
+lcomment 9055 check address in X against memory-protect bounds
+lcomment 907A SPC function: eval arg, compute spacing from column pos
+lcomment 90C0 PRINT item dispatch: #file, USING, comma, semi, expression
+lcomment 9135 send CR ($0D), optionally LF ($0A)
+lcomment 9145 PRINT comma: tab to next zone boundary
+lcomment 9152 PRINT semicolon: suppress newline
+lcomment 915D TAB function: eval arg, expect ), space to target col
+lcomment 9167 tab to column B: print spaces until position reached
+lcomment 9181 print string from descriptor: loop outputting chars
+lcomment 9191 load space char ($20) for output
+lcomment 9196 character output: JMP $A7C9 (device-selected putchar)
+lcomment 9199 INSTR function: search for substring, return position
+lcomment 9221 STRING$ function: eval count and char, fill string
+lcomment 923F SPACE$ function: eval count, fill with spaces
+lcomment 9254 MID$ assignment: replace substring in-place
+lcomment 92F0 HEX$/OCT$ function: convert integer to hex or octal string
+lcomment 9341 parse &H (hex) or &O (octal) numeric literal from input
+lcomment 939D output one BASIC line: number, space, detokenized text
+lcomment 93E7 LIST command: init range ptrs, parse line number range
+lcomment 9442 parse line number: . = current line, else decimal
+lcomment 9585 PRINT USING entry: eval format string, process items
 lcomment 9071 DEF statement
 lcomment 90B5 POKE statement
 lcomment 9456 SWAP statement
