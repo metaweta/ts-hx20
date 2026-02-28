@@ -713,7 +713,163 @@ label 9585 bas_print_using
 * --- FOR / NEXT ($9722-$97EA) ---
 * (labels defined in dispatch table section above)
 
-* --- BASIC SAVE/LOAD ---
+* --- Error code table ($9965-$99E3) ---
+data 9965-99E3
+label 9965 bas_error_codes
+lcomment 9965 39 two-character error codes (NF UF SN RG OD FC OV OM...)
+
+* --- ERROR / RESUME ($9A14-$9A62) ---
+label 9A04 bas_error_resume_entry
+lcomment 9A14 ERROR statement: raise error by number
+lcomment 9A1F RESUME statement: restore execution after error
+label 9A3F bas_resume_find_handler
+
+* --- SWAP ($9A63-$9AA0) ---
+label 9A7F bas_swap_copy_loop
+lcomment 9A63 SWAP statement: exchange two variables
+
+* --- DEF FN / DEF USR ($9AA1-$9C97) ---
+lcomment 9AA1 DEF statement: checks $D5 (USR) or falls through (FN)
+label 9AD9 bas_def_parse_name
+label 9AEB bas_def_check_direct
+label 9AF5 bas_def_fn_body
+label 9B48 bas_def_fn_eval
+label 9C44 bas_defusr
+lcomment 9C44 DEF USR: set USR function address
+label 9C5E bas_parse_digit
+lcomment 9C5E parse digit 0-9, return in B
+label 9C71 bas_var_lookup_typed
+
+* --- RENUM ($9C98-$9EF0) ---
+lcomment 9C98 RENUM: renumber program lines
+label 9CA7 bas_renum_parse_args
+label 9CFC bas_renum_mem_check
+label 9D1D bas_renum_assign
+label 9D48 bas_renum_scan_refs
+label 9DA3 bas_renum_update_refs
+label 9E97 bas_renum_verify
+
+* --- ERASE ($9F07-$9FF5) ---
+lcomment 9F07 ERASE: remove array from variable table
+
+* --- READ / DATA ($9FF6-$A132) ---
+lcomment 9FF6 READ: read values from DATA statements
+label A00E bas_read_dispatch
+label A067 bas_read_data_scan
+label A0E8 bas_read_array_init
+label A10E bas_read_finish
+
+* --- Tokenizer ($A13B-$A370) ---
+label A13B bas_tokenize
+lcomment A13B tokenize BASIC text line into token stream
+label A14E bas_tokenize_loop
+label A23E bas_tokenize_store
+label A248 bas_tokenize_special
+label A267 bas_tokenize_string
+label A280 bas_tokenize_keyword
+label A30E bas_to_upper
+lcomment A30E convert lowercase to uppercase
+
+* --- Statement executor ($A379-$A411) ---
+label A379 bas_exec_loop
+lcomment A379 main statement execution loop
+label A38E bas_exec_next
+label A3BA bas_exec_dispatch
+label A3C3 bas_exec_keyword
+label A3E1 bas_exec_fn_call
+label A3FF bas_exec_line_end
+
+* --- Variable assignment ($A412-$A4FE) ---
+label A412 bas_assign_init
+label A415 bas_assign_parse
+
+* --- LIST (token $A4) ---
+lcomment A4FF LIST statement
+
+* --- File operation helpers ($A50F-$A5DF) ---
+label A50F file_setup_init
+lcomment A50F init file operation state (error_mode, device, CRC)
+label A522 file_parse_filename
+label A538 file_merge_check_mode
+label A57B file_check_device
+label A5BA file_setup_device_state
+label A5C9 file_mode_handler
+
+* --- CLOSE ($A5E2) / OPEN ($A618) ---
+lcomment A5E2 CLOSE statement
+label A5FC io_channel_open
+label A5FF io_expect_char
+label A608 io_eval_channel
+label A613 io_error_bad_channel
+lcomment A618 OPEN statement
+label A652 io_find_descriptor
+label A665 io_load_device_info
+label A66B io_error_device_not_found
+label A676 io_set_device_mode
+label A69B io_check_file_format
+
+* --- MERGE ($A6A7) / LOAD ($A6AF) / SAVE ($A560) ---
+lcomment A6A7 MERGE statement
+label A6AC file_merge_flags
+lcomment A6AF LOAD statement
+label A6F3 file_parse_device
+label A709 file_check_direct
+
+* --- Device I/O dispatch ($A7AE-$A8B0) ---
+label A7AE io_get_device_handler
+lcomment A7AE get device descriptor and call handler
+label A7C9 io_write_byte
+lcomment A7C9 write byte from A to current device
+label A7EE io_find_descriptor_table
+label A808 io_setup_device_state
+label A836 io_clear_error_flags
+label A847 io_device_param_setup
+label A8AD io_eval_channel_byte
+label A8B0 io_check_channel_bounds
+
+* --- LLIST ($AAF1) / LPRINT ($AB00) / SOUND ($AB11) / MON ($AB1C) ---
+lcomment AAF1 LLIST statement
+lcomment AB00 LPRINT statement
+lcomment AB11 SOUND statement
+lcomment AB1C MON statement
+
+* --- LOAD/EXEC/SAVEM helpers ($AC54-$AD00) ---
+label AC54 file_load_response
+lcomment AC54 process LOAD response: tape position and byte count
+label AC85 file_close_cleanup
+label ACA2 file_savem_range_check
+label ACDF file_eval_expr
+label ACE5 io_get_device_checked
+label ACF2 io_parse_device_mode
+
+* --- LOADM ($AD01) / COPY ($AD72) / PRESET ($AD84) / LOADQ ($AE10) ---
+lcomment AD01 LOADM statement
+lcomment AD72 COPY (was EXEC)
+lcomment AD84 PRESET statement
+
+* --- Device handler dispatch ($ADC8-$AE10) ---
+label ADC8 io_get_state
+label AD9D io_update_flags
+label AE03 io_write_control
+label AE05 io_call_handler
+
+* --- FILES ($AF5D) / MOTOR ($AF8C) ---
+lcomment AF5D FILES statement
+lcomment AF8C MOTOR statement
+label AF3A io_get_handler_ptr
+label AF41 io_list_entries
+label AFD5 io_device_scan
+label AFFB io_update_motor
+
+* --- Printer / device output ($B00D-$B175) ---
+label B00D printer_status
+label B0EE printer_output_line
+label B10D printer_call_handler
+label B111 io_send_crlf
+label B129 io_parse_device_params
+label B175 io_parse_hex_char
+
+* --- BASIC SAVE/LOAD (cassette protocol) ---
 
 * ============================================================
 * Boot Menu / Monitor (D000-DFFF)
