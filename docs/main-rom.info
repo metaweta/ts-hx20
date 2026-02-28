@@ -426,155 +426,165 @@ label 85F8 bas_init_vars
 label 8645 bas_exec_setup
 
 * --- Statement handlers: from dispatch table at $8015 ---
-* Token $80: '
-label 866B bas_tick_comment
-* Token $81: END
-* (at $9722)
-* Token $82: FOR
-* (at $97EA)
-* Token $83: NEXT (skip to delimiter, advance)
-label 8721 bas_next
-* Token $84: DATA
-label 8AC7 bas_data
-* Token $85: DIM
-label 9FF6 bas_dim
-* Token $86: READ
-label 87E6 bas_read
-* Token $87: LET
-label 86C2 bas_let
-* Token $88: GO (GOTO/GOSUB)
-label 86AC bas_go
-* Token $89: RUN
-label 8750 bas_run
-* Token $8A: IF
-label 8658 bas_if
-* Token $8B: RESTORE
-label 86FC bas_restore
-* Token $8C/$8D/$8F: RETURN/REM/STOP — shared entry (skip to delimiter)
-label 8724 bas_return_rem_stop
-* Token $8E: ' (apostrophe — REM alias, SEC then skip)
-label 8675 bas_rem_apost
-* Token $90: ELSE
-label 9518 bas_else
-* Token $91: TRON
-label 9519 bas_tron
-* Token $92: TROFF
-label 9A63 bas_troff
-* Token $93: SWAP
-label 9456 bas_swap
-* Token $94: DEFSTR
-label 9459 bas_defstr
-* Token $95: DEFINT
-label 945C bas_defint
-* Token $96: DEFSNG
-label 945F bas_defsng
-* Token $97: DEFDBL
-label BEAB bas_defdbl
-* Token $98: DEFFIL
-label 8791 bas_deffil
-* Token $99: ON
-label AB00 bas_on
-* Token $9A: LPRINT
-label AAF1 bas_lprint
-* Token $9B: LLIST
-label 9C98 bas_llist
-* Token $9C: RENUM
-label 9A14 bas_renum
-* Token $9D: ERROR
-label 9A1F bas_error_stmt
-* Token $9E: RESUME
-label 94E1 bas_resume
-* Token $9F: AUTO
-label 9497 bas_auto
-* Token $A0: DELETE
-label 9AA1 bas_delete
-* Token $A1: DEF
-label 9071 bas_def
-* Token $A2: POKE
-label 90B5 bas_poke
-* Token $A3: PRINT
-label 869C bas_print
-* Token $A4: CONT
-label A4FF bas_cont
-* Token $A5: LIST
-label BC0F bas_list
-* Token $A6: CLEAR
-label 8D56 bas_clear
-* Token $A7: OPTION
-label BFCD bas_option
-* Token $A8/$A9: RANDOMIZE/WHILE — RAM indirect vectors ($0651/$0654)
-* Token $AA: WEND
-label 85CD bas_wend
-* Token $AB: NEW
-label 9F07 bas_new
-* Token $AC: ERASE
-label AD01 bas_erase
-* Token $AD: LOADM
-label AE10 bas_loadm
-* Token $AE: LOAD?
-label AC8D bas_loadq
-* Token $AF: SAVEM
-label A560 bas_savem
-* Token $B0: SAVE
-label A6AF bas_save_stmt
-* Token $B1: LOAD
-label A6A7 bas_load_stmt
-* Token $B2: MERGE
-label A618 bas_merge
-* Token $B3: OPEN
-label A5E2 bas_open
-* Token $B4: CLOSE
-label B9AA bas_close
-* Token $B5: LINE
-label B8EE bas_line
-* Token $B6: SCROLL
-label AB11 bas_scroll
-* Token $B7: SOUND
-label AB1C bas_sound
-* Token $B8: MON
-label AF5D bas_mon
-* Token $B9: FILES
-label AF8C bas_files
-* Token $BA: MOTOR
-label BEC0 bas_motor
-* Token $BB: PUT
-label BF44 bas_put
-* Token $BC: GET
-label B7D5 bas_get
-* Token $BD: LOCATES
-label B7CF bas_locates
-* Token $BE: LOCATE
-label B844 bas_locate
-* Token $BF: CLS
-label AA4E bas_cls
-* Token $C0: KEY
-label B851 bas_key
-* Token $C1: WIDTH
-label B93E bas_width
-* Token $C2: PSET
-label B941 bas_pset
-* Token $C3: PRESET
-label AD84 bas_preset
-* Token $C4: COPY
-label AD72 bas_copy
-* Token $C5: EXEC
-label AC66 bas_exec
-* Token $C6: WIND
-label B837 bas_wind
-* Token $C7: GCLS
-label BA22 bas_gcls
-* Token $C8: SCREEN
-label B9F4 bas_screen
-* Token $C9: COLOR
-label BB76 bas_color
-* Token $CA: LOGIN
-label BA93 bas_login
-* Token $CB: TITLE
-label BB2C bas_title
-* Token $CC: STAT
-label BBB9 bas_stat
-* Token $CD: PCOPY
-label BCE0 bas_pcopy
+* Tokens $80-$CD map to keywords 0-77 (END..MEMSET)
+* CORRECTED mapping: token $80 = keyword 0 = END (NOT tick_comment)
+* Verified by: TRON/TROFF multi-entry at $9518/$9519,
+*   GO handler CMPB #$D0(TO)/#$D1(SUB), IF handler CMPA #$87(GO),
+*   RUN handler CMPA #$22("), FOR marker $81 on stack
+* Secondary tokens start at $CE: BASE=$CE, TAB(=$CF, TO=$D0, SUB=$D1
+*
+* Token $80: END
+label 866B bas_end
+* Token $81: FOR
+label 9722 bas_for
+* Token $82: NEXT
+label 97EA bas_next
+* Token $83: DATA (skip to delimiter, advance)
+label 8721 bas_data
+* Token $84: DIM
+label 8AC7 bas_dim
+* Token $85: READ
+label 9FF6 bas_read
+* Token $86: LET
+label 87E6 bas_let
+* Token $87: GO (GOTO/GOSUB — checks TO=$D0, SUB=$D1)
+label 86C2 bas_go
+* Token $88: RUN
+label 86AC bas_run
+* Token $89: IF
+label 8750 bas_if
+* Token $8A: RESTORE
+label 8658 bas_restore
+* Token $8B: RETURN
+label 86FC bas_return
+* Token $8C/$8D/$8F: REM/' /ELSE — shared entry (skip to delimiter)
+label 8724 bas_rem
+* Token $8E: STOP
+label 8675 bas_stop
+* Token $90: TRON
+label 9518 bas_tron
+* Token $91: TROFF
+label 9519 bas_troff
+* Token $92: SWAP
+label 9A63 bas_swap
+* Token $93: DEFSTR
+label 9456 bas_defstr
+* Token $94: DEFINT
+label 9459 bas_defint
+* Token $95: DEFSNG
+label 945C bas_defsng
+* Token $96: DEFDBL
+label 945F bas_defdbl
+* Token $97: DEFFIL
+label BEAB bas_deffil
+* Token $98: ON
+label 8791 bas_on
+* Token $99: LPRINT
+label AB00 bas_lprint
+* Token $9A: LLIST
+label AAF1 bas_llist
+* Token $9B: RENUM
+label 9C98 bas_renum
+* Token $9C: ERROR
+label 9A14 bas_error_stmt
+* Token $9D: RESUME
+label 9A1F bas_resume
+* Token $9E: AUTO
+label 94E1 bas_auto
+* Token $9F: DELETE
+label 9497 bas_delete
+* Token $A0: DEF
+label 9AA1 bas_def
+* Token $A1: POKE
+label 9071 bas_poke
+* Token $A2: PRINT
+label 90B5 bas_print
+* Token $A3: CONT
+label 869C bas_cont
+* Token $A4: LIST
+label A4FF bas_list
+* Token $A5: CLEAR
+label BC0F bas_clear
+* Token $A6: OPTION
+label 8D56 bas_option
+* Token $A7: RANDOMIZE
+label BFCD bas_randomize
+* Token $A8: WHILE — RAM indirect vector ($0651)
+label 0651 bas_while_vec
+* Token $A9: WEND — RAM indirect vector ($0654)
+label 0654 bas_wend_vec
+* Token $AA: NEW
+label 85CD bas_new
+* Token $AB: ERASE
+label 9F07 bas_erase
+* Token $AC: LOADM
+label AD01 bas_loadm
+* Token $AD: LOAD?
+label AE10 bas_loadq
+* Token $AE: SAVEM
+label AC8D bas_savem
+* Token $AF: SAVE
+label A560 bas_save_stmt
+* Token $B0: LOAD
+label A6AF bas_load_stmt
+* Token $B1: MERGE
+label A6A7 bas_merge
+* Token $B2: OPEN
+label A618 bas_open
+* Token $B3: CLOSE
+label A5E2 bas_close
+* Token $B4: LINE
+label B9AA bas_line
+* Token $B5: SCROLL
+label B8EE bas_scroll
+* Token $B6: SOUND
+label AB11 bas_sound
+* Token $B7: MON
+label AB1C bas_mon
+* Token $B8: FILES
+label AF5D bas_files
+* Token $B9: MOTOR
+label AF8C bas_motor
+* Token $BA: PUT
+label BEC0 bas_put
+* Token $BB: GET
+label BF44 bas_get
+* Token $BC: LOCATES
+label B7D5 bas_locates
+* Token $BD: LOCATE
+label B7CF bas_locate
+* Token $BE: CLS
+label B844 bas_cls
+* Token $BF: KEY
+label AA4E bas_key
+* Token $C0: WIDTH
+label B851 bas_width
+* Token $C1: PSET
+label B93E bas_pset
+* Token $C2: PRESET
+label B941 bas_preset
+* Token $C3: COPY
+label AD84 bas_copy
+* Token $C4: EXEC
+label AD72 bas_exec
+* Token $C5: WIND
+label AC66 bas_wind
+* Token $C6: GCLS
+label B837 bas_gcls
+* Token $C7: SCREEN
+label BA22 bas_screen
+* Token $C8: COLOR
+label B9F4 bas_color
+* Token $C9: LOGIN
+label BB76 bas_login
+* Token $CA: TITLE
+label BA93 bas_title
+* Token $CB: STAT
+label BB2C bas_stat
+* Token $CC: PCOPY
+label BBB9 bas_pcopy
+* Token $CD: MEMSET
+label BCE0 bas_memset
 
 * --- Expression evaluator ($884F-$8AC6) ---
 label 884F bas_eval_term
@@ -660,8 +670,8 @@ label 8FE9 bas_eval_to_byte
 label 8FF5 bas_error_funcall
 label 8FF8 bas_len_fn
 
-* --- DEF / POKE helpers ($902C-$90BF) ---
-label 902C bas_def_helper
+* --- POKE / PRINT helpers ($902C-$90BF) ---
+label 902C bas_poke_helper
 label 9038 bas_eval_address
 label 9055 bas_check_addr_range
 label 907A bas_spc_fn
@@ -700,9 +710,8 @@ label 9442 bas_parse_linenum
 * --- PRINT USING ($9585-$9721) ---
 label 9585 bas_print_using
 
-* --- END / FOR ---
-label 9722 bas_end
-label 97EA bas_for
+* --- FOR / NEXT ($9722-$97EA) ---
+* (labels defined in dispatch table section above)
 
 * --- BASIC SAVE/LOAD ---
 
@@ -1423,14 +1432,14 @@ lcomment 84EF command loop: read line, tokenize, execute
 lcomment 851F execute direct mode command
 lcomment 8594 relink all program lines (recompute NEXT pointers)
 lcomment 85AF search program for line >= text_ptr
-lcomment 85CD WEND statement
+lcomment 85CD NEW statement
 lcomment 85D5 setup ON ERROR state from prog_start
 lcomment 85F3 set input_ptr = prog_start - 1
 lcomment 85F8 clear variables, init BASIC workspace
 lcomment 8645 setup execution context (push+setup)
 lcomment 8658 IF statement
 lcomment 8675 apostrophe (REM alias): SEC then skip to delim
-lcomment 869C PRINT statement
+lcomment 869C CONT statement
 lcomment 884F evaluate expression term (numbers, vars, strings)
 lcomment 8878 parse string literal in quotes
 lcomment 88D5 expect char B at input_ptr, syntax error if mismatch
@@ -1460,7 +1469,7 @@ lcomment 8C6D error: Subscript out of range (LDAB #$09)
 lcomment 8D11 load array dimension bounds from descriptor at +3,X
 lcomment 8D13 16x16 bit multiply D * $EE/$EF via shift-and-add
 lcomment 8D36 FRE function: compute free memory (var_start - string_top)
-lcomment 8D56 CLEAR statement
+lcomment 8D56 OPTION statement
 lcomment 8D7F execute CLEAR: reset variables and string space
 lcomment 8D8D scan string at X for delimiters in $80/$81, return length
 lcomment 8DC0 allocate string space, store X to $CE
@@ -1507,22 +1516,22 @@ lcomment 939D output one BASIC line: number, space, detokenized text
 lcomment 93E7 LIST command: init range ptrs, parse line number range
 lcomment 9442 parse line number: . = current line, else decimal
 lcomment 9585 PRINT USING entry: eval format string, process items
-lcomment 9071 DEF statement
-lcomment 90B5 POKE statement
+lcomment 9071 POKE statement
+lcomment 90B5 PRINT statement
 lcomment 9456 SWAP statement
 lcomment 9459 DEFSTR statement
 lcomment 945C DEFINT statement
 lcomment 945F DEFSNG statement
 lcomment 9497 AUTO statement
 lcomment 94E1 RESUME statement
-lcomment 9518 ELSE statement (skip to matching END/line end)
-lcomment 9519 TRON statement (trace on)
-lcomment 9722 END statement
-lcomment 97EA FOR statement
+lcomment 9518 TRON statement (trace on)
+lcomment 9519 TROFF statement (trace off)
+lcomment 9722 FOR statement
+lcomment 97EA NEXT statement
 lcomment 9A14 RENUM statement
 lcomment 9A1F ERROR statement
 lcomment 9A63 TROFF statement (trace off)
-lcomment 9AA1 DELETE statement
+lcomment 9AA1 DEF statement
 lcomment 9C98 LLIST statement
 lcomment 9F07 NEW statement
 lcomment 9FF6 DIM statement
@@ -1554,12 +1563,12 @@ lcomment BA93 LOGIN statement
 lcomment BB2C TITLE statement
 lcomment BB76 COLOR statement
 lcomment BBB9 STAT statement
-lcomment BC0F LIST statement
+lcomment BC0F CLEAR statement
 lcomment BCE0 PCOPY statement
 lcomment BEAB DEFDBL statement
 lcomment BEC0 MOTOR statement
 lcomment BF44 PUT statement
-lcomment BFCD OPTION statement
+lcomment BFCD RANDOMIZE statement
 
 * --- Boot Menu ---
 lcomment D00E boot menu: SP=$04AF, system_mode=1, detect ROM options
