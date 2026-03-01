@@ -307,7 +307,7 @@ lcomment 8015 statement dispatch table: 78 entries, tokens $80-$CD
 data 80B1-8304
 lcomment 80B1 keyword table: MSB-terminated strings (END,FOR,NEXT,...PCOPY)
 data 8305-8358
-lcomment 8305 function dispatch: precedence + 2-byte handler address
+lcomment 8305 function dispatch table: 42 entries x 2 bytes (handler address), indexed by $FF sub-token
 data 8359-837C
 lcomment 8359 operator precedence/dispatch table for expression evaluator
 data 837D-8393
@@ -340,6 +340,10 @@ code B4DB-BE56
 * --- Boot menu format data and strings ---
 data BE57-BEAA
 code BEAB-CC37
+
+* --- LOG function FP coefficient tables ---
+data C29F-C2BF
+lcomment C29F FP constants for LOG polynomial evaluation
 
 * --- Floating-point constant tables ---
 data CC38-CCC3
@@ -509,6 +513,7 @@ label 9497 bas_delete
 * Token $A0: DEF
 label 9AA1 bas_def
 * Token $A1: POKE
+label 9068 bas_peek_fn
 label 9071 bas_poke
 * Token $A2: PRINT
 label 90B5 bas_print
@@ -573,6 +578,10 @@ label AA4E bas_key
 * Token $C0: WIDTH
 label B851 bas_width
 * Token $C1: PSET
+label B92C bas_csrline_fn
+lcomment B92C CSRLINE function: return current cursor line number
+label B932 bas_point_fn
+lcomment B932 POINT function: read pixel state at (x,y)
 label B93E bas_pset
 * Token $C2: PRESET
 label B941 bas_preset
@@ -612,9 +621,13 @@ label 89B9 bas_swap_fp_accum
 label 89E3 bas_power_op
 label 8A36 bas_relop_eval
 label 8A5B bas_string_compare
+label 8A1C bas_div_op
 label 8AAA bas_and_op
+label 8AAF bas_or_op
 label 8AB4 bas_xor_op
+label 8AB9 bas_eqv_op
 label 8ABB bas_complement
+label 8ABE bas_imp_op
 
 * --- Variable lookup and assignment ($8ACF-$8BA5) ---
 label 8ACF bas_parse_varname
@@ -641,9 +654,9 @@ label 8CD2 bas_dim_existing
 label 8D11 bas_array_load_bounds
 label 8D13 bas_multiply_16x16
 
-* --- Memory / FRE / CLEAR ($8D36-$8D7F) ---
+* --- Memory / FRE / STR$ ($8D36-$8D7F) ---
 label 8D36 bas_fre
-label 8D7F bas_clear_exec
+label 8D7F bas_str_fn
 label 8D8D bas_scan_string
 
 * --- String space management ($8DC0-$8F2C) ---
@@ -666,6 +679,7 @@ label 8F30 str_get_checked
 label 8F33 str_get_descriptor
 label 8F35 str_read_descriptor
 label 8F4D str_check_temp_top
+label 8F5A bas_len_fn
 label 8F5F str_get_len_test
 
 * --- String functions ($8F63-$8FC9) ---
@@ -681,9 +695,9 @@ label 8FE3 bas_eval_advance
 label 8FE6 bas_eval_byte_expr
 label 8FE9 bas_eval_to_byte
 label 8FF5 bas_error_funcall
-label 8FF8 bas_len_fn
+label 8FF8 bas_val_fn
 
-* --- POKE / PRINT helpers ($902C-$90BF) ---
+* --- PEEK / POKE / PRINT helpers ($902C-$90BF) ---
 label 902C bas_poke_helper
 label 9038 bas_eval_address
 label 9055 bas_check_addr_range
@@ -751,6 +765,8 @@ label 9C44 bas_defusr
 lcomment 9C44 DEF USR: set USR function address
 label 9C5E bas_parse_digit
 lcomment 9C5E parse digit 0-9, return in B
+label 9C29 bas_varptr_fn
+lcomment 9C29 VARPTR function: return address of variable storage
 label 9C71 bas_var_lookup_typed
 
 * --- RENUM ($9C98-$9EF0) ---
@@ -782,6 +798,10 @@ label A267 bas_tokenize_string
 label A280 bas_tokenize_keyword
 label A30E bas_to_upper
 lcomment A30E convert lowercase to uppercase
+label A31E bas_ext_fn_dispatch
+lcomment A31E extended function dispatch ($FF prefix + sub-token)
+label A36D bas_ext_fn_call
+lcomment A36D look up handler in function table (M05AE) and JSR
 
 * --- Statement executor ($A379-$A411) ---
 label A379 bas_exec_loop
@@ -833,18 +853,37 @@ label A7AE io_get_device_handler
 lcomment A7AE get device descriptor and call handler
 label A7C9 io_write_byte
 lcomment A7C9 write byte from A to current device
+lcomment A86F EOF function: test end-of-file on channel
+lcomment A895 LOF function: return length of file
+lcomment A8BA POS function: return cursor position
+lcomment A8D2 INPUT$ function: read N characters from device
 label A7EE io_find_descriptor_table
 label A808 io_setup_device_state
 label A836 io_clear_error_flags
 label A847 io_device_param_setup
+label A86F bas_eof_fn
+label A895 bas_lof_fn
 label A8AD io_eval_channel_byte
 label A8B0 io_check_channel_bounds
+label A8BA bas_pos_fn
+label A8D2 bas_input_fn
 
-* --- LLIST ($AAF1) / LPRINT ($AB00) / SOUND ($AB11) / MON ($AB1C) ---
+* --- INKEY$ / TIME / DATE / DAY ($AA38-$ABB4) ---
+label AA38 bas_inkey_fn
+lcomment AA38 INKEY$ function: return next key from buffer, or empty string
 lcomment AAF1 LLIST statement
 lcomment AB00 LPRINT statement
 lcomment AB11 SOUND statement
 lcomment AB1C MON statement
+label AB21 bas_time_fn
+lcomment AB21 TIME function: return system time as string
+lcomment AB71 DATE function: return system date as string
+lcomment ABB4 DAY function: return day of week as string
+label AB71 bas_date_fn
+label ABB4 bas_day_fn
+
+label AC44 bas_tapcnt_fn
+lcomment AC44 TAPCNT function: return tape counter value
 
 * --- LOAD/EXEC/SAVEM helpers ($AC54-$AD00) ---
 label AC54 file_load_response
@@ -923,6 +962,8 @@ lcomment BEAB DEFFIL statement
 lcomment BEC0 PUT statement
 lcomment BF44 GET statement
 lcomment BFCD RANDOMIZE statement (seed RNG)
+label BFE6 bas_rnd_fn
+lcomment BFE6 RND function: generate pseudo-random number
 
 * ============================================================
 * Floating Point Math ($C000-$CFFF)
@@ -932,6 +973,8 @@ lcomment BFCD RANDOMIZE statement (seed RNG)
 * Single precision (4 bytes) and double precision (8 bytes).
 
 * --- FP core arithmetic ($C000-$C3FF) ---
+label C040 bas_atn_fn
+lcomment C040 ATN function: arctangent via polynomial approximation
 label C111 fp_sub_exp
 lcomment C111 subtract exponents for add/sub alignment
 label C163 fp_add_mantissa
@@ -946,10 +989,48 @@ label C3A6 fp_load_from_mem
 lcomment C3A6 load FP number from memory (X points to data)
 
 * --- FP comparison / conversion ($C400-$C6FF) ---
+label C5D3 bas_sgn_fn
+lcomment C5D3 SGN function: return sign (-1, 0, or 1)
+label C5EA bas_abs_fn
+lcomment C5EA ABS function: return absolute value
+label C67C bas_fix_fn
+lcomment C67C FIX function: truncate toward zero
+label C68E bas_int_fn
+lcomment C68E INT function: truncate toward negative infinity
 
 * --- FP math functions ($C700-$CFFF) ---
 * SQR, LOG, EXP, SIN, COS, TAN, ATN and helper routines.
 * These use polynomial approximation with constant tables.
+label C2C0 bas_log_fn
+lcomment C2C0 LOG function: natural logarithm
+label CCC4 bas_sqr_fn
+lcomment CCC4 SQR function: square root via Newton's method
+label CD30 bas_exp_fn
+lcomment CD30 EXP function: natural exponent (e^x)
+label CD9C bas_cint_fn
+lcomment CD9C CINT function: convert to integer
+label CDF4 bas_cdbl_fn
+lcomment CDF4 CDBL function: convert to double precision
+label CE07 bas_csng_fn
+lcomment CE07 CSNG function: convert to single precision
+label CE5C fp_sub
+lcomment CE5C FP subtraction: FAC = FAC - ARG
+label CE6A fp_add
+lcomment CE6A FP addition: FAC = FAC + ARG
+label CE90 fp_mul
+lcomment CE90 FP multiplication: FAC = FAC * ARG
+label CF14 fp_intdiv
+lcomment CF14 integer division operator (\)
+label CF3D fp_mod
+lcomment CF3D MOD operator: remainder after integer division
+label CF4D fp_power
+lcomment CF4D power operator (^): FAC = ARG ^ FAC
+label CF69 bas_cos_fn
+lcomment CF69 COS function: cosine
+label CF6F bas_sin_fn
+lcomment CF6F SIN function: sine via polynomial approximation
+label CFBB bas_tan_fn
+lcomment CFBB TAN function: tangent (SIN/COS)
 
 * ============================================================
 * Boot Menu / Monitor (D000-DFFF)
@@ -1688,9 +1769,13 @@ lcomment 89B9 swap FP accumulators (D5/D7/E3/E5/E7/E9)
 lcomment 89E3 exponentiation operator
 lcomment 8A36 evaluate relational comparison result
 lcomment 8A5B string comparison (lexicographic)
+lcomment 8A1C division operator: FAC = ARG / FAC (type-checked)
 lcomment 8AAA bitwise AND: D &= $E5/$E6
+lcomment 8AAF bitwise OR: D |= $E5/$E6
 lcomment 8AB4 bitwise XOR: D ^= $E5/$E6
+lcomment 8AB9 EQV operator: XOR + complement (equivalence)
 lcomment 8ABB complement: COM A, COM B
+lcomment 8ABE IMP operator: COMA/COMB, AND, COMA/COMB (implication)
 lcomment 8ACF parse variable name from input into $085C buffer
 lcomment 8AFE test if A is letter A-Z: CY clear=yes, CY set=no
 lcomment 8B07 variable lookup: parse name, determine type, search/create
@@ -1706,7 +1791,7 @@ lcomment 8D11 load array dimension bounds from descriptor at +3,X
 lcomment 8D13 16x16 bit multiply D * $EE/$EF via shift-and-add
 lcomment 8D36 FRE function: compute free memory (var_start - string_top)
 lcomment 8D56 OPTION statement
-lcomment 8D7F execute CLEAR: reset variables and string space
+lcomment 8D7F STR$ function: convert number to string representation
 lcomment 8D8D scan string at X for delimiters in $80/$81, return length
 lcomment 8DC0 allocate string space, store X to $CE
 lcomment 8DCA scan quoted string: set A=$22 (double quote)
@@ -1719,6 +1804,7 @@ lcomment 8F17 load string data pointer from descriptor offset +1,X
 lcomment 8F19 copy B+1 bytes from aux_stack_ptr to string space at $A8
 lcomment 8F33 load string descriptor address from $D7 into X
 lcomment 8F35 read descriptor at X: B=length; free temp if at stack top
+lcomment 8F5A LEN function: return string length as integer
 lcomment 8F5F get string info, test length (Z=1 if empty string)
 lcomment 8F63 CHR$ function: eval byte, allocate 1-char string
 lcomment 8F77 ASC function: get string, return first byte as integer
@@ -1728,7 +1814,7 @@ lcomment 8FA6 MID$ function: return substring from position
 lcomment 8FC9 common string fn arg parser: expect ), restore descriptor
 lcomment 8FE6 backup input, eval expression, ensure single-byte result
 lcomment 8FF5 JMP error: Illegal function call (error $05)
-lcomment 8FF8 LEN function: get string length, return as integer
+lcomment 8FF8 VAL function: convert string to numeric value
 lcomment 902C DEF helper: parse target expression
 lcomment 9038 evaluate expression and convert to address in X
 lcomment 9055 check address in X against memory-protect bounds
@@ -1752,59 +1838,13 @@ lcomment 939D output one BASIC line: number, space, detokenized text
 lcomment 93E7 LIST command: init range ptrs, parse line number range
 lcomment 9442 parse line number: . = current line, else decimal
 lcomment 9585 PRINT USING entry: eval format string, process items
+lcomment 9068 PEEK function: eval address, read byte, return as integer
 lcomment 9071 POKE statement
 lcomment 90B5 PRINT statement
-lcomment 9456 SWAP statement
-lcomment 9459 DEFSTR statement
-lcomment 945C DEFINT statement
-lcomment 945F DEFSNG statement
-lcomment 9497 AUTO statement
-lcomment 94E1 RESUME statement
 lcomment 9518 TRON statement (trace on)
 lcomment 9519 TROFF statement (trace off)
 lcomment 9722 FOR statement
 lcomment 97EA NEXT statement
-lcomment 9A14 RENUM statement
-lcomment 9A1F ERROR statement
-lcomment 9A63 TROFF statement (trace off)
-lcomment 9AA1 DEF statement
-lcomment 9C98 LLIST statement
-lcomment 9F07 NEW statement
-lcomment 9FF6 DIM statement
-lcomment AA4E CLS statement (clear screen)
-lcomment AAF1 LPRINT statement
-lcomment AB00 ON statement (ON x GOTO/GOSUB)
-lcomment AB11 SCROLL statement
-lcomment AB1C SOUND statement
-lcomment AC66 EXEC statement
-lcomment AC8D LOAD? statement (variant)
-lcomment AD01 ERASE statement
-lcomment AD72 COPY statement
-lcomment AD84 PRESET statement
-lcomment AE10 LOADM statement
-lcomment AF5D MON statement (enter monitor)
-lcomment AF8C FILES statement
-lcomment B7CF LOCATES statement
-lcomment B7D5 GET statement
-lcomment B837 WIND statement (define window)
-lcomment B844 LOCATE statement
-lcomment B851 KEY statement
-lcomment B8EE LINE statement
-lcomment B9AA CLOSE statement
-lcomment B93E WIDTH statement
-lcomment B941 PSET statement
-lcomment B9F4 SCREEN statement
-lcomment BA22 GCLS statement (graphics clear)
-lcomment BA93 LOGIN statement
-lcomment BB2C TITLE statement
-lcomment BB76 COLOR statement
-lcomment BBB9 STAT statement
-lcomment BC0F CLEAR statement
-lcomment BCE0 PCOPY statement
-lcomment BEAB DEFDBL statement
-lcomment BEC0 MOTOR statement
-lcomment BF44 PUT statement
-lcomment BFCD RANDOMIZE statement
 
 * --- Boot Menu ---
 lcomment D00E boot menu: SP=$04AF, system_mode=1, detect ROM options
