@@ -237,6 +237,7 @@ label EB fp_temp
 label DF str_len_temp
 lcomment DF temporary string length for STR$/string operations
 label E0 str_data_ptr
+label E1 str_data_ptr_lo
 label E2 fp_negate_flag
 label E8 arg_man6
 label EA arg_man7
@@ -260,6 +261,7 @@ label F9 chrget_lo
 lcomment F8 print zone width
 label FA chrgot
 label FB input_ptr
+label FC input_ptr_lo
 label FF disp_cmd_param
 
 * ============================================================
@@ -346,6 +348,7 @@ label 01BC sci_buf_size
 label 01BE sci_write_ptr
 label 01C0 sci_read_ptr
 label 01C2 sci_count
+label 01C3 mon_cursor_pos_2
 label 01C4 tf20_param_block
 label 01C5 sci_session_flag
 label 01C8 tf20_xfer_size
@@ -364,6 +367,8 @@ label 01CF tf20_delay_loops
 * ============================================================
 label 01D5 cb_cas1
 label 01EC cb_cas0
+label 01F2 rom_ext_block_size
+label 01F4 delay_count_500
 
 * ============================================================
 * SAVE Protocol / Device I/O ($0200-$021F)
@@ -381,6 +386,7 @@ label 020D printer_read_ptr
 label 020F data_read_ptr
 label 0211 data_end_ptr
 label 0213 io_block_base_addr
+label 0215 io_block_reset_ptr
 label 0217 io_type_code
 label 0219 io_context_ptr
 label 021B active_session_mask
@@ -392,6 +398,7 @@ label 0220 display_buffer
 * ============================================================
 label 0270 bas_workspace
 label 0272 disp_line_buf_ptr
+label 0273 disp_line_buf_ptr_lo
 lcomment 0272 display line buffer pointer
 label 0274 disp_viewport_ptr
 lcomment 0274 display viewport buffer address pointer
@@ -419,8 +426,11 @@ label 02A2 mon_break_saved_opcode
 label 02A3 mon_saved_reg_a
 label 02A4 mon_reg_mode_flag
 label 02A5 mon_io_ctrl_ptr
+label 02A6 mon_reg_data
 label 02AF mon_io_start
+label 02B1 mon_io_count
 label 02B2 mon_io_device_lo
+label 02B4 mon_io_device_hi
 label 02B6 mon_reg_display
 label 02BB mon_io_block_ptr
 label 02BF mon_saved_sp
@@ -429,6 +439,7 @@ label 02C3 mon_input_end
 label 02C5 mon_saved_system_mode
 label 02D0 cas1_tape_buffer
 label 0324 cas0_tape_buffer
+label 040A rmcr_init_value
 label 04AF stack_init
 label 04B0 bas_mem_top
 label 04B2 mem_size
@@ -442,10 +453,13 @@ label 04BB using_format_buf
 label 04BC using_decimal_pos
 lcomment 04BA numeric conversion buffer (used by HEX$/OCT$)
 label 04BD fp_out_buf
+label 04BE fp_out_buf_plus1
+label 04C4 mon_cursor_pos_3
 lcomment 04BD FP number-to-string output buffer
 label 04E4 kw_table_ptr
 label 04E5 fp_rng_seed_hi
 label 04E6 cmd_ext_ptr
+label 04E7 fp_rng_seed_byte
 label 04E8 fp_rng_seed_mid
 label 04E9 fp_rng_seed_lo
 label 04EA fp_mult_save
@@ -471,15 +485,18 @@ lcomment 0500 I/O device descriptor table base
 label 04FE var_end
 label 0502 io_channel_table
 label 059C bas_keyword_table1
+label 059D bas_keyword_table1_lo
 label 05A1 bas_keyword_table2
 label 05A2 file_base_addr
 label 05A4 str_work_ptr
+label 05A6 str_work_ptr_lo2
 lcomment 05A2 PUT/GET file base address
 label 05A9 stmt_dispatch_ptr
 label 05AE bas_ext_fn_table
 label 05B3 bas_ext_fn_dispatch_ptr
 label 05B8 bas_ext_stmt_dispatch_ptr
 label 05D6 bas_fn_default_table
+label 05D8 bas_fn_handler_ptr
 label 0639 bas_check_break_vec
 lcomment 0639 RAM vector: check for Ctrl-C / break
 label 0677 bas_on_error_ptr
@@ -929,22 +946,29 @@ label 068D io_device_count
 label 068F io_device_params
 label 0697 file_eof_flag
 label 0698 io_read_ptr
+label 069C io_init_area
 label 06D0 io_crlf_descriptor
 label 06E5 io_open_flag
 label 06E6 io_crlf_flag
 label 06FD io_serial_flag
+label 0708 io_hex_device_addr
 label 0717 io_device_flag2
 label 0738 printer_line_buf
 label 074D printer_width_flag
 label 0751 bas_data_stack_init
+label 0752 bas_data_stack_offset
 label 0753 bas_init_flag
 label 0755 bas_data_stack_base
+label 0759 line_input_buf_offset
+label 0800 lcd_sio_length
+label 0808 lcdctl_cmd_value
 label 0856 bas_stack_limit
 label 0858 bas_patch_end
 label 0859 bas_patch_addr
 label 085A bas_patch_addr_hi
 label 085B bas_patch_char
 label 085C bas_varname_buf
+label 085D bas_varname_buf_lo
 label 086C bas_str_temp_buf
 label 0874 bas_deftype_table
 label 088A bas_dim_limit
@@ -956,8 +980,11 @@ label 0890 bas_for_flag
 label 0892 str_source_len
 label 0893 str_mid_len
 label 0897 str_mid_start
+label 0899 for_loop_limit_lo
 label 089B bas_line_start
 label 089D auto_step_size
+label 08A0 list_start_ptr_lo
+label 08A2 list_end_ptr_lo
 label 08A3 bas_line_end
 label 08A5 bas_using_temp
 label 08AE bas_error_resume_flag
@@ -987,6 +1014,7 @@ label 0914 file_merge_ptr
 label 0917 io_string_ptr
 label 0919 io_xfer_ptr
 label 091C sci_irq_handler_ptr
+label 091D sci_irq_handler_lo
 label 0921 io_error_table_base
 label 0A25 io_response_code
 label 0A26 lcd_cursor_x
@@ -996,7 +1024,14 @@ label 0A2C gfx_last_x2
 label 0A2E gfx_last_y2
 label 0A34 bas_renum_flag
 label 0A40 io_work_buffer
+label 0A64 tf20_baud_default
+label 0BB8 sci_rx_timeout_val
+label 0C02 sci_sync_pattern
+label 0C80 delay_count_3200
+label 0DAA sci_crlf_value
+label 0E00 io_block_size_3584
 label 0F08 lcd_display_buffer
+label 0F80 lcdctl_graphics_mode
 label 1010 lcdctl_idle_mode
 label 2008 file_init_pattern
 label 2402 cas1_cmd_channel

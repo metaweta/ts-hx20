@@ -171,7 +171,7 @@ fac_sign EQU     $00DD
 fp_num_digits EQU     $00DE
 str_len_temp EQU     $00DF                    ; temporary string length for STR$/string operations
 str_data_ptr EQU     $00E0                    ; temporary string data pointer (2 bytes, hi/lo)
-M00E1   EQU     $00E1
+str_data_ptr_lo EQU     $00E1
 fp_negate_flag EQU     $00E2
 arg_exp EQU     $00E3
 arg_man1 EQU     $00E4
@@ -196,7 +196,7 @@ print_width EQU     $00F8                    ; print zone width
 chrget_lo EQU     $00F9
 chrgot  EQU     $00FA
 input_ptr EQU     $00FB
-M00FC   EQU     $00FC
+input_ptr_lo EQU     $00FC
 disp_cmd_param EQU     $00FF
 ram_sub_rtc EQU     $0100
 M0101   EQU     $0101
@@ -260,7 +260,7 @@ sci_buf_size EQU     $01BC
 sci_write_ptr EQU     $01BE
 sci_read_ptr EQU     $01C0
 sci_count EQU     $01C2
-M01C3   EQU     $01C3
+mon_cursor_pos_2 EQU     $01C3
 tf20_param_block EQU     $01C4
 sci_session_flag EQU     $01C5
 tf20_xfer_size EQU     $01C8
@@ -273,8 +273,8 @@ tf20_device_type EQU     $01CE
 tf20_delay_loops EQU     $01CF
 cb_cas1 EQU     $01D5
 cb_cas0 EQU     $01EC
-M01F2   EQU     $01F2
-M01F4   EQU     $01F4
+rom_ext_block_size EQU     $01F2
+delay_count_500 EQU     $01F4
 tape_header_buf EQU     $0200
 block_byte_count EQU     $0203
 block_byte_count_lo EQU     $0204
@@ -288,7 +288,7 @@ printer_read_ptr EQU     $020D
 data_read_ptr EQU     $020F
 data_end_ptr EQU     $0211
 io_block_base_addr EQU     $0213
-M0215   EQU     $0215
+io_block_reset_ptr EQU     $0215
 io_type_code EQU     $0217
 io_context_ptr EQU     $0219
 active_session_mask EQU     $021B
@@ -296,7 +296,7 @@ disp_buffer_end EQU     $021F
 display_buffer EQU     $0220
 bas_workspace EQU     $0270
 disp_line_buf_ptr EQU     $0272                    ; display line buffer pointer
-M0273   EQU     $0273
+disp_line_buf_ptr_lo EQU     $0273
 disp_viewport_ptr EQU     $0274                    ; display viewport buffer address pointer
 disp_scroll_offset EQU     $0276                    ; display scroll row offset
 disp_line_width EQU     $0277
@@ -317,11 +317,11 @@ mon_break_saved_opcode EQU     $02A2
 mon_saved_reg_a EQU     $02A3
 mon_reg_mode_flag EQU     $02A4
 mon_io_ctrl_ptr EQU     $02A5
-M02A6   EQU     $02A6
+mon_reg_data EQU     $02A6
 mon_io_start EQU     $02AF
-M02B1   EQU     $02B1
+mon_io_count EQU     $02B1
 mon_io_device_lo EQU     $02B2
-M02B4   EQU     $02B4
+mon_io_device_hi EQU     $02B4
 mon_reg_display EQU     $02B6
 mon_io_block_ptr EQU     $02BB
 mon_saved_sp EQU     $02BF
@@ -330,7 +330,7 @@ mon_input_end EQU     $02C3
 mon_saved_system_mode EQU     $02C5
 cas1_tape_buffer EQU     $02D0
 cas0_tape_buffer EQU     $0324
-M040A   EQU     $040A
+rmcr_init_value EQU     $040A
 stack_init EQU     $04AF
 bas_mem_top EQU     $04B0
 mem_size EQU     $04B2
@@ -342,12 +342,12 @@ bas_num_buf EQU     $04BA                    ; numeric conversion buffer (used b
 using_format_buf EQU     $04BB
 using_decimal_pos EQU     $04BC
 fp_out_buf EQU     $04BD                    ; FP number-to-string output buffer
-M04BE   EQU     $04BE
-M04C4   EQU     $04C4
+fp_out_buf_plus1 EQU     $04BE
+mon_cursor_pos_3 EQU     $04C4
 kw_table_ptr EQU     $04E4
 fp_rng_seed_hi EQU     $04E5
 cmd_ext_ptr EQU     $04E6
-M04E7   EQU     $04E7
+fp_rng_seed_byte EQU     $04E7
 fp_rng_seed_mid EQU     $04E8
 fp_rng_seed_lo EQU     $04E9
 fp_mult_save EQU     $04EA
@@ -369,17 +369,17 @@ var_end EQU     $04FE
 io_device_table EQU     $0500                    ; I/O device descriptor table base
 io_channel_table EQU     $0502
 bas_keyword_table1 EQU     $059C
-M059D   EQU     $059D
+bas_keyword_table1_lo EQU     $059D
 bas_keyword_table2 EQU     $05A1
 file_base_addr EQU     $05A2                    ; PUT/GET file base address
 str_work_ptr EQU     $05A4
-M05A6   EQU     $05A6
+str_work_ptr_lo2 EQU     $05A6
 stmt_dispatch_ptr EQU     $05A9
 bas_ext_fn_table EQU     $05AE
 bas_ext_fn_dispatch_ptr EQU     $05B3
 bas_ext_stmt_dispatch_ptr EQU     $05B8
 bas_fn_default_table EQU     $05D6
-M05D8   EQU     $05D8
+bas_fn_handler_ptr EQU     $05D8
 Z05E2   EQU     $05E2
 Z05E5   EQU     $05E5
 Z05E8   EQU     $05E8
@@ -431,7 +431,7 @@ io_cb_base EQU     $0696                    ; I/O control block table base addre
 file_eof_flag EQU     $0697
 io_read_ptr EQU     $0698
 init_flag EQU     $069A
-M069C   EQU     $069C
+io_init_area EQU     $069C
 lcd_default_desc EQU     $06B6                    ; default LCD device descriptor
 lcd_cursor_col EQU     $06CB                    ; current cursor column position
 lcd_display_width EQU     $06CC                    ; current display width in columns
@@ -439,28 +439,28 @@ io_crlf_descriptor EQU     $06D0
 io_open_flag EQU     $06E5
 io_crlf_flag EQU     $06E6
 io_serial_flag EQU     $06FD
-M0708   EQU     $0708
+io_hex_device_addr EQU     $0708
 io_device_flag2 EQU     $0717
 pac_open_flag EQU     $0731                    ; PAC device open flag
 printer_line_buf EQU     $0738
 printer_width_flag EQU     $074D
 bas_data_stack_init EQU     $0751
-M0752   EQU     $0752
+bas_data_stack_offset EQU     $0752
 bas_init_flag EQU     $0753
 text_save EQU     $0754
 bas_data_stack_base EQU     $0755
 edit_line_count EQU     $0756                    ; line edit mode line counter
 line_input_buf EQU     $0757                    ; LINE INPUT keyboard buffer
-M0759   EQU     $0759
-M0800   EQU     $0800
-M0808   EQU     $0808
+line_input_buf_offset EQU     $0759
+lcd_sio_length EQU     $0800
+lcdctl_cmd_value EQU     $0808
 bas_stack_limit EQU     $0856
 bas_patch_end EQU     $0858
 bas_patch_addr EQU     $0859
 bas_patch_addr_hi EQU     $085A
 bas_patch_char EQU     $085B
 bas_varname_buf EQU     $085C
-M085D   EQU     $085D
+bas_varname_buf_lo EQU     $085D
 bas_str_temp_buf EQU     $086C
 bas_deftype_table EQU     $0874
 bas_dim_limit EQU     $088A
@@ -476,14 +476,14 @@ bas_string_buf2 EQU     $0894                    ; secondary string operation bu
 hex_oct_sign EQU     $0896                    ; HEX$/OCT$ sign flag ($00=unsigned, $FF=signed)
 str_mid_start EQU     $0897
 for_loop_limit EQU     $0898                    ; FOR loop limit value (2 bytes)
-M0899   EQU     $0899
+for_loop_limit_lo EQU     $0899
 auto_flag EQU     $089A
 bas_line_start EQU     $089B
 auto_step_size EQU     $089D
 list_start_ptr EQU     $089F                    ; LIST/DELETE start line pointer
-M08A0   EQU     $08A0
+list_start_ptr_lo EQU     $08A0
 list_end_ptr EQU     $08A1                    ; LIST/DELETE end line pointer
-M08A2   EQU     $08A2
+list_end_ptr_lo EQU     $08A2
 bas_line_end EQU     $08A3
 bas_using_temp EQU     $08A5
 trace_flag EQU     $08A6
@@ -525,7 +525,7 @@ io_string_ptr EQU     $0917
 io_xfer_ptr EQU     $0919
 serial_session_mask EQU     $091B                    ; active serial session bitmask
 sci_irq_handler_ptr EQU     $091C
-M091D   EQU     $091D
+sci_irq_handler_lo EQU     $091D
 lcd_screen_mode EQU     $091E                    ; LCD screen mode (0=text, nonzero=graphics)
 lcd_alt_mode EQU     $091F                    ; LCD alternate screen mode
 io_error_mode EQU     $0920                    ; I/O operation error handling mode
@@ -546,14 +546,14 @@ gfx_bg_color EQU     $0A33                    ; graphics background color
 bas_renum_flag EQU     $0A34
 Z0A35   EQU     $0A35
 io_work_buffer EQU     $0A40
-M0A64   EQU     $0A64
-M0BB8   EQU     $0BB8
-M0C02   EQU     $0C02
-M0C80   EQU     $0C80
-M0DAA   EQU     $0DAA
-M0E00   EQU     $0E00
+tf20_baud_default EQU     $0A64
+sci_rx_timeout_val EQU     $0BB8
+sci_sync_pattern EQU     $0C02
+delay_count_3200 EQU     $0C80
+sci_crlf_value EQU     $0DAA
+io_block_size_3584 EQU     $0E00
 lcd_display_buffer EQU     $0F08
-M0F80   EQU     $0F80
+lcdctl_graphics_mode EQU     $0F80
 M1000   EQU     $1000
 lcdctl_idle_mode EQU     $1010
 M103B   EQU     $103B
@@ -1086,7 +1086,7 @@ Z83BF:  STX     lcdctl_prev              ;83BF: DF 50          '.P'
         LDD     mem_size                 ;83C1: FC 04 B2       '...'
         SUBD    mem_top                  ;83C4: 93 C4          '..'
         SUBD    lcdctl_prev              ;83C6: 93 50          '.P'
-        SUBD    #M0273                   ;83C8: 83 02 73       '..s'
+        SUBD    #disp_line_buf_ptr_lo    ;83C8: 83 02 73       '..s'
         BCS     bas_error_oom            ;83CB: 25 5B          '%['
         RTS                              ;83CD: 39             '9'
 bas_check_mem_need: ADDD    #RDR                     ;83CE: C3 00 12       '...'
@@ -1952,7 +1952,7 @@ bas_parse_varname: STAA    bas_varname_buf          ;8ACF: B7 08 5C       '..\' 
 Z8AD8:  JMP     bas_syntax_error         ;8AD8: 7E 88 DF       '~..'
 Z8ADB:  LDX     input_ptr                ;8ADB: DE FB          '..'
         STX     aux_stack_ptr            ;8ADD: DF F2          '..'
-        LDX     #M085D                   ;8ADF: CE 08 5D       '..]'
+        LDX     #bas_varname_buf_lo      ;8ADF: CE 08 5D       '..]'
         CLRB                             ;8AE2: 5F             '_'
 Z8AE3:  JSR     bas_pop_byte             ;8AE3: BD 84 1C       '...'
         CMPB    #$10                     ;8AE6: C1 10          '..'
@@ -2361,7 +2361,7 @@ Z8DE6:  LDAA    str_len_temp             ;8DE6: 96 DF          '..'
         STAA    ,X                       ;8DE8: A7 00          '..'
         LDAA    str_data_ptr             ;8DEA: 96 E0          '..'
         STAA    $01,X                    ;8DEC: A7 01          '..'
-        LDAA    M00E1                    ;8DEE: 96 E1          '..'
+        LDAA    str_data_ptr_lo          ;8DEE: 96 E1          '..'
         STAA    $02,X                    ;8DF0: A7 02          '..'
         LDAA    #$03                     ;8DF2: 86 03          '..'
         STAA    var_type                 ;8DF4: 97 85          '..'
@@ -3137,8 +3137,8 @@ bas_auto_check_range: LDAA    list_start_ptr           ;9417: B6 08 9F       '..
         CMPA    list_end_ptr             ;941A: B1 08 A1       '...'
         BCS     Z9429                    ;941D: 25 0A          '%.'
         BNE     bas_error_illegal_fn_jmp ;941F: 26 78          '&x'
-        LDAA    M08A0                    ;9421: B6 08 A0       '...'
-        CMPA    M08A2                    ;9424: B1 08 A2       '...'
+        LDAA    list_start_ptr_lo        ;9421: B6 08 A0       '...'
+        CMPA    list_end_ptr_lo          ;9424: B1 08 A2       '...'
         BHI     bas_error_illegal_fn_jmp ;9427: 22 70          '"p'
 Z9429:  LDX     list_end_ptr             ;9429: FE 08 A1       '...'
         INX                              ;942C: 08             '.'
@@ -3705,7 +3705,7 @@ Z98DC:  INX                              ;98DC: 08             '.'
         INX                              ;98E1: 08             '.'
         STAA    for_loop_limit           ;98E2: B7 08 98       '...'
         LDAA    ,X                       ;98E5: A6 00          '..'
-        STAA    M0899                    ;98E7: B7 08 99       '...'
+        STAA    for_loop_limit_lo        ;98E7: B7 08 99       '...'
         STX     input_ptr                ;98EA: DF FB          '..'
 Z98EC:  JSR     chrget                   ;98EC: BD B3 CD       '...'
         BSR     Z994D                    ;98EF: 8D 5C          '.\'
@@ -4878,7 +4878,7 @@ ZA22D:  LDX     ptr_temp                 ;A22D: DE 8F          '..'
         CLR     ,X                       ;A22F: 6F 00          'o.'
         CLR     $01,X                    ;A231: 6F 01          'o.'
         LDD     ptr_temp                 ;A233: DC 8F          '..'
-        SUBD    #M0752                   ;A235: 83 07 52       '..R'
+        SUBD    #bas_data_stack_offset   ;A235: 83 07 52       '..R'
         LDX     #bas_data_stack_base     ;A238: CE 07 55       '..U'
         STX     input_ptr                ;A23B: DF FB          '..'
         RTS                              ;A23D: 39             '9'
@@ -6595,7 +6595,7 @@ ZB051:  JSR     api_serial_read          ;B051: BD FF 79       '..y'
         DECB                             ;B05B: 5A             'Z'
         BEQ     ZB051                    ;B05C: 27 F3          ''.'
         BRA     ZB0AA                    ;B05E: 20 4A          ' J'
-ZB060:  LDAB    M091D                    ;B060: F6 09 1D       '...'
+ZB060:  LDAB    sci_irq_handler_lo       ;B060: F6 09 1D       '...'
         BITB    #$08                     ;B063: C5 08          '..'
         BNE     ZB069                    ;B065: 26 02          '&.'
         ANDA    #$7F                     ;B067: 84 7F          '..'
@@ -6695,7 +6695,7 @@ io_parse_device_params: LDX     #io_device_params        ;B129: CE 06 8F       '
         LDAB    #$10                     ;B135: C6 10          '..'
         MUL                              ;B137: 3D             '='
         STAB    ptr_temp_lo              ;B138: D7 90          '..'
-        LDD     #M0708                   ;B13A: CC 07 08       '...'
+        LDD     #io_hex_device_addr      ;B13A: CC 07 08       '...'
         BSR     io_parse_hex_char        ;B13D: 8D 36          '.6'
         ORAA    ptr_temp_lo              ;B13F: 9A 90          '..'
         STAA    ptr_temp_lo              ;B141: 97 90          '..'
@@ -6836,7 +6836,7 @@ ZB24A:  CLR     ,X                       ;B24A: 6F 00          'o.'
         LDX     #chrgot_template         ;B25A: CE B3 E5       '...'
         LDAB    #$06                     ;B25D: C6 06          '..'
         JSR     mem_copy_bytes           ;B25F: BD B3 A4       '...'
-        LDX     #M05A6                   ;B262: CE 05 A6       '...'
+        LDX     #str_work_ptr_lo2        ;B262: CE 05 A6       '...'
         STX     ptr_temp                 ;B265: DF 8F          '..'
         LDX     #MB4E9                   ;B267: CE B4 E9       '...'
         LDAB    #$0A                     ;B26A: C6 0A          '..'
@@ -6846,7 +6846,7 @@ ZB24A:  CLR     ,X                       ;B24A: 6F 00          'o.'
         STD     $03,X                    ;B274: ED 03          '..'
         STD     $08,X                    ;B276: ED 08          '..'
         LDX     #MB4F3                   ;B278: CE B4 F3       '...'
-        STX     M05D8                    ;B27B: FF 05 D8       '...'
+        STX     bas_fn_handler_ptr       ;B27B: FF 05 D8       '...'
         LDX     #Z8C70                   ;B27E: CE 8C 70       '..p'
         STX     io_read_ptr              ;B281: FF 06 98       '...'
         STX     ptr_temp                 ;B284: DF 8F          '..'
@@ -6879,7 +6879,7 @@ ZB24A:  CLR     ,X                       ;B24A: 6F 00          'o.'
         BEQ     ZB2C9                    ;B2C5: 27 02          ''.'
         LDAB    #$04                     ;B2C7: C6 04          '..'
 ZB2C9:  STAB    io_device_count          ;B2C9: F7 06 8D       '...'
-        LDX     #M069C                   ;B2CC: CE 06 9C       '...'
+        LDX     #io_init_area            ;B2CC: CE 06 9C       '...'
         STX     ptr_temp                 ;B2CF: DF 8F          '..'
         LDX     #MB425                   ;B2D1: CE B4 25       '..%'
         LDAB    #$B6                     ;B2D4: C6 B6          '..'
@@ -6996,7 +6996,7 @@ ZB3B6:  STAA    ,X                       ;B3B6: A7 00          '..'
 MB3C7:  FCB     $00                      ;B3C7: 00             '.'     6-byte init template (copied to MFFDC target)
         FCC     "1 "                     ;B3C8: 31 20          '1 '
         FCB     $80,$00,$80              ;B3CA: 80 00 80       '...'
-chrget: INC     >M00FC                   ;B3CD: 7C 00 FC       '|..'   CHRGET: INC input_ptr, JMP chrgot — advance and get next char
+chrget: INC     >input_ptr_lo            ;B3CD: 7C 00 FC       '|..'   CHRGET: INC input_ptr, JMP chrgot — advance and get next char
                                          ; CHRGET: advance input_ptr (INC $FC, INC $FB), JMP chrgot
         BNE     ZB3D5                    ;B3D0: 26 03          '&.'
         INC     >input_ptr               ;B3D2: 7C 00 FB       '|..'
@@ -7100,7 +7100,7 @@ MB4E9:  INC     $80,X                    ;B4E9: 6C 80          'l.'
         CMPA    M8015                    ;B4EB: B1 80 15       '...'
         BPL     ZB472                    ;B4EE: 2A 82          '*.'
         TSTB                             ;B4F0: 5D             ']'
-        SUBD    #M059D                   ;B4F1: 83 05 9D       '...'
+        SUBD    #bas_keyword_table1_lo   ;B4F1: 83 05 9D       '...'
         SBCA    fp_work_byte             ;B4F4: 92 81          '..'
         SBCA    $AB,X                    ;B4F6: A2 AB          '..'
         CPX     MA3AB                    ;B4F8: BC A3 AB       '...'
@@ -7265,7 +7265,7 @@ ZB659:  LDD     io_device_desc_buf       ;B659: FC 08 EA       '...'
         ADCA    #$00                     ;B66D: 89 00          '..'
         BEQ     ZB674                    ;B66F: 27 03          ''.'
         LDD     #disp_cmd_param          ;B671: CC 00 FF       '...'
-ZB674:  STAB    M0759                    ;B674: F7 07 59       '..Y'
+ZB674:  STAB    line_input_buf_offset    ;B674: F7 07 59       '..Y'
         ADDD    #line_input_buf          ;B677: C3 07 57       '..W'
         PSHB                             ;B67A: 37             '7'
         PSHA                             ;B67B: 36             '6'
@@ -8097,7 +8097,7 @@ bas_boot_menu_init: LDAA    ext_rom_flags            ;BD72: 96 78          '.x'
         BMI     ZBDB4                    ;BD74: 2B 3E          '+>'
         OIM     #$80,ext_rom_flags       ;BD76: 72 80 78       'r.x'
         LDD     ram_top2                 ;BD79: FC 01 34       '..4'
-        SUBD    #M01F2                   ;BD7C: 83 01 F2       '...'
+        SUBD    #rom_ext_block_size      ;BD7C: 83 01 F2       '...'
         STD     ram_top2                 ;BD7F: FD 01 34       '..4'
         STD     ptr_temp                 ;BD82: DD 8F          '..'
         LDX     #MBE57                   ;BD84: CE BE 57       '..W'
@@ -8364,7 +8364,7 @@ ZBFF2:  JSR     fp_test_fac_zero         ;BFF2: BD C5 B5       '...'
         BEQ     fp_load_fac_from_var     ;BFF7: 27 2B          ''+'
         LDX     fp_rng_seed_hi           ;BFF9: FE 04 E5       '...'
         STX     fac_man1                 ;BFFC: DF D6          '..'
-        LDAA    M04E7                    ;BFFE: B6 04 E7       '...'
+        LDAA    fp_rng_seed_byte         ;BFFE: B6 04 E7       '...'
         STAA    fac_man3                 ;C001: 97 D8          '..'
 fp_atn_setup: LDX     fp_rng_multiplier        ;C003: FE C0 38       '..8'   ATN setup: load coefficients from MC038 into ARG
         STX     arg_man1                 ;C006: DF E4          '..'
@@ -9453,7 +9453,7 @@ ZC83C:  JSR     fp_format_store_char     ;C83C: BD CA 5A       '..Z'
         CBA                              ;C8C7: 11             '.'
         BCS     FCB+$100                 ;C8C8: 25 76          '%v'
         JSR     fp_load_arg_to_fac       ;C8CA: BD C5 76       '..v'
-        LDX     #M04BE                   ;C8CD: CE 04 BE       '...'
+        LDX     #fp_out_buf_plus1        ;C8CD: CE 04 BE       '...'
         STX     fp_work_ptr              ;C8D0: DF EE          '..'
         JSR     fp_format_decimal_point  ;C8D2: BD CA 41       '..A'
         TBA                              ;C8D5: 17             '.'
@@ -10584,9 +10584,9 @@ ZD1C6:  STAA    ptr_temp_lo              ;D1C6: 97 90          '..'
         STAA    mon_menu_cols            ;D1CA: 97 89          '..'
         LDD     #M1387                   ;D1CC: CC 13 87       '...'
         BSR     mon_lcd_set_cursor       ;D1CF: 8D 45          '.E'
-        LDD     #M01C3                   ;D1D1: CC 01 C3       '...'
+        LDD     #mon_cursor_pos_2        ;D1D1: CC 01 C3       '...'
         BSR     mon_lcd_set_cursor       ;D1D4: 8D 40          '.@'
-        LDD     #M04C4                   ;D1D6: CC 04 C4       '...'
+        LDD     #mon_cursor_pos_3        ;D1D6: CC 04 C4       '...'
         BSR     mon_lcd_set_cursor       ;D1D9: 8D 3B          '.;'
         LDD     #M1792                   ;D1DB: CC 17 92       '...'
         BSR     mon_lcd_set_cursor       ;D1DE: 8D 36          '.6'
@@ -10960,7 +10960,7 @@ mon_reg_set_mode: STAA    mon_hex_value            ;D4DD: 97 61          '.a'
         LDAA    #$01                     ;D4DF: 86 01          '..'
         STAA    mon_reg_mode_flag        ;D4E1: B7 02 A4       '...'
         LDD     #M2010                   ;D4E4: CC 20 10       '. .'
-        LDX     #M02A6                   ;D4E7: CE 02 A6       '...'
+        LDX     #mon_reg_data            ;D4E7: CE 02 A6       '...'
         STX     mon_reg_ptr              ;D4EA: DF 63          '.c'
         JSR     ZD363                    ;D4EC: BD D3 63       '..c'
         LDX     rom_ptr_io_ctrl          ;D4EF: FE FF DC       '...'
@@ -10991,11 +10991,11 @@ mon_reg_parse_params: DECA                             ;D50B: 4A             'J'
 ZD522:  LDD     $01,X                    ;D522: EC 01          '..'
         STD     mon_io_start             ;D524: FD 02 AF       '...'
         LDAA    $03,X                    ;D527: A6 03          '..'
-        STAA    M02B1                    ;D529: B7 02 B1       '...'
+        STAA    mon_io_count             ;D529: B7 02 B1       '...'
         LDD     #tape_header_buf         ;D52C: CC 02 00       '...'
         STD     mon_io_device_lo         ;D52F: FD 02 B2       '...'
         LDD     #LCDDATA                 ;D532: CC 00 2A       '..*'
-        STD     M02B4                    ;D535: FD 02 B4       '...'
+        STD     mon_io_device_hi         ;D535: FD 02 B4       '...'
         JSR     mon_skip_whitespace      ;D538: BD D4 09       '...'
         BVS     mon_reg_execute_op       ;D53B: 29 06          ').'
         LDAB    #$03                     ;D53D: C6 03          '..'
@@ -12343,7 +12343,7 @@ reset_entry: SEI                              ;E000: 0F             '.'     cold
         STAA    PORT2                    ;E00A: 97 03          '..'
         LDAA    #$16                     ;E00C: 86 16          '..'
         STAA    P2DDR                    ;E00E: 97 01          '..'
-        LDD     #M040A                   ;E010: CC 04 0A       '...'
+        LDD     #rmcr_init_value         ;E010: CC 04 0A       '...'
         STD     RMCR                     ;E013: DD 10          '..'
         LDAA    #$02                     ;E015: 86 02          '..'
         STAA    rtc_reg_b                ;E017: 97 4B          '.K'
@@ -12430,7 +12430,7 @@ session_close: AIM     #$7F,session_flags       ;E0BE: 71 7F 7C       'q.|'
         RTS                              ;E0C8: 39             '9'
 boot_menu_exit: BSR     sci_reinit               ;E0C9: 8D 0A          '..'    SCI reinit, session init, send CR/LF to slave, main loop
         BSR     session_init             ;E0CB: 8D DE          '..'
-        LDD     #M0DAA                   ;E0CD: CC 0D AA       '...'
+        LDD     #sci_crlf_value          ;E0CD: CC 0D AA       '...'
         JSR     sci_two_byte             ;E0D0: BD E3 F8       '...'
         BRA     boot_menu_exit           ;E0D3: 20 F4          ' .'
 sci_reinit: SEI                              ;E0D5: 0F             '.'     disable EOCI/RIE, set P22=1, RMCR=$04 (38400 baud)
@@ -12451,7 +12451,7 @@ sci_sync_loop: LDD     TRCSR                    ;E0E9: DC 11          '..'
         BPL     sci_sync_send_multi      ;E0F7: 2A 04          '*.'
         CMPB    #$02                     ;E0F9: C1 02          '..'
         BEQ     sci_post_sync            ;E0FB: 27 17          ''.'
-sci_sync_send_multi: LDD     #M0C02                   ;E0FD: CC 0C 02       '...'
+sci_sync_send_multi: LDD     #sci_sync_pattern        ;E0FD: CC 0C 02       '...'
 ZE100:  TIM     #$20,TRCSR               ;E100: 7B 20 11       '{ .'
         BEQ     ZE100                    ;E103: 27 FB          ''.'
         STAA    TDR                      ;E105: 97 13          '..'
@@ -12482,7 +12482,7 @@ session_set_flags: OIM     #$80,session_flags       ;E136: 72 80 7C       'r.|'
         AIM     #$C8,session_flags       ;E13C: 71 C8 7C       'q.|'
         CLR     sci_session_flag         ;E13F: 7F 01 C5       '...'
         RTS                              ;E142: 39             '9'
-delay_500: LDX     #M01F4                   ;E143: CE 01 F4       '...'   delay loop: X=$01F4 (500), DEX until 0
+delay_500: LDX     #delay_count_500         ;E143: CE 01 F4       '...'   delay loop: X=$01F4 (500), DEX until 0
 ZE146:  DEX                              ;E146: 09             '.'
         BNE     ZE146                    ;E147: 26 FD          '&.'
         RTS                              ;E149: 39             '9'
@@ -12704,7 +12704,7 @@ lcd_exit_ok: CLC                              ;E30D: 0C             '.'
 ZE30E:  PULB                             ;E30E: 33             '3'
         PULX                             ;E30F: 38             '8'
         RTS                              ;E310: 39             '9'
-lcd_set_cmd_mode: LDD     #M0808                   ;E311: CC 08 08       '...'   load D=$0808, fall through to lcdctl_write (set C/D=1)
+lcd_set_cmd_mode: LDD     #lcdctl_cmd_value        ;E311: CC 08 08       '...'   load D=$0808, fall through to lcdctl_write (set C/D=1)
 lcdctl_write: PSHX                             ;E314: 3C             '<'     interrupt-safe LCD control write (shadow regs $4F/$50)
         XGDX                             ;E315: 18             '.'
         TPA                              ;E316: 07             '.'
@@ -12803,7 +12803,7 @@ ZE3BA:  BNE     ZE33E                    ;E3BA: 26 82          '&.'
         STAA    $03,X                    ;E3C0: A7 03          '..'
         CMPA    #$07                     ;E3C2: 81 07          '..'
         BNE     ZE3BA                    ;E3C4: 26 F4          '&.'
-ZE3C6:  LDD     #M0F80                   ;E3C6: CC 0F 80       '...'
+ZE3C6:  LDD     #lcdctl_graphics_mode    ;E3C6: CC 0F 80       '...'
         JSR     lcdctl_write             ;E3C9: BD E3 14       '...'
         PULX                             ;E3CC: 38             '8'
         PULX                             ;E3CD: 38             '8'
@@ -13858,7 +13858,7 @@ save_negotiate: BSR     send_6e6f_negotiate      ;EBE1: 8D D1          '..'
         DEX                              ;EBE5: 09             '.'
         BEQ     save_done                ;EBE6: 27 60          ''`'
         LDX     mon_default_display_ptr  ;EBE8: FE FF DA       '...'
-        LDD     #M0E00                   ;EBEB: CC 0E 00       '...'
+        LDD     #io_block_size_3584      ;EBEB: CC 0E 00       '...'
         STD     ,X                       ;EBEE: ED 00          '..'
         LDAA    #$20                     ;EBF0: 86 20          '. '
         STAA    $02,X                    ;EBF2: A7 02          '..'
@@ -14028,7 +14028,7 @@ io_write_next_block: LDX     data_end_ptr             ;ED37: FE 02 11       '...
         XGDX                             ;ED3B: 18             '.'
         SUBD    data_read_ptr            ;ED3C: B3 02 0F       '...'
         BNE     ZED47                    ;ED3F: 26 06          '&.'
-        LDX     M0215                    ;ED41: FE 02 15       '...'
+        LDX     io_block_reset_ptr       ;ED41: FE 02 15       '...'
         STX     data_read_ptr            ;ED44: FF 02 0F       '...'
 ZED47:  TSTA                             ;ED47: 4D             'M'
         BNE     ZED4E                    ;ED48: 26 04          '&.'
@@ -14350,7 +14350,7 @@ ZEFBA:  OIM     #$10,$08,X               ;EFBA: 62 10 08       'b..'
         SEI                              ;EFC4: 0F             '.'
         LDD     #M8000                   ;EFC5: CC 80 00       '...'
         JSR     lcdctl_write             ;EFC8: BD E3 14       '...'
-        LDX     #M0C80                   ;EFCB: CE 0C 80       '...'
+        LDX     #delay_count_3200        ;EFCB: CE 0C 80       '...'
 ZEFCE:  DEX                              ;EFCE: 09             '.'
         BNE     ZEFCE                    ;EFCF: 26 FD          '&.'
         LDD     #M7D77                   ;EFD1: CC 7D 77       '.}w'
@@ -14677,7 +14677,7 @@ ZF256:  BSR     tf20_rx_single           ;F256: 8D 0D          '..'
 ZF263:  PULB                             ;F263: 33             '3'
         RTS                              ;F264: 39             '9'
 tf20_rx_single: PSHX                             ;F265: 3C             '<'     SCI RX single byte: $0BB8 timeout; C=1 abort, V=1 timeout
-        LDX     #M0BB8                   ;F266: CE 0B B8       '...'
+        LDX     #sci_rx_timeout_val      ;F266: CE 0B B8       '...'
 ZF269:  CLRA                             ;F269: 4F             'O'
         DEX                              ;F26A: 09             '.'
         SEV                              ;F26B: 0B             '.'
@@ -14701,7 +14701,7 @@ tf20_param_init: PSHA                             ;F282: 36             '6'     
         PULA                             ;F28D: 32             '2'
         STAA    $0A,X                    ;F28E: A7 0A          '..'
         OIM     #$03,$06,X               ;F290: 62 03 06       'b..'
-        LDD     #M0A64                   ;F293: CC 0A 64       '..d'
+        LDD     #tf20_baud_default       ;F293: CC 0A 64       '..d'
         STD     $07,X                    ;F296: ED 07          '..'
         STAA    $09,X                    ;F298: A7 09          '..'
         INC     $0B,X                    ;F29A: 6C 0B          'l.'
@@ -14991,7 +14991,7 @@ lcd_sio_set_cursor: LDAA    #$64                     ;F493: 86 64          '.d' 
         TBA                              ;F497: 17             '.'
         ORAA    #$80                     ;F498: 8A 80          '..'
         BSR     sio_send_byte            ;F49A: 8D 71          '.q'
-        LDD     #M0800                   ;F49C: CC 08 00       '...'
+        LDD     #lcd_sio_length          ;F49C: CC 08 00       '...'
         JSR     sio_wait_busy_lcdctl     ;F49F: BD F5 24       '..$'
 lcd_sio_data_loop: LDAB    ,X                       ;F4A2: E6 00          '..'    fetch char from display buffer, send via sio_send_byte
         LDX     $01,X                    ;F4A4: EE 01          '..'
