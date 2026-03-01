@@ -78,8 +78,10 @@ label 59 tf20_session_ctr
 label 5A tape_buf_base
 label 5B trcsr_saved
 label 5C save_cb_ptr
+label 005D disp_line_count
 label 5E io_op_code
 label 5F checksum_accum
+label 0060 mon_hex_nibble
 
 label 70 kbd_change_count
 label 72 kbd_krtn89_acc_h
@@ -96,10 +98,15 @@ label 7E dip_switches
 label 7F sys_config2
 * Monitor workspace overlaps BASIC workspace at $61-$6F
 label 61 mon_hex_value
+label 0062 mon_reg_op
+label 0063 mon_reg_ptr
 lcomment 61 monitor hex value accumulator (2 bytes)
 label 65 mon_dump_addr
 lcomment 65 monitor dump current address (2 bytes)
 label 67 mon_cursor_addr
+label 0069 mon_save_x
+label 6B mon_save_pc
+label 006D mon_save_ccr
 lcomment 67 monitor current cursor/edit address (2 bytes)
 label 6E mon_mode_flag
 lcomment 6E monitor mode flags
@@ -108,6 +115,7 @@ lcomment 6E monitor mode flags
 * Internal RAM ($80-$FF) - BASIC workspace
 * ============================================================
 label 80 mon_work_base
+label 81 fp_work_byte
 label 82 mon_rom_scan_addr
 label 83 fp_precision_bytes
 lcomment 83 FP byte count: 2=int, 4=single, 8=double
@@ -116,6 +124,8 @@ label 85 var_type
 lcomment 85 variable type: $02=int, $04=single, $08=double, $03=string
 label 86 mon_option_mask
 label 87 var_name_flags
+label 88 read_input_flag
+label 89 mon_menu_cols
 lcomment 87 variable name type byte (bit flags during var lookup)
 label 8A mon_line_id
 label 8B str_temp_top
@@ -126,7 +136,14 @@ label 8E mon_cursor_col
 label 8F ptr_temp
 label 90 ptr_temp_lo
 label 91 ptr_temp2
+label 92 fp_mult_ext0
+label 93 fp_mult_ext1
 label 94 fp_mult_accum
+label 95 fp_mult_ext3
+label 96 fp_mult_ext4
+label 97 fp_mult_ext5
+label 98 fp_mult_ext6
+label 99 fp_mult_ext7
 lcomment 94 FP multiply accumulator ($92-$99, 8 bytes)
 label 9A stack_limit
 lcomment 9A stack limit for overflow check (STS/CPX)
@@ -141,10 +158,12 @@ lcomment A6 current end of string pool
 label A0 array_start
 lcomment A0 start of array storage area
 label A8 var_table_end
+label AA line_buf_ptr
 lcomment A8 end of variable/array table
 label AC line_num
 label AE prog_ptr
 label B0 text_ptr
+label B1 text_ptr_lo
 label B2 data_ptr
 label B4 cont_ptr
 label B6 auto_line_num
@@ -159,10 +178,15 @@ label BD var_ptr
 lcomment BD pointer to current variable data
 label BF search_ptr
 label C1 op_precedence
+label C3 gc_boundary
 label C4 mem_top
+label C5 token_quote_flag
 label C6 src_ptr
+label C7 token_data_flag
 label C8 dst_ptr
+label C9 fp_decimal_count
 label CA end_ptr
+label CB fp_exponent_flag
 label CC gc_scan_ptr
 lcomment CC garbage collector scan pointer
 label CE str_desc_temp
@@ -186,6 +210,7 @@ lcomment DB extended mantissa byte (double precision)
 label DC fac_man7
 lcomment DC extended mantissa byte (double precision)
 label DD fac_sign
+label DE fp_num_digits
 * Floating Point ARG at $E3-$EA
 label E3 arg_exp
 label E4 arg_man1
@@ -199,12 +224,16 @@ label EB fp_temp
 label DF str_len_temp
 lcomment DF temporary string length for STR$/string operations
 label E0 str_data_ptr
+label E2 fp_negate_flag
+label E8 arg_man6
+label EA arg_man7
 lcomment E0 temporary string data pointer (2 bytes, hi/lo)
 label EC fp_sign_xor
 lcomment EC sign XOR for multiply/divide
 label ED fp_shift_count
 lcomment ED mantissa shift count during normalization
 label EE fp_work_ptr
+label EF dim_type_save
 lcomment EE general FP work pointer (also used by arrays, GC, formatting)
 label F0 save_x
 label F2 aux_stack_ptr
@@ -213,6 +242,7 @@ label F5 direct_flag
 label F6 print_col
 lcomment F6 current print column position
 label F8 print_width
+label F9 chrget_lo
 lcomment F8 print zone width
 label FA chrgot
 label FB input_ptr
@@ -224,6 +254,7 @@ label FB input_ptr
 * ============================================================
 label 0100 ram_sub_rtc
 label 0103 ram_sub_p14
+label 0104 io_block_size
 label 0106 ram_sub_ocf_user
 label 0109 ram_vec_sci_jmp
 label 010C ram_vec_tof_jmp
@@ -342,19 +373,25 @@ lcomment 0272 display line buffer pointer
 label 0274 disp_viewport_ptr
 lcomment 0274 display viewport buffer address pointer
 label 0276 disp_scroll_offset
+label 0277 disp_line_width
 lcomment 0276 display scroll row offset
 label 0278 disp_horiz_offset
+label 0279 disp_vert_offset
 lcomment 0278 display horizontal scroll offset
 label 027A disp_row_count
+label 027B disp_cursor_row
+label 027C disp_saved_cursor_x
 lcomment 027A display row count
 label 027E disp_param_ptr
 lcomment 027E display parameter pointer
 label 0280 mon_reg_save_a
 lcomment 0280 monitor: saved A register / workspace byte
 label 0286 lcd_desc_table
+label 02A0 mon_break_addr
 label 02B6 mon_reg_display
 label 02BF mon_saved_sp
 label 02C1 mon_saved_pc
+label 02C3 mon_input_end
 label 02D0 cas1_tape_buffer
 label 0324 cas0_tape_buffer
 label 04AF stack_init
@@ -364,6 +401,8 @@ lcomment 04B4 current program slot number (1-5)
 label 04B5 prog_area_ptr
 lcomment 04B5 pointer to current program storage area
 label 04BA bas_num_buf
+label 04BB using_format_buf
+label 04BC using_decimal_pos
 lcomment 04BA numeric conversion buffer (used by HEX$/OCT$)
 label 04BD fp_out_buf
 lcomment 04BD FP number-to-string output buffer
@@ -374,13 +413,21 @@ lcomment 04EB PRINT USING decimal point position counter
 label 04EC using_format_pos
 lcomment 04EC PRINT USING format string position
 label 04ED using_format_flags
+label 04EE using_format_ptr
+label 04F0 using_sign_flag
+label 04F1 using_field_width
+label 04F2 using_fill_char
+label 04F4 using_total_width
+label 04F6 using_work_area
 lcomment 04ED PRINT USING format flags
 label 04F8 file_record_size
+label 04FC using_work_value
 lcomment 04F8 PUT/GET record size
 label 0500 io_device_table
 lcomment 0500 I/O device descriptor table base
 label 04FE var_end
 label 05A2 file_base_addr
+label 05A4 str_work_ptr
 lcomment 05A2 PUT/GET file base address
 label 05A9 stmt_dispatch_ptr
 label 0639 bas_check_break_vec
@@ -825,6 +872,47 @@ label BFCD bas_randomize
 label 0651 bas_while_vec
 * Token $A9: WEND — RAM indirect vector ($0654)
 label 0654 bas_wend_vec
+label 068B file_io_status
+label 0697 file_eof_flag
+label 0698 io_read_ptr
+label 06E5 io_open_flag
+label 0856 bas_stack_limit
+label 0859 bas_patch_addr
+label 085B bas_patch_char
+label 085C bas_varname_buf
+label 086C bas_str_temp_buf
+label 088A bas_dim_limit
+label 088E bas_dim_count
+label 088F dim_element_size
+label 0890 bas_for_flag
+label 0893 str_mid_len
+label 0897 str_mid_start
+label 089B bas_line_start
+label 08A3 bas_line_end
+label 08A5 bas_using_temp
+label 08AE bas_error_resume_flag
+label 08AF bas_cont_save
+label 08B1 bas_error_line
+label 08E7 io_ctrl_block
+label 08E9 io_ctrl_block2
+label 08EC io_date_year
+label 08F3 io_filename_buf
+label 08FB io_buf_ptr
+label 08FD io_end_ptr
+label 08FF io_save_ptr
+label 0906 io_device_info
+label 090D file_list_flag
+label 090E io_suppress_flag
+label 090F io_session_flag
+label 0913 file_device_save
+label 0917 io_string_ptr
+label 0919 io_xfer_ptr
+label 091C sci_irq_handler_ptr
+label 0A26 lcd_cursor_x
+label 0A28 io_device_timeout
+label 0A34 bas_renum_flag
+label 0A40 io_work_buffer
+label 0F08 lcd_display_buffer
 * Token $AA: NEW
 label 85CD bas_new
 * Token $AB: ERASE
@@ -1447,6 +1535,8 @@ lcomment C251 initialize multiply accumulator at M0092-M0099
 label C27C fp_shift_right_n
 lcomment C27C right-shift mantissa by variable count in B
 label C286 fp_shift_right
+label C29F fp_const_one
+label C2A3 fp_log_coeffs
 lcomment C286 right-shift mantissa via ASR/ROR chain
 label C2CA fp_log_setup
 lcomment C2CA LOG setup: save exponent, normalize to [0.5, 1.0)
@@ -1583,6 +1673,11 @@ label CAF6 fp_format_leading_zeros
 label CB09 fp_format_check_commas
 label CB18 fp_format_pad_zeros
 label CB26 fp_format_number_sng
+label CC7E fp_pow10_neg
+label CC84 fp_pow10_pos
+label CC8E fp_pow10_max
+label CC8F fp_int_max_bcd
+label CCBC fp_const_table
 lcomment CA5A store formatted character to output buffer at M00EE
 label CCC4 bas_sqr_fn
 lcomment CCC4 SQR function: square root via Newton's method
@@ -1648,6 +1743,8 @@ lcomment CFB8 evaluate polynomial series from coefficient table at X
 label CFBB bas_tan_fn
 label CFD3 file_check_and_list
 label CFD9 fp_load_and_check_jmp
+label CFDF fp_const_pi_half
+label CFE7 fp_const_quarter
 lcomment CFBB TAN function: tangent (SIN/COS)
 
 * ============================================================
@@ -1762,7 +1859,9 @@ label D723 mon_clear_status_line
 label D724 mon_show_lcd_string
 label D727 mon_set_cursor_pos
 label D729 mon_fill_to_eol
+label D77B mon_cmd_entry_x
 label D77E mon_cmd_table_end
+label D7AF mon_reg_table
 
 * --- Display/Graphics (D7B0-DF63) ---
 label D7B0 disp_cmd_dispatch
@@ -2161,6 +2260,7 @@ label F87A kbd_case_convert
 label F88B kbd_shift_convert
 label F8C2 kbd_ctrl_convert
 label F562 lcd_display_fkey_string
+label F8D3 kbd_shift_table
 lcomment F562 display string from function key table via lcd_display_char loop
 label F963 kbd_timer_init
 label F9AA kbd_check_buffer
@@ -2170,6 +2270,11 @@ label F9F9 kbd_fkey_expand
 label FA2E kbd_fifo_dequeue
 label FA4A kbd_fifo_enqueue
 label FA6F kbd_fkey_dispatch
+label FFD0 rom_ptr_stack_base
+label FFD2 rom_ptr_sys_area
+label FFD8 rom_ptr_printer
+label FFDC rom_ptr_io_ctrl
+label FFDE rom_ptr_device_num
 
 * ============================================================
 * Inline Comments
