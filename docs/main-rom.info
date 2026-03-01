@@ -122,6 +122,19 @@ label C4 mem_top
 label C6 src_ptr
 label C8 dst_ptr
 label CA end_ptr
+* Floating Point Accumulator (FAC) at $D5-$DD
+label D5 fac_exp
+label D6 fac_man1
+label D7 fac_man2
+label D8 fac_man3
+label D9 fac_man4
+label DD fac_sign
+* Floating Point ARG at $E3-$EA
+label E3 arg_exp
+label E4 arg_man1
+label E5 arg_man2
+label E6 arg_man3
+label EB fp_temp
 label F0 save_x
 label F2 aux_stack_ptr
 label F4 error_mode
@@ -869,7 +882,74 @@ label B111 io_send_crlf
 label B129 io_parse_device_params
 label B175 io_parse_hex_char
 
-* --- BASIC SAVE/LOAD (cassette protocol) ---
+* ============================================================
+* LCD / Display / Graphics ($B500-$B7CE)
+* ============================================================
+* Complex LCD character output and graphics mode handlers.
+* Interfaces with 6x UPD7227 LCD controllers via SIO bus.
+lcomment B7CF LOCATE statement
+lcomment B7D5 LOCATES statement
+lcomment B837 GCLS statement (graphics clear screen)
+lcomment B844 CLS statement (clear screen)
+lcomment B851 WIDTH statement
+lcomment B8EE SCROLL statement
+lcomment B93E PSET statement (pixel set)
+lcomment B941 PRESET statement (pixel reset)
+lcomment B9AA LINE statement (draw line)
+lcomment B9F4 COLOR statement
+
+* ============================================================
+* SCREEN / LOGIN / STAT / PCOPY / session ($BA22-$BBB8)
+* ============================================================
+lcomment BA22 SCREEN statement
+lcomment BA93 TITLE statement
+lcomment BB2C STAT statement
+lcomment BBB9 PCOPY statement (screen page copy)
+
+* String messages for SCREEN display
+data BABB-BAC7
+lcomment BABB "Bytes Free" message
+data BAC8-BAD1
+lcomment BAC8 "MEMORY SET" message
+data BAD2-BADB
+lcomment BAD2 "RAMFILE" message
+
+* ============================================================
+* CLEAR / MEMSET / DEFFIL / PUT / GET / RANDOMIZE ($BC0F-$BFFF)
+* ============================================================
+lcomment BC0F CLEAR statement (reset variables and string space)
+lcomment BCE0 MEMSET statement (fill memory)
+lcomment BEAB DEFFIL statement
+lcomment BEC0 PUT statement
+lcomment BF44 GET statement
+lcomment BFCD RANDOMIZE statement (seed RNG)
+
+* ============================================================
+* Floating Point Math ($C000-$CFFF)
+* ============================================================
+* Microsoft BASIC floating point library.
+* FAC at $D5-$DD (exp, man1-4, sign), ARG at $E3-$EA.
+* Single precision (4 bytes) and double precision (8 bytes).
+
+* --- FP core arithmetic ($C000-$C3FF) ---
+label C111 fp_sub_exp
+lcomment C111 subtract exponents for add/sub alignment
+label C163 fp_add_mantissa
+lcomment C163 multi-byte mantissa addition with carry
+label C213 fp_negate_mantissa
+lcomment C213 complement mantissa bytes (2s complement)
+label C286 fp_shift_right
+lcomment C286 right-shift mantissa via ASR/ROR chain
+label C352 fp_multiply_loop
+lcomment C352 shift-and-add multiplication of mantissa
+label C3A6 fp_load_from_mem
+lcomment C3A6 load FP number from memory (X points to data)
+
+* --- FP comparison / conversion ($C400-$C6FF) ---
+
+* --- FP math functions ($C700-$CFFF) ---
+* SQR, LOG, EXP, SIN, COS, TAN, ATN and helper routines.
+* These use polynomial approximation with constant tables.
 
 * ============================================================
 * Boot Menu / Monitor (D000-DFFF)
