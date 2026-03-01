@@ -68,11 +68,11 @@ mon_reg_op EQU     $0062
 mon_reg_ptr EQU     $0063
 mon_dump_addr EQU     $0065                    ; monitor dump current address (2 bytes)
 mon_cursor_addr EQU     $0067                    ; monitor current cursor/edit address (2 bytes)
-M0068   EQU     $0068
+mon_key_mode EQU     $0068
 mon_save_x EQU     $0069
-M006A   EQU     $006A
+mon_save_sp EQU     $006A
 mon_save_pc EQU     $006B
-M006C   EQU     $006C
+mon_io_result_ptr EQU     $006C
 mon_save_ccr EQU     $006D
 mon_mode_flag EQU     $006E                    ; monitor mode flags
 kbd_change_count EQU     $0070
@@ -115,7 +115,7 @@ fp_mult_ext5 EQU     $0097
 fp_mult_ext6 EQU     $0098
 fp_mult_ext7 EQU     $0099
 stack_limit EQU     $009A                    ; stack limit for overflow check (STS/CPX)
-M009B   EQU     $009B
+stack_limit_lo EQU     $009B
 prog_start EQU     $009C
 mem_size_ptr EQU     $009E                    ; pointer to top of available memory
 M009F   EQU     $009F
@@ -132,7 +132,7 @@ prog_ptr EQU     $00AE
 text_ptr EQU     $00B0
 text_ptr_lo EQU     $00B1
 data_ptr EQU     $00B2
-M00B3   EQU     $00B3
+data_ptr_lo EQU     $00B3
 cont_ptr EQU     $00B4
 auto_line_num EQU     $00B6                    ; AUTO mode current line number
 auto_step EQU     $00B8                    ; AUTO mode step increment
@@ -141,9 +141,9 @@ var_name_byte2 EQU     $00BC                    ; second byte of variable name d
 var_ptr EQU     $00BD                    ; pointer to current variable data
 M00BE   EQU     $00BE
 search_ptr EQU     $00BF
-M00C0   EQU     $00C0
+search_ptr_lo EQU     $00C0
 op_precedence EQU     $00C1
-M00C2   EQU     $00C2
+fp_precision_mode EQU     $00C2
 gc_boundary EQU     $00C3
 mem_top EQU     $00C4
 token_quote_flag EQU     $00C5
@@ -155,10 +155,10 @@ end_ptr EQU     $00CA
 fp_exponent_flag EQU     $00CB
 gc_scan_ptr EQU     $00CC                    ; garbage collector scan pointer
 str_desc_temp EQU     $00CE                    ; temporary string descriptor (3 bytes: len, ptr_hi, ptr_lo)
-M00CF   EQU     $00CF
+str_desc_temp_lo EQU     $00CF
 read_mode EQU     $00D0                    ; READ/INPUT mode flag
 field_ptr EQU     $00D1                    ; PUT/GET field record pointer
-M00D3   EQU     $00D3
+read_save_ptr EQU     $00D3
 fac_exp EQU     $00D5
 fac_man1 EQU     $00D6
 fac_man2 EQU     $00D7
@@ -191,7 +191,7 @@ aux_stack_ptr EQU     $00F2
 error_mode EQU     $00F4
 direct_flag EQU     $00F5
 print_col EQU     $00F6                    ; current print column position
-M00F7   EQU     $00F7
+print_tab_col EQU     $00F7
 print_width EQU     $00F8                    ; print zone width
 chrget_lo EQU     $00F9
 chrgot  EQU     $00FA
@@ -205,13 +205,13 @@ ram_sub_p14 EQU     $0103
 io_block_size EQU     $0104
 ram_vec_sci_jmp EQU     $0109
 ram_vec_tof_jmp EQU     $010C
-M010D   EQU     $010D
+ram_vec_ocf_addr EQU     $010D
 ram_vec_ocf_jmp EQU     $010F
 ram_vec_icf_jmp EQU     $0112
 ram_vec_irq1_jmp EQU     $0115
 ram_vec_swi_jmp EQU     $0118
 ram_vec_nmi_jmp EQU     $011B
-M011E   EQU     $011E
+kbd_fkey_exec_ptr EQU     $011E
 kbd_vec_init EQU     $0120
 kbd_vec_ext EQU     $0122
 kbd_fkey1_handler EQU     $0124
@@ -225,16 +225,16 @@ mon_exec_vec EQU     $0138
 mon_scan_param EQU     $013A
 mon_item_counter EQU     $013B
 mon_item_limit EQU     $013C
-M013E   EQU     $013E
+boot_rom_limit EQU     $013E
 kbd_buf_max EQU     $0140
 kbd_repeat_delay EQU     $0141
 kbd_repeat_rate EQU     $0142
 kbd_timer_period EQU     $0143
 kbd_scan_cur EQU     $0145
-M014B   EQU     $014B
+kbd_scan_status EQU     $014B
 kbd_krtn89_prev EQU     $014D
 kbd_row89_status EQU     $014E
-M015F   EQU     $015F
+kbd_meta_status EQU     $015F
 kbd_fkey_mode EQU     $0165
 kbd_fkey_rd_ptr EQU     $0166
 kbd_fkey_wr_ptr EQU     $0167
@@ -277,7 +277,7 @@ M01F2   EQU     $01F2
 M01F4   EQU     $01F4
 tape_header_buf EQU     $0200
 block_byte_count EQU     $0203
-M0204   EQU     $0204
+block_byte_count_lo EQU     $0204
 last_cmd_sent EQU     $0205
 timer_redirect_flag EQU     $0206
 device_mode_resp EQU     $0207
@@ -292,7 +292,7 @@ M0215   EQU     $0215
 io_type_code EQU     $0217
 io_context_ptr EQU     $0219
 active_session_mask EQU     $021B
-M021F   EQU     $021F
+disp_buffer_end EQU     $021F
 display_buffer EQU     $0220
 bas_workspace EQU     $0270
 disp_line_buf_ptr EQU     $0272                    ; display line buffer pointer
@@ -305,34 +305,34 @@ disp_vert_offset EQU     $0279
 disp_row_count EQU     $027A                    ; display row count
 disp_cursor_row EQU     $027B
 disp_saved_cursor_x EQU     $027C
-M027D   EQU     $027D
+disp_window_height EQU     $027D
 disp_param_ptr EQU     $027E                    ; display parameter pointer
 mon_reg_save_a EQU     $0280                    ; monitor: saved A register / workspace byte
 lcd_desc_table EQU     $0286
-M028E   EQU     $028E
-M0293   EQU     $0293
+disp_esc_prefix EQU     $028E
+disp_cmd_buf EQU     $0293
 M0294   EQU     $0294
 mon_break_addr EQU     $02A0
-M02A2   EQU     $02A2
+mon_break_saved_opcode EQU     $02A2
 M02A3   EQU     $02A3
-M02A4   EQU     $02A4
-M02A5   EQU     $02A5
+mon_reg_mode_flag EQU     $02A4
+mon_io_ctrl_ptr EQU     $02A5
 M02A6   EQU     $02A6
-M02AF   EQU     $02AF
+mon_io_start EQU     $02AF
 M02B1   EQU     $02B1
-M02B2   EQU     $02B2
+mon_io_device_lo EQU     $02B2
 M02B4   EQU     $02B4
 mon_reg_display EQU     $02B6
-M02BB   EQU     $02BB
+mon_io_block_ptr EQU     $02BB
 mon_saved_sp EQU     $02BF
 mon_saved_pc EQU     $02C1
 mon_input_end EQU     $02C3
-M02C5   EQU     $02C5
+mon_saved_system_mode EQU     $02C5
 cas1_tape_buffer EQU     $02D0
 cas0_tape_buffer EQU     $0324
 M040A   EQU     $040A
 stack_init EQU     $04AF
-M04B0   EQU     $04B0
+bas_mem_top EQU     $04B0
 mem_size EQU     $04B2
 login_slot_num EQU     $04B4                    ; current program slot number (1-5)
 prog_area_ptr EQU     $04B5                    ; pointer to current program storage area
@@ -350,7 +350,7 @@ cmd_ext_ptr EQU     $04E6
 M04E7   EQU     $04E7
 fp_rng_seed_mid EQU     $04E8
 fp_rng_seed_lo EQU     $04E9
-M04EA   EQU     $04EA
+fp_mult_save EQU     $04EA
 using_decimal_pos EQU     $04EB                    ; PRINT USING decimal point position counter
 using_format_pos EQU     $04EC                    ; PRINT USING format string position
 using_format_flags EQU     $04ED                    ; PRINT USING format flags
@@ -376,9 +376,9 @@ str_work_ptr EQU     $05A4
 M05A6   EQU     $05A6
 stmt_dispatch_ptr EQU     $05A9
 bas_ext_fn_table EQU     $05AE
-M05B3   EQU     $05B3
-M05B8   EQU     $05B8
-M05D6   EQU     $05D6
+bas_ext_fn_dispatch_ptr EQU     $05B3
+bas_ext_stmt_dispatch_ptr EQU     $05B8
+bas_fn_default_table EQU     $05D6
 M05D8   EQU     $05D8
 Z05E2   EQU     $05E2
 Z05E5   EQU     $05E5
@@ -417,7 +417,7 @@ Z0648   EQU     $0648
 Z064B   EQU     $064B
 Z064E   EQU     $064E
 io_handler_table EQU     $0657
-M0659   EQU     $0659
+io_error_handler_ptr EQU     $0659
 bas_on_error_ptr EQU     $0677                    ; ON ERROR GOTO handler address
 io_device_status EQU     $0688                    ; current I/O device status byte
 sys_flag_689 EQU     $0689
@@ -437,25 +437,25 @@ lcd_cursor_col EQU     $06CB                    ; current cursor column position
 lcd_display_width EQU     $06CC                    ; current display width in columns
 io_crlf_descriptor EQU     $06D0
 io_open_flag EQU     $06E5
-M06E6   EQU     $06E6
-M06FD   EQU     $06FD
+io_crlf_flag EQU     $06E6
+io_serial_flag EQU     $06FD
 M0708   EQU     $0708
-M0717   EQU     $0717
+io_device_flag2 EQU     $0717
 pac_open_flag EQU     $0731                    ; PAC device open flag
-M0738   EQU     $0738
+printer_line_buf EQU     $0738
 printer_width_flag EQU     $074D
-M0751   EQU     $0751
+bas_data_stack_init EQU     $0751
 M0752   EQU     $0752
 bas_init_flag EQU     $0753
 text_save EQU     $0754
-M0755   EQU     $0755
+bas_data_stack_base EQU     $0755
 edit_line_count EQU     $0756                    ; line edit mode line counter
 line_input_buf EQU     $0757                    ; LINE INPUT keyboard buffer
 M0759   EQU     $0759
 M0800   EQU     $0800
 M0808   EQU     $0808
 bas_stack_limit EQU     $0856
-M0858   EQU     $0858
+bas_patch_end EQU     $0858
 bas_patch_addr EQU     $0859
 bas_patch_addr_hi EQU     $085A
 bas_patch_char EQU     $085B
@@ -494,9 +494,9 @@ stack_save EQU     $08AC
 bas_error_resume_flag EQU     $08AE
 bas_cont_save EQU     $08AF
 bas_error_line EQU     $08B1
-M08B2   EQU     $08B2
+bas_error_line_lo EQU     $08B2
 bas_relop_save_ptr EQU     $08B3
-M08B5   EQU     $08B5
+bas_fn_init_table EQU     $08B5
 bas_fn_dispatch_table EQU     $08CF
 io_ctrl_block EQU     $08E7
 io_cmd_param_buf EQU     $08E8                    ; I/O command parameter buffer (also display params)
@@ -505,13 +505,13 @@ io_device_desc_buf EQU     $08EA                    ; I/O device descriptor buff
 io_handler_vec EQU     $08EB                    ; I/O handler vector table base
 io_date_year EQU     $08EC
 io_date_dow EQU     $08ED
-M08F0   EQU     $08F0
+gfx_draw_mode EQU     $08F0
 io_filename_buf EQU     $08F3
-M08F6   EQU     $08F6
+io_filename_end EQU     $08F6
 io_buf_ptr EQU     $08FB
 io_end_ptr EQU     $08FD
 io_save_ptr EQU     $08FF
-M0901   EQU     $0901
+file_exec_addr EQU     $0901
 io_device_info EQU     $0906
 file_list_flag EQU     $090D
 io_suppress_flag EQU     $090E
@@ -529,7 +529,7 @@ M091D   EQU     $091D
 lcd_screen_mode EQU     $091E                    ; LCD screen mode (0=text, nonzero=graphics)
 lcd_alt_mode EQU     $091F                    ; LCD alternate screen mode
 io_error_mode EQU     $0920                    ; I/O operation error handling mode
-M0921   EQU     $0921
+io_error_table_base EQU     $0921
 io_response_code EQU     $0A25
 lcd_cursor_x EQU     $0A26
 input_col_limit EQU     $0A27                    ; LINE INPUT column limit ($FF=no limit)
@@ -1281,7 +1281,7 @@ Z8562:  LDAA    edit_line_count          ;8562: B6 07 56       '..V'
         PULB                             ;856D: 33             '3'
         JSR     mem_grow_region          ;856E: BD BD 38       '..8'
         STX     save_x                   ;8571: DF F0          '..'
-        LDX     #M0751                   ;8573: CE 07 51       '..Q'
+        LDX     #bas_data_stack_init     ;8573: CE 07 51       '..Q'
         STX     aux_stack_ptr            ;8576: DF F2          '..'
         LDX     save_x                   ;8578: DE F0          '..'
 Z857A:  JSR     bas_pop_byte             ;857A: BD 84 1C       '...'
@@ -1363,14 +1363,14 @@ M8601:  STAA    file_record_size         ;8601: B7 04 F8       '...'
         STX     var_start                ;860F: DF A2          '..'
         LDAA    #$04                     ;8611: 86 04          '..'
         LDAB    #$1A                     ;8613: C6 1A          '..'
-        LDX     #M08B5                   ;8615: CE 08 B5       '...'
+        LDX     #bas_fn_init_table       ;8615: CE 08 B5       '...'
 Z8618:  STAA    ,X                       ;8618: A7 00          '..'
         INX                              ;861A: 08             '.'
         DECB                             ;861B: 5A             'Z'
         BNE     Z8618                    ;861C: 26 FA          '&.'
         STAB    bas_error_resume_flag    ;861E: F7 08 AE       '...'
 M8621:  STAB    bas_error_line           ;8621: F7 08 B1       '...'
-        STAB    M08B2                    ;8624: F7 08 B2       '...'
+        STAB    bas_error_line_lo        ;8624: F7 08 B2       '...'
         STAB    dim_element_size         ;8627: F7 08 8F       '...'
         STAB    bas_dim_count            ;862A: F7 08 8E       '...'
         LDX     #M804F                   ;862D: CE 80 4F       '..O'
@@ -1383,7 +1383,7 @@ Z8639:  PULX                             ;8639: 38             '8'
         PSHA                             ;863D: 36             '6'
         STS     stack_save               ;863E: BF 08 AC       '...'
         STAA    data_ptr                 ;8641: 97 B2          '..'
-        STAA    M00B3                    ;8643: 97 B3          '..'
+        STAA    data_ptr_lo              ;8643: 97 B3          '..'
 bas_exec_setup: PSHX                             ;8645: 3C             '<'     setup execution context (push+setup)
         LDX     #bas_str_temp_buf        ;8646: CE 08 6C       '..l'
         STX     str_temp_top             ;8649: DF 8B          '..'
@@ -1782,7 +1782,7 @@ Z897F:  ANDB    #$FE                     ;897F: C4 FE          '..'
 Z8988:  JSR     LINBUF+$21               ;8988: BD C0 A1       '...'
         JSR     Z8909                    ;898B: BD 89 09       '...'
         JSR     LINBUF+$48               ;898E: BD C0 C8       '...'
-        LDAB    M00C2                    ;8991: D6 C2          '..'
+        LDAB    fp_precision_mode        ;8991: D6 C2          '..'
         CMPB    #$08                     ;8993: C1 08          '..'
         BNE     Z899E                    ;8995: 26 07          '&.'
 Z8997:  JSR     bas_cdbl_fn              ;8997: BD CD F4       '...'
@@ -2263,7 +2263,7 @@ M8D1C:  ROLA                             ;8D1C: 49             'I'
         ASL     >dim_type_save           ;8D1F: 78 00 EF       'x..'
         ROL     >fp_work_ptr             ;8D22: 79 00 EE       'y..'
         BCC     Z8D2D                    ;8D25: 24 06          '$.'
-        ADDB    M009B                    ;8D27: DB 9B          '..'
+        ADDB    stack_limit_lo           ;8D27: DB 9B          '..'
         ADCA    stack_limit              ;8D29: 99 9A          '..'
 M8D2B:  BCS     Z8D33                    ;8D2B: 25 06          '%.'
 Z8D2D:  DEC     >dst_ptr                 ;8D2D: 7A 00 C8       'z..'
@@ -2628,9 +2628,9 @@ str_fn_get_args: JSR     bas_expect_rparen        ;8FC9: BD 88 CD       '...'   
         PULB                             ;8FD3: 33             '3'
         STAB    str_desc_temp            ;8FD4: D7 CE          '..'
         PULB                             ;8FD6: 33             '3'
-        STAB    M00CF                    ;8FD7: D7 CF          '..'
+        STAB    str_desc_temp_lo         ;8FD7: D7 CF          '..'
         LDX     str_desc_temp            ;8FD9: DE CE          '..'
-        LDAB    M009B                    ;8FDB: D6 9B          '..'
+        LDAB    stack_limit_lo           ;8FDB: D6 9B          '..'
         PSHB                             ;8FDD: 37             '7'
         LDAB    stack_limit              ;8FDE: D6 9A          '..'
         PSHB                             ;8FE0: 37             '7'
@@ -2798,7 +2798,7 @@ bas_send_cr: LDAA    #$0D                     ;9135: 86 0D          '..'    send
 bas_print_comma: JSR     io_setup_device_state    ;9145: BD A8 08       '...'   PRINT comma: tab to next zone boundary
         BEQ     Z9154                    ;9148: 27 0A          ''.'
         LDAB    print_width              ;914A: D6 F8          '..'
-        CMPB    M00F7                    ;914C: D1 F7          '..'
+        CMPB    print_tab_col            ;914C: D1 F7          '..'
         BCS     Z9156                    ;914E: 25 06          '%.'
         BSR     bas_send_cr              ;9150: 8D E3          '..'
 bas_print_semi: BRA     bas_print_next_item      ;9152: 20 1D          ' .'    PRINT semicolon: suppress newline
@@ -4609,7 +4609,7 @@ bas_read: LDX     auto_step                ;9FF6: DE B8          '..'    READ: r
         BNE     ZA00C                    ;A002: 26 08          '&.'
         STX     field_ptr                ;A004: DF D1          '..'
         LDX     input_ptr                ;A006: DE FB          '..'
-        STX     M00D3                    ;A008: DF D3          '..'
+        STX     read_save_ptr            ;A008: DF D3          '..'
         LDAA    #$80                     ;A00A: 86 80          '..'
 ZA00C:  STAA    read_mode                ;A00C: 97 D0          '..'
 bas_read_dispatch: LDAA    read_mode                ;A00E: 96 D0          '..'
@@ -4740,7 +4740,7 @@ bas_read_finish: LDX     for_nest_ptr             ;A10E: DE BA          '..'
         BNE     ZA11E                    ;A118: 26 04          '&.'
         LDAA    ,X                       ;A11A: A6 00          '..'
         BNE     ZA0D3                    ;A11C: 26 B5          '&.'
-ZA11E:  LDX     M00D3                    ;A11E: DE D3          '..'
+ZA11E:  LDX     read_save_ptr            ;A11E: DE D3          '..'
         STX     input_ptr                ;A120: DF FB          '..'
         LDX     field_ptr                ;A122: DE D1          '..'
         STX     for_nest_ptr             ;A124: DF BA          '..'
@@ -4879,7 +4879,7 @@ ZA22D:  LDX     ptr_temp                 ;A22D: DE 8F          '..'
         CLR     $01,X                    ;A231: 6F 01          'o.'
         LDD     ptr_temp                 ;A233: DC 8F          '..'
         SUBD    #M0752                   ;A235: 83 07 52       '..R'
-        LDX     #M0755                   ;A238: CE 07 55       '..U'
+        LDX     #bas_data_stack_base     ;A238: CE 07 55       '..U'
         STX     input_ptr                ;A23B: DF FB          '..'
         RTS                              ;A23D: 39             '9'
 bas_tokenize_store: PSHX                             ;A23E: 3C             '<'
@@ -5008,7 +5008,7 @@ bas_ext_fn_dispatch: JSR     Z0621                    ;A31E: BD 06 21       '..!
         JSR     chrget                   ;A326: BD B3 CD       '...'
         CMPB    #$52                     ;A329: C1 52          '.R'
         BLS     ZA332                    ;A32B: 23 05          '#.'
-        LDX     M05B8                    ;A32D: FE 05 B8       '...'
+        LDX     bas_ext_stmt_dispatch_ptr ;A32D: FE 05 B8       '...'
         JMP     ,X                       ;A330: 6E 00          'n.'
 ZA332:  PSHB                             ;A332: 37             '7'
         CMPB    #$36                     ;A333: C1 36          '.6'
@@ -5095,10 +5095,10 @@ ZA3D4:  CMPA    #$FF                     ;A3D4: 81 FF          '..'
         BEQ     bas_exec_fn_call         ;A3D6: 27 09          ''.'
         CMPA    #$EB                     ;A3D8: 81 EB          '..'
         BLS     ZA38B                    ;A3DA: 23 AF          '#.'
-        LDX     M05B3                    ;A3DC: FE 05 B3       '...'
+        LDX     bas_ext_fn_dispatch_ptr  ;A3DC: FE 05 B3       '...'
         JMP     ,X                       ;A3DF: 6E 00          'n.'
 bas_exec_fn_call: JSR     chrget                   ;A3E1: BD B3 CD       '...'
-        LDX     #M05D6                   ;A3E4: CE 05 D6       '...'
+        LDX     #bas_fn_default_table    ;A3E4: CE 05 D6       '...'
         STX     ptr_temp                 ;A3E7: DF 8F          '..'
 ZA3E9:  LDX     ptr_temp                 ;A3E9: DE 8F          '..'
         INX                              ;A3EB: 08             '.'
@@ -5198,7 +5198,7 @@ ZA4A7:  RTS                              ;A4A7: 39             '9'
 ZA4A8:  LDX     #io_filename_buf         ;A4A8: CE 08 F3       '...'
 ZA4AB:  TSTB                             ;A4AB: 5D             ']'
         BEQ     ZA4A7                    ;A4AC: 27 F9          ''.'
-        CPX     #M08F6                   ;A4AE: 8C 08 F6       '...'
+        CPX     #io_filename_end         ;A4AE: 8C 08 F6       '...'
         BEQ     bas_error_bad_file_number ;A4B1: 27 BE          ''.'
         JSR     bas_pop_byte             ;A4B3: BD 84 1C       '...'
         DECB                             ;A4B6: 5A             'Z'
@@ -5600,7 +5600,7 @@ ZA804:  CPX     #P1DDR                   ;A804: 8C 00 00       '...'
 io_setup_device_state: PSHX                             ;A808: 3C             '<'
         PSHB                             ;A809: 37             '7'
         PSHA                             ;A80A: 36             '6'
-        LDX     M0659                    ;A80B: FE 06 59       '..Y'
+        LDX     io_error_handler_ptr     ;A80B: FE 06 59       '..Y'
         LDAB    error_mode               ;A80E: D6 F4          '..'
         BEQ     ZA81F                    ;A810: 27 0D          ''.'
         LDX     #bas_on_error_ptr        ;A812: CE 06 77       '..w'
@@ -5837,8 +5837,8 @@ ZA9D8:  JSR     Z063C                    ;A9D8: BD 06 3C       '..<'
         LDD     #RDR                     ;A9E9: CC 00 12       '...'
         JSR     ZBAB4                    ;A9EC: BD BA B4       '...'
         CLR     pac_open_flag            ;A9EF: 7F 07 31       '..1'
-        CLR     M06FD                    ;A9F2: 7F 06 FD       '...'
-        CLR     M0717                    ;A9F5: 7F 07 17       '...'
+        CLR     io_serial_flag           ;A9F2: 7F 06 FD       '...'
+        CLR     io_device_flag2          ;A9F5: 7F 07 17       '...'
         CLR     >error_mode              ;A9F8: 7F 00 F4       '...'
         CLR     >fp_precision_bytes      ;A9FB: 7F 00 83       '...'
         BSR     bas_check_init_and_resume ;A9FE: 8D CE          '..'
@@ -5861,7 +5861,7 @@ ZAA09:  CLR     bas_session_flag         ;AA09: 7F 09 16       '...'
         BLS     ZAA32                    ;AA26: 23 0A          '#.'
         CPX     #text_save               ;AA28: 8C 07 54       '..T'
         BCS     ZAA34                    ;AA2B: 25 07          '%.'
-        CPX     #M0858                   ;AA2D: 8C 08 58       '..X'
+        CPX     #bas_patch_end           ;AA2D: 8C 08 58       '..X'
         BHI     ZAA34                    ;AA30: 22 02          '".'
 ZAA32:  PULX                             ;AA32: 38             '8'
         RTS                              ;AA33: 39             '9'
@@ -6168,7 +6168,7 @@ bas_savem: JSR     file_setup_init          ;AC8D: BD A5 0F       '...'
         JMP     Z8C70                    ;AC9F: 7E 8C 70       '~.p'
 file_savem_range_check: STX     io_end_ptr               ;ACA2: FF 08 FD       '...'
         BSR     file_eval_expr           ;ACA5: 8D 38          '.8'
-        STX     M0901                    ;ACA7: FF 09 01       '...'
+        STX     file_exec_addr           ;ACA7: FF 09 01       '...'
         JSR     chrgot                   ;ACAA: 9D FA          '..'
         BEQ     ZACB1                    ;ACAC: 27 03          ''.'
         JSR     file_parse_filename      ;ACAE: BD A5 22       '.."'
@@ -6535,7 +6535,7 @@ io_device_scan: LDAA    bas_init_complete        ;AFD5: B6 09 12       '...'
         LDX     rom_ptr_io_ctrl          ;AFDA: FE FF DC       '...'
         RORA                             ;AFDD: 46             'F'
         BCC     ZAFE7                    ;AFDE: 24 07          '$.'
-        LDX     #M0921                   ;AFE0: CE 09 21       '..!'
+        LDX     #io_error_table_base     ;AFE0: CE 09 21       '..!'
         ASLB                             ;AFE3: 58             'X'
         RORA                             ;AFE4: 46             'F'
         BCS     ZAFF5                    ;AFE5: 25 0E          '%.'
@@ -6574,7 +6574,7 @@ ZB019:  CLRB                             ;B019: 5F             '_'
         LDAA    #$0D                     ;B029: 86 0D          '..'
         BSR     ZB02F                    ;B02B: 8D 02          '..'
         LDAA    #$0A                     ;B02D: 86 0A          '..'
-ZB02F:  LDX     #M0738                   ;B02F: CE 07 38       '..8'
+ZB02F:  LDX     #printer_line_buf        ;B02F: CE 07 38       '..8'
         JSR     printer_output_line      ;B032: BD B0 EE       '...'
         JSR     api_lcd_putchar          ;B035: BD FF 97       '...'
         BCS     io_abort_check_jmp       ;B038: 25 73          '%s'
@@ -6637,7 +6637,7 @@ ZB0B0:  JMP     ZB1F2                    ;B0B0: 7E B1 F2       '~..'
         JSR     api_sci_end_irq          ;B0BE: BD FF 7F       '...'
         BCS     io_abort_check_jmp       ;B0C1: 25 EA          '%.'
         BRA     ZB0D7                    ;B0C3: 20 12          ' .'
-ZB0C5:  TST     M06E6                    ;B0C5: 7D 06 E6       '}..'
+ZB0C5:  TST     io_crlf_flag             ;B0C5: 7D 06 E6       '}..'
         BEQ     ZB0D7                    ;B0C8: 27 0D          ''.'
         TST     io_open_flag             ;B0CA: 7D 06 E5       '}..'
         BEQ     ZB0D7                    ;B0CD: 27 08          ''.'
@@ -6892,7 +6892,7 @@ ZB2C9:  STAB    io_device_count          ;B2C9: F7 06 8D       '...'
         LDD     #M2624                   ;B2E6: CC 26 24       '.&$'
         STD     using_total_width        ;B2E9: FD 04 F4       '...'
         STX     using_fill_char          ;B2EC: FF 04 F2       '...'
-        LDX     #M014B                   ;B2EF: CE 01 4B       '..K'
+        LDX     #kbd_scan_status         ;B2EF: CE 01 4B       '..K'
         STX     str_work_ptr             ;B2F2: FF 05 A4       '...'
         JSR     bas_restore_memory_layout ;B2F5: BD BE 0C       '...'
         STX     line_buf_ptr             ;B2F8: DF AA          '..'
@@ -7670,7 +7670,7 @@ ZB9C6:  LDAB    #$DE                     ;B9C6: C6 DE          '..'
 ZB9E2:  JSR     chrget                   ;B9E2: BD B3 CD       '...'
         BEQ     ZB9E9                    ;B9E5: 27 02          ''.'
         BSR     bas_eval_color_arg       ;B9E7: 8D B6          '..'
-ZB9E9:  STAB    M08F0                    ;B9E9: F7 08 F0       '...'
+ZB9E9:  STAB    gfx_draw_mode            ;B9E9: F7 08 F0       '...'
         LDAA    #$C8                     ;B9EC: 86 C8          '..'
         JMP     lcd_dispatch_alt_mode    ;B9EE: 7E B7 2B       '~.+'
 bas_error_funcall_jmp5: JMP     Z8C70                    ;B9F1: 7E 8C 70       '~.p'
@@ -8132,7 +8132,7 @@ ZBDB4:  TIM     #$40,ext_rom_flags       ;BDB4: 7B 40 78       '{@x'
         STD     end_ptr                  ;BDC1: DD CA          '..'
         ADDD    var_end                  ;BDC3: F3 04 FE       '...'
         STD     src_ptr                  ;BDC6: DD C6          '..'
-        LDD     M04B0                    ;BDC8: FC 04 B0       '...'
+        LDD     bas_mem_top              ;BDC8: FC 04 B0       '...'
         SUBD    var_end                  ;BDCB: B3 04 FE       '...'
         JSR     mem_relocate_block       ;BDCE: BD BC B1       '...'
         LDD     mon_bank_ptr             ;BDD1: FC 01 36       '..6'
@@ -8163,7 +8163,7 @@ bas_restore_memory_layout: TIM     #$40,ext_rom_flags       ;BE0C: 7B 40 78     
         LDX     ram_top2                 ;BE11: FE 01 34       '..4'
         LDD     ,X                       ;BE14: EC 00          '..'
         ADDD    ram_top2                 ;BE16: F3 01 34       '..4'
-        STD     M04B0                    ;BE19: FD 04 B0       '...'
+        STD     bas_mem_top              ;BE19: FD 04 B0       '...'
         STD     mem_size                 ;BE1C: FD 04 B2       '...'
         LDX     #using_work_area         ;BE1F: CE 04 F6       '...'
         STX     ptr_temp                 ;BE22: DF 8F          '..'
@@ -8469,7 +8469,7 @@ LINBUF: MUL                              ;C080: 3D             '='
         INS                              ;C0CD: 31             '1'
         INS                              ;C0CE: 31             '1'
         PULA                             ;C0CF: 32             '2'
-        STAA    M00C2                    ;C0D0: 97 C2          '..'
+        STAA    fp_precision_mode        ;C0D0: 97 C2          '..'
         CMPA    #$02                     ;C0D2: 81 02          '..'
         BEQ     LINBUF+$65               ;C0D4: 27 0F          ''.'
         LDX     #arg_exp                 ;C0D6: CE 00 E3       '...'
@@ -8759,7 +8759,7 @@ fp_clear_mult_accum: LDX     #P1DDR                   ;C30C: CE 00 00       '...
 ZC32B:  LDAB    fac_man3                 ;C32B: D6 D8          '..'
         BSR     fp_mult_bit_check        ;C32D: 8D 1D          '..'
         LDAB    fp_shift_count           ;C32F: D6 ED          '..'
-        STAB    M04EA                    ;C331: F7 04 EA       '...'
+        STAB    fp_mult_save             ;C331: F7 04 EA       '...'
         LDAB    fac_man2                 ;C334: D6 D7          '..'
         BSR     fp_mult_bit_check        ;C336: 8D 14          '..'
         LDAB    fp_shift_count           ;C338: D6 ED          '..'
@@ -10420,7 +10420,7 @@ boot_advance_rom_addr: BSR     boot_advance_scan_ptr    ;D070: 8D 1F          '.
         LDD     #M3A45                   ;D074: CC 3A 45       '.:E'
         STD     mon_item_limit           ;D077: FD 01 3C       '..<'
         LDD     #MFFFF                   ;D07A: CC FF FF       '...'
-        STD     M013E                    ;D07D: FD 01 3E       '..>'
+        STD     boot_rom_limit           ;D07D: FD 01 3E       '..>'
         OIM     #$01,ext_rom_flags       ;D080: 72 01 78       'r.x'
 boot_detection_done: BRA     mon_init_display         ;D083: 20 2A          ' *'
 boot_select_bank2: STAA    BANK2                    ;D085: 97 32          '.2'    STAA BANK2; clear dip_switches bit 4; RTS
@@ -10460,7 +10460,7 @@ mon_init_display: CLRA                             ;D0AF: 4F             'O'    
         COM     >mon_display_flag2       ;D0CB: 73 00 8D       's..'
 mon_redraw_menu_page: LDAA    #$01                     ;D0CE: 86 01          '..'
         STAA    ptr_temp_lo              ;D0D0: 97 90          '..'
-        LDD     #M00C0                   ;D0D2: CC 00 C0       '...'
+        LDD     #search_ptr_lo           ;D0D2: CC 00 C0       '...'
         JSR     mon_lcd_set_cursor       ;D0D5: BD D2 16       '...'
         JMP     mon_menu_input_loop      ;D0D8: 7E D2 3E       '~.>'
 mon_setup_bank_a_scan: LDAA    #$01                     ;D0DB: 86 01          '..'
@@ -10740,7 +10740,7 @@ mon_enter_from_trap: PULX                             ;D310: 38             '8' 
         LDX     mon_mode_flag            ;D321: DE 6E          '.n'
         CPX     #mon_cmd_table_end       ;D323: 8C D7 7E       '..~'
         BEQ     mon_enter_from_break     ;D326: 27 0F          ''.'
-        LDAA    M02A2                    ;D328: B6 02 A2       '...'
+        LDAA    mon_break_saved_opcode   ;D328: B6 02 A2       '...'
         CPX     mon_break_addr           ;D32B: BC 02 A0       '...'
         BNE     mon_show_trap_msg        ;D32E: 26 0F          '&.'
         STAA    ,X                       ;D330: A7 00          '..'
@@ -10759,7 +10759,7 @@ mon_save_sp_show_regs: STS     mon_saved_sp             ;D347: BF 02 BF       '.
 mon_save_system_state: LDAA    mon_reg_save_a           ;D34F: B6 02 80       '...'
         STAA    M02A3                    ;D352: B7 02 A3       '...'
         LDAA    system_mode              ;D355: 96 7B          '.{'
-        STAA    M02C5                    ;D357: B7 02 C5       '...'
+        STAA    mon_saved_system_mode    ;D357: B7 02 C5       '...'
         OIM     #$40,system_mode         ;D35A: 72 40 7B       'r@{'
 mon_clear_work_area: LDX     #mon_reg_display         ;D35D: CE 02 B6       '...'
         CLRA                             ;D360: 4F             'O'
@@ -10780,7 +10780,7 @@ mon_cmd_prompt: CLRA                             ;D373: 4F             'O'     c
         STX     mon_break_addr           ;D37A: FF 02 A0       '...'
         JSR     mon_fill_to_eol          ;D37D: BD D7 29       '..)'
         LDAA    #$2D                     ;D380: 86 2D          '.-'
-mon_cmd_read_key: CLR     >M0068                   ;D382: 7F 00 68       '..h'
+mon_cmd_read_key: CLR     >mon_key_mode            ;D382: 7F 00 68       '..h'
         CMPA    #$FE                     ;D385: 81 FE          '..'
         BNE     ZD38D                    ;D387: 26 04          '&.'
         JSR     mon_putchar              ;D389: BD D6 9D       '...'
@@ -10863,16 +10863,16 @@ mon_skip_whitespace: INX                              ;D409: 08             '.'
 mon_exit_to_user: LDX     mon_saved_pc             ;D416: FE 02 C1       '...'   exit monitor: restore state, RTI
         STX     mon_mode_flag            ;D419: DF 6E          '.n'
         CLRB                             ;D41B: 5F             '_'
-mon_restore_and_rti: LDAA    M02C5                    ;D41C: B6 02 C5       '...'
+mon_restore_and_rti: LDAA    mon_saved_system_mode    ;D41C: B6 02 C5       '...'
         STAA    system_mode              ;D41F: 97 7B          '.{'
         LDX     mon_saved_sp             ;D421: FE 02 BF       '...'
         INX                              ;D424: 08             '.'
         TXS                              ;D425: 35             '5'
         LDX     mon_mode_flag            ;D426: DE 6E          '.n'
         PSHX                             ;D428: 3C             '<'
-        LDX     M006C                    ;D429: DE 6C          '.l'
+        LDX     mon_io_result_ptr        ;D429: DE 6C          '.l'
         PSHX                             ;D42B: 3C             '<'
-        LDX     M006A                    ;D42C: DE 6A          '.j'
+        LDX     mon_save_sp              ;D42C: DE 6A          '.j'
         PSHX                             ;D42E: 3C             '<'
         LDAA    mon_save_x               ;D42F: 96 69          '.i'
         PSHA                             ;D431: 36             '6'
@@ -10937,7 +10937,7 @@ ZD4A4:  STX     mon_reg_ptr              ;D4A4: DF 63          '.c'
         LDX     mon_hex_value            ;D4B0: DE 61          '.a'
         STX     mon_break_addr           ;D4B2: FF 02 A0       '...'
         LDAA    ,X                       ;D4B5: A6 00          '..'
-        STAA    M02A2                    ;D4B7: B7 02 A2       '...'
+        STAA    mon_break_saved_opcode   ;D4B7: B7 02 A2       '...'
         CLR     ,X                       ;D4BA: 6F 00          'o.'
 ZD4BC:  LDX     mon_reg_ptr              ;D4BC: DE 63          '.c'
         STX     mon_mode_flag            ;D4BE: DF 6E          '.n'
@@ -10958,13 +10958,13 @@ mon_cmd_write_io: CLRA                             ;D4D8: 4F             'O'
 mon_cmd_registers: LDAA    #$01                     ;D4DB: 86 01          '..'    R command: display/modify registers
 mon_reg_set_mode: STAA    mon_hex_value            ;D4DD: 97 61          '.a'
         LDAA    #$01                     ;D4DF: 86 01          '..'
-        STAA    M02A4                    ;D4E1: B7 02 A4       '...'
+        STAA    mon_reg_mode_flag        ;D4E1: B7 02 A4       '...'
         LDD     #M2010                   ;D4E4: CC 20 10       '. .'
         LDX     #M02A6                   ;D4E7: CE 02 A6       '...'
         STX     mon_reg_ptr              ;D4EA: DF 63          '.c'
         JSR     ZD363                    ;D4EC: BD D3 63       '..c'
         LDX     rom_ptr_io_ctrl          ;D4EF: FE FF DC       '...'
-        STX     M02A5                    ;D4F2: FF 02 A5       '...'
+        STX     mon_io_ctrl_ptr          ;D4F2: FF 02 A5       '...'
         LDX     mon_default_display_ptr  ;D4F5: FE FF DA       '...'
         INX                              ;D4F8: 08             '.'
         JSR     mon_skip_whitespace      ;D4F9: BD D4 09       '...'
@@ -10989,11 +10989,11 @@ mon_reg_parse_params: DECA                             ;D50B: 4A             'J'
         PULX                             ;D51F: 38             '8'
         BRA     mon_reg_parse_params     ;D520: 20 E9          ' .'
 ZD522:  LDD     $01,X                    ;D522: EC 01          '..'
-        STD     M02AF                    ;D524: FD 02 AF       '...'
+        STD     mon_io_start             ;D524: FD 02 AF       '...'
         LDAA    $03,X                    ;D527: A6 03          '..'
         STAA    M02B1                    ;D529: B7 02 B1       '...'
         LDD     #tape_header_buf         ;D52C: CC 02 00       '...'
-        STD     M02B2                    ;D52F: FD 02 B2       '...'
+        STD     mon_io_device_lo         ;D52F: FD 02 B2       '...'
         LDD     #LCDDATA                 ;D532: CC 00 2A       '..*'
         STD     M02B4                    ;D535: FD 02 B4       '...'
         JSR     mon_skip_whitespace      ;D538: BD D4 09       '...'
@@ -11005,12 +11005,12 @@ mon_reg_execute_op: STAB    mon_reg_op               ;D543: D7 62          '.b'
         JSR     mon_clear_status_line    ;D545: BD D7 23       '..#'
         LDAB    mon_hex_nibble           ;D548: D6 60          '.`'
         CLRA                             ;D54A: 4F             'O'
-        LDX     #M02A4                   ;D54B: CE 02 A4       '...'
+        LDX     #mon_reg_mode_flag       ;D54B: CE 02 A4       '...'
         TST     >mon_hex_value           ;D54E: 7D 00 61       '}.a'
         BEQ     ZD55F                    ;D551: 27 0C          ''.'
         PSHA                             ;D553: 36             '6'
         LDAA    #$2A                     ;D554: 86 2A          '.*'
-        STAA    M02B2                    ;D556: B7 02 B2       '...'
+        STAA    mon_io_device_lo         ;D556: B7 02 B2       '...'
         PULA                             ;D559: 32             '2'
         JSR     api_io_open_write        ;D55A: BD FE DA       '...'
         BRA     ZD564                    ;D55D: 20 05          ' .'
@@ -11025,11 +11025,11 @@ ZD564:  STAA    mon_save_pc              ;D564: 97 6B          '.k'
         BPL     ZD576                    ;D571: 2A 03          '*.'
         STAA    mon_reg_op               ;D573: 97 62          '.b'
         INCA                             ;D575: 4C             'L'
-ZD576:  LDX     M02BB                    ;D576: FE 02 BB       '...'
+ZD576:  LDX     mon_io_block_ptr         ;D576: FE 02 BB       '...'
         JSR     api_io_read_block        ;D579: BD FE D7       '...'
         BRA     ZD581                    ;D57C: 20 03          ' .'
 ZD57E:  JSR     api_io_write_block       ;D57E: BD FE DD       '...'
-ZD581:  STX     M006C                    ;D581: DF 6C          '.l'
+ZD581:  STX     mon_io_result_ptr        ;D581: DF 6C          '.l'
         STAA    mon_save_pc              ;D583: 97 6B          '.k'
         BNE     mon_reg_show_error       ;D585: 26 14          '&.'
         BCS     mon_reg_show_error       ;D587: 25 12          '%.'
@@ -11179,7 +11179,7 @@ mon_putchar: PSHB                             ;D69D: 37             '7'
 ZD6B1:  STD     mon_cursor_addr          ;D6B1: DD 67          '.g'
         BRA     ZD6B7                    ;D6B3: 20 02          ' .'
 ZD6B5:  BSR     mon_put_at_cursor        ;D6B5: 8D 21          '.!'
-ZD6B7:  LDAB    M0068                    ;D6B7: D6 68          '.h'
+ZD6B7:  LDAB    mon_key_mode             ;D6B7: D6 68          '.h'
         CMPB    #$01                     ;D6B9: C1 01          '..'
         BCC     ZD6D4                    ;D6BB: 24 17          '$.'
         LDAB    #$20                     ;D6BD: C6 20          '. '
@@ -11316,7 +11316,7 @@ disp_cmd_dispatch: PSHB                             ;D7B0: 37             '7'   
         LDAA    ,X                       ;D7B2: A6 00          '..'
         CMPA    #$84                     ;D7B4: 81 84          '..'
         BEQ     disp_cmd_esc_prefix      ;D7B6: 27 0E          ''.'
-        LDAB    M028E                    ;D7B8: F6 02 8E       '...'
+        LDAB    disp_esc_prefix          ;D7B8: F6 02 8E       '...'
         CMPB    #$30                     ;D7BB: C1 30          '.0'
         BEQ     ZD7CD                    ;D7BD: 27 0E          ''.'
         JSR     disp_handle_byte         ;D7BF: BD D8 50       '..P'
@@ -11325,7 +11325,7 @@ ZD7C3:  PULX                             ;D7C3: 38             '8'
         PULB                             ;D7C4: 33             '3'
         RTS                              ;D7C5: 39             '9'
 disp_cmd_esc_prefix: LDAA    $01,X                    ;D7C6: A6 01          '..'
-        STAA    M028E                    ;D7C8: B7 02 8E       '...'
+        STAA    disp_esc_prefix          ;D7C8: B7 02 8E       '...'
         BRA     ZD7C2                    ;D7CB: 20 F5          ' .'
 ZD7CD:  PSHX                             ;D7CD: 3C             '<'
         LDX     #MD80F                   ;D7CE: CE D8 0F       '...'
@@ -11358,9 +11358,9 @@ disp_cmd_exec_api: JSR     api_tf20_send            ;D7F3: BD FF 70       '..p'
 ZD7FC:  PULX                             ;D7FC: 38             '8'
         BRA     ZD7C3                    ;D7FD: 20 C4          ' .'
 disp_cmd_wrapper: LDAB    #$92                     ;D7FF: C6 92          '..'
-        STAB    M0293                    ;D801: F7 02 93       '...'
+        STAB    disp_cmd_buf             ;D801: F7 02 93       '...'
         STAA    M0294                    ;D804: B7 02 94       '...'
-        LDX     #M0293                   ;D807: CE 02 93       '...'
+        LDX     #disp_cmd_buf            ;D807: CE 02 93       '...'
         JSR     disp_cmd_dispatch        ;D80A: BD D7 B0       '...'
         LDX     M0294                    ;D80D: FE 02 94       '...'
         RTS                              ;D810: 39             '9'
@@ -11394,7 +11394,7 @@ disp_get_text_at: LDD     #M1303                   ;D868: CC 13 03       '...'
         BRA     ZD8C4                    ;D86B: 20 57          ' W'
         LDX     lcdctl_prev              ;D86D: DE 50          '.P'
         LDAA    $01,X                    ;D86F: A6 01          '..'
-        STAA    M027D                    ;D871: B7 02 7D       '..}'
+        STAA    disp_window_height       ;D871: B7 02 7D       '..}'
         RTS                              ;D874: 39             '9'
 disp_define_window: LDX     lcdctl_prev              ;D875: DE 50          '.P'    define text window dimensions
         LDD     $03,X                    ;D877: EC 03          '..'
@@ -12202,7 +12202,7 @@ disp_refresh: LDAA    mon_reg_save_a           ;DEB4: B6 02 80       '...'
         ANDA    #$10                     ;DEB7: 84 10          '..'
         BEQ     disp_render_visible      ;DEB9: 27 16          ''.'
         LDAA    #$09                     ;DEBB: 86 09          '..'
-        SUBA    M027D                    ;DEBD: B0 02 7D       '..}'
+        SUBA    disp_window_height       ;DEBD: B0 02 7D       '..}'
         BEQ     disp_render_visible      ;DEC0: 27 0F          ''.'
 ZDEC2:  LDX     #M4FFF                   ;DEC2: CE 4F FF       '.O.'
 ZDEC5:  DEX                              ;DEC5: 09             '.'
@@ -12215,7 +12215,7 @@ disp_render_visible: LDX     disp_param_ptr           ;DED1: FE 02 7E       '..~
         PSHX                             ;DED4: 3C             '<'
         LDX     disp_horiz_offset        ;DED5: FE 02 78       '..x'
         PSHX                             ;DED8: 3C             '<'
-        LDX     #M021F                   ;DED9: CE 02 1F       '...'
+        LDX     #disp_buffer_end         ;DED9: CE 02 1F       '...'
         PSHX                             ;DEDC: 3C             '<'
         CLRA                             ;DEDD: 4F             'O'
         CLRB                             ;DEDE: 5F             '_'
@@ -13750,7 +13750,7 @@ ZEB05:  RTS                              ;EB05: 39             '9'
 block_xfer_init_err: OIM     #$40,$08,X               ;EB06: 62 40 08       'b@.'
         RTS                              ;EB09: 39             '9'
 set_timer_vec_ef85: LDD     #p17_debounce_handler    ;EB0A: CC EF 85       '...'   redirect OCF vector to EF85, set debounce counter=9
-        STD     M010D                    ;EB0D: FD 01 0D       '...'
+        STD     ram_vec_ocf_addr         ;EB0D: FD 01 0D       '...'
         LDAA    #$09                     ;EB10: 86 09          '..'
         STAA    timer_redirect_flag      ;EB12: B7 02 06       '...'
         RTS                              ;EB15: 39             '9'
@@ -14762,7 +14762,7 @@ ZF2FA:  INC     >tf20_block_count        ;F2FA: 7C 00 55       '|.U'
         XGDX                             ;F306: 18             '.'
         JSR     printer_send_clocks      ;F307: BD F4 02       '...'
         BRA     ZF2B4                    ;F30A: 20 A8          ' .'
-ZF30C:  LDX     #M0204                   ;F30C: CE 02 04       '...'
+ZF30C:  LDX     #block_byte_count_lo     ;F30C: CE 02 04       '...'
 ZF30F:  BSR     p1_serial_read_byte      ;F30F: 8D 60          '.`'
         PSHA                             ;F311: 36             '6'
         BSR     p1_serial_read_byte      ;F312: 8D 5D          '.]'
@@ -15384,7 +15384,7 @@ ZF79A:  INX                              ;F79A: 08             '.'
         DECB                             ;F79B: 5A             'Z'
         BITB    #$7F                     ;F79C: C5 7F          '..'
         BNE     ZF778                    ;F79E: 26 D8          '&.'
-        LDX     #M015F                   ;F7A0: CE 01 5F       '.._'
+        LDX     #kbd_meta_status         ;F7A0: CE 01 5F       '.._'
         AIM     #$BF,$00,X               ;F7A3: 61 BF 00       'a..'
         LDAA    kbd_krtn89_acc_l         ;F7A6: 96 73          '.s'
 ZF7A8:  PULX                             ;F7A8: 38             '8'
@@ -15406,7 +15406,7 @@ kbd_update_modifiers: PSHA                             ;F7BB: 36             '6'
         ANDB    #$60                     ;F7C4: C4 60          '.`'
         ABA                              ;F7C6: 1B             '.'
         ANDA    #$FE                     ;F7C7: 84 FE          '..'
-        LDAB    M014B                    ;F7C9: F6 01 4B       '..K'
+        LDAB    kbd_scan_status          ;F7C9: F6 01 4B       '..K'
         BITB    #$40                     ;F7CC: C5 40          '.@'
         BEQ     ZF7D2                    ;F7CE: 27 02          ''.'
         ORAA    #$10                     ;F7D0: 8A 10          '..'
@@ -15747,11 +15747,11 @@ ZFA99:  TSX                              ;FA99: 30             '0'
         BCS     ZFAB8                    ;FAA1: 25 15          '%.'
         SUBA    #$60                     ;FAA3: 80 60          '.`'
         BCS     ZFACF                    ;FAA5: 25 28          '%('
-        LDX     M011E                    ;FAA7: FE 01 1E       '...'
+        LDX     kbd_fkey_exec_ptr        ;FAA7: FE 01 1E       '...'
         TSX                              ;FAAA: 30             '0'
         BEQ     ZFACF                    ;FAAB: 27 22          ''"'
         STAA    ,X                       ;FAAD: A7 00          '..'
-        LDD     M011E                    ;FAAF: FC 01 1E       '...'
+        LDD     kbd_fkey_exec_ptr        ;FAAF: FC 01 1E       '...'
 ZFAB2:  INC     $01,X                    ;FAB2: 6C 01          'l.'
         STD     $02,X                    ;FAB4: ED 02          '..'
         BRA     ZFACF                    ;FAB6: 20 17          ' .'

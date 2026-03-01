@@ -104,8 +104,11 @@ lcomment 61 monitor hex value accumulator (2 bytes)
 label 65 mon_dump_addr
 lcomment 65 monitor dump current address (2 bytes)
 label 67 mon_cursor_addr
+label 68 mon_key_mode
 label 0069 mon_save_x
+label 6A mon_save_sp
 label 6B mon_save_pc
+label 6C mon_io_result_ptr
 label 006D mon_save_ccr
 lcomment 67 monitor current cursor/edit address (2 bytes)
 label 6E mon_mode_flag
@@ -146,6 +149,7 @@ label 98 fp_mult_ext6
 label 99 fp_mult_ext7
 lcomment 94 FP multiply accumulator ($92-$99, 8 bytes)
 label 9A stack_limit
+label 9B stack_limit_lo
 lcomment 9A stack limit for overflow check (STS/CPX)
 label 9C prog_start
 label 9E mem_size_ptr
@@ -165,6 +169,7 @@ label AE prog_ptr
 label B0 text_ptr
 label B1 text_ptr_lo
 label B2 data_ptr
+label B3 data_ptr_lo
 label B4 cont_ptr
 label B6 auto_line_num
 lcomment B6 AUTO mode current line number
@@ -177,7 +182,9 @@ lcomment BC second byte of variable name during lookup
 label BD var_ptr
 lcomment BD pointer to current variable data
 label BF search_ptr
+label C0 search_ptr_lo
 label C1 op_precedence
+label C2 fp_precision_mode
 label C3 gc_boundary
 label C4 mem_top
 label C5 token_quote_flag
@@ -190,12 +197,14 @@ label CB fp_exponent_flag
 label CC gc_scan_ptr
 lcomment CC garbage collector scan pointer
 label CE str_desc_temp
+label CF str_desc_temp_lo
 lcomment CE temporary string descriptor (3 bytes: len, ptr_hi, ptr_lo)
 label D2 for_loop_var
 lcomment D2 pointer to FOR loop control variable
 label D0 read_mode
 lcomment D0 READ/INPUT mode flag
 label D1 field_ptr
+label D3 read_save_ptr
 lcomment D1 PUT/GET field record pointer
 * Floating Point Accumulator (FAC) at $D5-$DD
 label D5 fac_exp
@@ -240,6 +249,7 @@ label F2 aux_stack_ptr
 label F4 error_mode
 label F5 direct_flag
 label F6 print_col
+label F7 print_tab_col
 lcomment F6 current print column position
 label F8 print_width
 label F9 chrget_lo
@@ -258,11 +268,13 @@ label 0104 io_block_size
 label 0106 ram_sub_ocf_user
 label 0109 ram_vec_sci_jmp
 label 010C ram_vec_tof_jmp
+label 010D ram_vec_ocf_addr
 label 010F ram_vec_ocf_jmp
 label 0112 ram_vec_icf_jmp
 label 0115 ram_vec_irq1_jmp
 label 0118 ram_vec_swi_jmp
 label 011B ram_vec_nmi_jmp
+label 011E kbd_fkey_exec_ptr
 
 * ============================================================
 * Keyboard Control Block ($0120-$018F)
@@ -283,15 +295,18 @@ label 0138 mon_exec_vec
 label 013A mon_scan_param
 label 013B mon_item_counter
 label 013C mon_item_limit
+label 013E boot_rom_limit
 label 0140 kbd_buf_max
 label 0141 kbd_repeat_delay
 label 0142 kbd_repeat_rate
 label 0143 kbd_timer_period
 label 0145 kbd_scan_cur
+label 014B kbd_scan_status
 label 014D kbd_krtn89_prev
 label 014E kbd_row89_status
 label 014F kbd_scan_prev
 label 0159 kbd_scan_debounced
+label 015F kbd_meta_status
 label 0163 kbd_fkey_buf_ptr
 label 0165 kbd_fkey_mode
 label 0166 kbd_fkey_rd_ptr
@@ -350,6 +365,7 @@ label 01EC cb_cas0
 * ============================================================
 label 0200 tape_header_buf
 label 0203 block_byte_count
+label 0204 block_byte_count_lo
 label 0205 last_cmd_sent
 label 0206 timer_redirect_flag
 label 0207 device_mode_resp
@@ -362,6 +378,7 @@ label 0211 data_end_ptr
 label 0217 io_type_code
 label 0219 io_context_ptr
 label 021B active_session_mask
+label 021F disp_buffer_end
 label 0220 display_buffer
 
 * ============================================================
@@ -381,20 +398,31 @@ lcomment 0278 display horizontal scroll offset
 label 027A disp_row_count
 label 027B disp_cursor_row
 label 027C disp_saved_cursor_x
+label 027D disp_window_height
 lcomment 027A display row count
 label 027E disp_param_ptr
 lcomment 027E display parameter pointer
 label 0280 mon_reg_save_a
 lcomment 0280 monitor: saved A register / workspace byte
 label 0286 lcd_desc_table
+label 028E disp_esc_prefix
+label 0293 disp_cmd_buf
 label 02A0 mon_break_addr
+label 02A2 mon_break_saved_opcode
+label 02A4 mon_reg_mode_flag
+label 02A5 mon_io_ctrl_ptr
+label 02AF mon_io_start
+label 02B2 mon_io_device_lo
 label 02B6 mon_reg_display
+label 02BB mon_io_block_ptr
 label 02BF mon_saved_sp
 label 02C1 mon_saved_pc
 label 02C3 mon_input_end
+label 02C5 mon_saved_system_mode
 label 02D0 cas1_tape_buffer
 label 0324 cas0_tape_buffer
 label 04AF stack_init
+label 04B0 bas_mem_top
 label 04B2 mem_size
 label 04B4 login_slot_num
 lcomment 04B4 current program slot number (1-5)
@@ -412,6 +440,7 @@ label 04E5 fp_rng_seed_hi
 label 04E6 cmd_ext_ptr
 label 04E8 fp_rng_seed_mid
 label 04E9 fp_rng_seed_lo
+label 04EA fp_mult_save
 label 04EB using_decimal_pos
 lcomment 04EB PRINT USING decimal point position counter
 label 04EC using_format_pos
@@ -440,6 +469,9 @@ label 05A4 str_work_ptr
 lcomment 05A2 PUT/GET file base address
 label 05A9 stmt_dispatch_ptr
 label 05AE bas_ext_fn_table
+label 05B3 bas_ext_fn_dispatch_ptr
+label 05B8 bas_ext_stmt_dispatch_ptr
+label 05D6 bas_fn_default_table
 label 0639 bas_check_break_vec
 lcomment 0639 RAM vector: check for Ctrl-C / break
 label 0677 bas_on_error_ptr
@@ -883,6 +915,7 @@ label 0651 bas_while_vec
 * Token $A9: WEND — RAM indirect vector ($0654)
 label 0654 bas_wend_vec
 label 0657 io_handler_table
+label 0659 io_error_handler_ptr
 label 068B file_io_status
 label 068D io_device_count
 label 068F io_device_params
@@ -890,9 +923,16 @@ label 0697 file_eof_flag
 label 0698 io_read_ptr
 label 06D0 io_crlf_descriptor
 label 06E5 io_open_flag
+label 06E6 io_crlf_flag
+label 06FD io_serial_flag
+label 0717 io_device_flag2
+label 0738 printer_line_buf
 label 074D printer_width_flag
+label 0751 bas_data_stack_init
 label 0753 bas_init_flag
+label 0755 bas_data_stack_base
 label 0856 bas_stack_limit
+label 0858 bas_patch_end
 label 0859 bas_patch_addr
 label 085A bas_patch_addr_hi
 label 085B bas_patch_char
@@ -915,16 +955,21 @@ label 08A5 bas_using_temp
 label 08AE bas_error_resume_flag
 label 08AF bas_cont_save
 label 08B1 bas_error_line
+label 08B2 bas_error_line_lo
 label 08B3 bas_relop_save_ptr
+label 08B5 bas_fn_init_table
 label 08CF bas_fn_dispatch_table
 label 08E7 io_ctrl_block
 label 08E9 io_ctrl_block2
 label 08EC io_date_year
 label 08ED io_date_dow
+label 08F0 gfx_draw_mode
 label 08F3 io_filename_buf
+label 08F6 io_filename_end
 label 08FB io_buf_ptr
 label 08FD io_end_ptr
 label 08FF io_save_ptr
+label 0901 file_exec_addr
 label 0906 io_device_info
 label 090D file_list_flag
 label 090E io_suppress_flag
@@ -934,6 +979,7 @@ label 0914 file_merge_ptr
 label 0917 io_string_ptr
 label 0919 io_xfer_ptr
 label 091C sci_irq_handler_ptr
+label 0921 io_error_table_base
 label 0A25 io_response_code
 label 0A26 lcd_cursor_x
 label 0A28 io_device_timeout
