@@ -94,6 +94,15 @@ label 7C session_flags
 label 7D irq_abort_flags
 label 7E dip_switches
 label 7F sys_config2
+* Monitor workspace overlaps BASIC workspace at $61-$6F
+label 61 mon_hex_value
+lcomment 61 monitor hex value accumulator (2 bytes)
+label 65 mon_dump_addr
+lcomment 65 monitor dump current address (2 bytes)
+label 67 mon_cursor_addr
+lcomment 67 monitor current cursor/edit address (2 bytes)
+label 6E mon_mode_flag
+lcomment 6E monitor mode flags
 
 * ============================================================
 * Internal RAM ($80-$FF) - BASIC workspace
@@ -106,13 +115,21 @@ label 84 mon_bank_select
 label 85 var_type
 lcomment 85 variable type: $02=int, $04=single, $08=double, $03=string
 label 86 mon_option_mask
+label 87 var_name_flags
+lcomment 87 variable name type byte (bit flags during var lookup)
 label 8A mon_line_id
+label 8B str_temp_top
+lcomment 8B string temp descriptor stack top pointer
 label 8C mon_display_flag
 label 8D mon_display_flag2
 label 8E mon_cursor_col
 label 8F ptr_temp
 label 90 ptr_temp_lo
 label 91 ptr_temp2
+label 94 fp_mult_accum
+lcomment 94 FP multiply accumulator ($92-$99, 8 bytes)
+label 9A stack_limit
+lcomment 9A stack limit for overflow check (STS/CPX)
 label 9C prog_start
 label 9E mem_size_ptr
 lcomment 9E pointer to top of available memory
@@ -121,6 +138,8 @@ label A4 str_pool_start
 lcomment A4 start of string pool (grows downward)
 label A6 str_pool_end
 lcomment A6 current end of string pool
+label A0 array_start
+lcomment A0 start of array storage area
 label A8 var_table_end
 lcomment A8 end of variable/array table
 label AC line_num
@@ -134,6 +153,8 @@ label B8 auto_step
 lcomment B8 AUTO mode step increment
 label BA for_nest_ptr
 lcomment BA FOR/NEXT nesting pointer
+label BC var_name_byte2
+lcomment BC second byte of variable name during lookup
 label BD var_ptr
 lcomment BD pointer to current variable data
 label BF search_ptr
@@ -146,6 +167,8 @@ label CC gc_scan_ptr
 lcomment CC garbage collector scan pointer
 label CE str_desc_temp
 lcomment CE temporary string descriptor (3 bytes: len, ptr_hi, ptr_lo)
+label D2 for_loop_var
+lcomment D2 pointer to FOR loop control variable
 label D0 read_mode
 lcomment D0 READ/INPUT mode flag
 label D1 field_ptr
@@ -173,6 +196,10 @@ lcomment E7 ARG extended mantissa byte
 label E9 arg_man5
 lcomment E9 ARG extended mantissa byte
 label EB fp_temp
+label DF str_len_temp
+lcomment DF temporary string length for STR$/string operations
+label E0 str_data_ptr
+lcomment E0 temporary string data pointer (2 bytes, hi/lo)
 label EC fp_sign_xor
 lcomment EC sign XOR for multiply/divide
 label ED fp_shift_count
@@ -310,12 +337,18 @@ label 0220 display_buffer
 * BASIC Interpreter RAM
 * ============================================================
 label 0270 bas_workspace
+label 0272 disp_line_buf_ptr
+lcomment 0272 display line buffer pointer
 label 0274 disp_viewport_ptr
 lcomment 0274 display viewport buffer address pointer
 label 0276 disp_scroll_offset
 lcomment 0276 display scroll row offset
 label 0278 disp_horiz_offset
 lcomment 0278 display horizontal scroll offset
+label 027A disp_row_count
+lcomment 027A display row count
+label 027E disp_param_ptr
+lcomment 027E display parameter pointer
 label 0280 mon_reg_save_a
 lcomment 0280 monitor: saved A register / workspace byte
 label 0286 lcd_desc_table
@@ -336,12 +369,16 @@ label 04BD fp_out_buf
 lcomment 04BD FP number-to-string output buffer
 label 04E4 kw_table_ptr
 label 04E6 cmd_ext_ptr
+label 04EB using_decimal_pos
+lcomment 04EB PRINT USING decimal point position counter
 label 04EC using_format_pos
 lcomment 04EC PRINT USING format string position
 label 04ED using_format_flags
 lcomment 04ED PRINT USING format flags
 label 04F8 file_record_size
 lcomment 04F8 PUT/GET record size
+label 0500 io_device_table
+lcomment 0500 I/O device descriptor table base
 label 04FE var_end
 label 05A2 file_base_addr
 lcomment 05A2 PUT/GET file base address
@@ -355,10 +392,14 @@ lcomment 0688 current I/O device status byte
 label 0689 sys_flag_689
 label 068C io_save_flag
 lcomment 068C I/O save/merge mode flag
+label 068A io_channel_num
+lcomment 068A current I/O channel number
 label 068E io_device_num
 lcomment 068E current I/O device number
 label 0691 io_filename_ptr
 lcomment 0691 pointer to filename string for I/O
+label 0696 io_cb_base
+lcomment 0696 I/O control block table base address
 label 069A init_flag
 label 06B6 lcd_default_desc
 lcomment 06B6 default LCD device descriptor
@@ -366,13 +407,21 @@ label 06CB lcd_cursor_col
 lcomment 06CB current cursor column position
 label 06CC lcd_display_width
 lcomment 06CC current display width in columns
+label 0731 pac_open_flag
+lcomment 0731 PAC device open flag
 label 0754 text_save
+label 0756 edit_line_count
+lcomment 0756 line edit mode line counter
 label 0757 line_input_buf
 lcomment 0757 LINE INPUT keyboard buffer
 label 0891 bas_string_buf
 lcomment 0891 temporary string buffer
 label 0896 hex_oct_sign
 lcomment 0896 HEX$/OCT$ sign flag ($00=unsigned, $FF=signed)
+label 0894 bas_string_buf2
+lcomment 0894 secondary string operation buffer
+label 0898 for_loop_limit
+lcomment 0898 FOR loop limit value (2 bytes)
 label 089A auto_flag
 label 089F list_start_ptr
 lcomment 089F LIST/DELETE start line pointer
@@ -388,6 +437,10 @@ label 08E8 io_cmd_param_buf
 lcomment 08E8 I/O command parameter buffer (also display params)
 label 08EA io_device_desc_buf
 lcomment 08EA I/O device descriptor buffer
+label 08EB io_handler_vec
+lcomment 08EB I/O handler vector table base
+label 0910 io_state_ptr
+lcomment 0910 current I/O device state pointer
 label 0912 bas_init_complete
 lcomment 0912 BASIC initialization complete flag
 label 0916 bas_session_flag
@@ -624,6 +677,8 @@ label FFCA api_irq1_handler
 
 * --- System tables ---
 data FFD0-FFEF
+label FFDA mon_default_display_ptr
+lcomment FFDA pointer to display_buffer ($0220) — loaded by monitor
 
 * --- CPU interrupt vectors ---
 cvector FFF0-FFFF
