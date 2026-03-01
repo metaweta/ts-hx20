@@ -41,6 +41,7 @@ label 30 BANK0
 label 31 BANK1
 label 32 BANK2
 label 33 BANK3
+label 003C rtc_battery_check_addr
 
 * ============================================================
 * RTC Registers (MC146818 at $40-$4D)
@@ -270,6 +271,8 @@ label FF disp_cmd_param
 * $0109-$011B: Hardware interrupt vectors
 * ============================================================
 label 0100 ram_sub_rtc
+label 0101 const_0101
+label 0102 const_0102
 label 0103 ram_sub_p14
 label 0104 io_block_size
 label 0106 ram_sub_ocf_user
@@ -1032,10 +1035,50 @@ label 0DAA sci_crlf_value
 label 0E00 io_block_size_3584
 label 0F08 lcd_display_buffer
 label 0F80 lcdctl_graphics_mode
+label 1000 lcdctl_scan_mode
 label 1010 lcdctl_idle_mode
+label 1303 lcd_cursor_pos_text
+label 1387 lcd_cursor_row1_col7
+label 1404 lcd_char_dims_20x4
+label 1792 lcd_cursor_row2
+label 2000 const_2000
+label 2001 const_2001
 label 2008 file_init_pattern
+label 200A rtc_init_rega
+label 200B const_200B
+label 2010 const_2010
+label 2018 const_sp_24
+label 2040 const_sp_64
+label 2284 lcd_cursor_mon_status
 label 2402 cas1_cmd_channel
+label 2624 const_2624
+label 2710 delay_10000
+label 2802 cas1_cmd_read
+label 2806 const_2806
+label 2808 lcd_init_dims_40x8
+label 2AFF const_2AFF
+label 2D32 const_dash2
+label 3000 const_3000
+label 3020 const_3020
+label 3235 const_25
+label 3A2C const_3A2C
+label 4268 delay_17000
+label 454F const_EO
+label 4844 const_HD
+label 4858 const_HX
+label 4A4B const_4A4B
+label 4E20 delay_20000
+label 4FFF delay_20479
+label 5231 const_R1
+label 6001 opt_rom_signature
+label 6004 opt_rom_entry_vec
 label 6404 cas0_cmd_channel
+label 6804 cas0_cmd_read
+label 6E6F const_6E6F
+label 7100 const_7100
+label 7B77 const_7B77
+label 7D77 const_7D77
+label 7FFF const_7FFF
 label 8000 bas_rom_header
 label 8004 bas_rom_name_ptr
 label 8015 bas_stmt_dispatch
@@ -1043,6 +1086,11 @@ label 804F bas_stmt_dispatch2
 label 8080 bas_fn_dispatch
 label 8104 bas_keyword_tokens
 label 8180 bas_keyword_tokens2
+label 8359 bas_op_precedence_tbl
+label 8365 bas_str_compare_prec
+label 837C bas_msg_ready
+label 837F bas_msg_error_suffix
+label 8386 bas_msg_crlf_break
 label 84CB bas_ready_print
 * Token $AA: NEW
 label 85CD bas_new
@@ -1194,10 +1242,12 @@ label 8B6B bas_var_not_in_table
 label 8BA3 bas_var_found
 label 8BA8 bas_var_compare_name
 label 8B94 bas_var_write_header
+label 8BA6 bas_var_xor_ef
 label 8BBF bas_var_setup_compare
 
 * --- Array / DIM handling ($8BE5-$8D10) ---
 label 8BD4 bas_eval_subscript
+label 8BD7 bas_require_num_eval
 label 8BDA bas_eval_byte
 label 8BE5 bas_array_subscript
 label 8C48 bas_dim_entry
@@ -1207,6 +1257,7 @@ label 8C8E bas_dim_alloc_loop
 label 8CD2 bas_dim_existing
 label 8D11 bas_array_load_bounds
 label 8D13 bas_multiply_16x16
+label 8D33 bas_error_subscript_jmp
 
 * --- Memory / FRE / STR$ ($8D36-$8D7F) ---
 label 8D36 bas_fre
@@ -1268,6 +1319,7 @@ lcomment 9030 expect comma, evaluate byte expression
 label 9035 bas_backup_eval_addr
 lcomment 9035 backup input, require numeric, convert to address in X
 label 9038 bas_eval_address
+label 9051 fp_const_65536
 label 9055 bas_check_addr_range
 label 907A bas_spc_fn
 
@@ -1313,6 +1365,7 @@ label 944B bas_jmp_chrget
 label 9585 bas_print_using
 label 9698 bas_using_advance_format
 label 9715 bas_using_format_sign
+label 9964 bas_error_codes_base
 
 * --- FOR / NEXT ($9722-$97EA) ---
 * (main for/next labels defined in dispatch table section above)
@@ -1322,6 +1375,7 @@ label 99E4 bas_on_error_goto
 * --- Error code table ($9965-$99E3) ---
 data 9965-99E3
 label 9965 bas_error_codes
+label 99DA bas_msg_null_error
 lcomment 9965 39 two-character error codes (NF UF SN RG OD FC OV OM...)
 
 * --- ERROR / RESUME ($9A14-$9A62) ---
@@ -1340,6 +1394,7 @@ lcomment 9AA1 DEF statement: checks $D5 (USR) or falls through (FN)
 label 9AD9 bas_def_parse_name
 label 9AEB bas_def_check_direct
 label 9AF5 bas_def_fn_body
+label 9B47 bas_def_fn_return
 label 9B48 bas_def_fn_eval
 label 9B5F bas_def_fn_swap_input_ptr
 label 9C44 bas_defusr
@@ -1360,6 +1415,8 @@ label 9D3D bas_renum_check_line_empty
 label 9D48 bas_renum_scan_refs
 label 9DA3 bas_renum_update_refs
 label 9E97 bas_renum_verify
+label 9EFB bas_edit_token_table
+label A000 opt_rom_base_addr
 
 * --- ERASE ($9F07-$9FF5) ---
 lcomment 9F07 ERASE: remove array from variable table
@@ -1396,6 +1453,7 @@ lcomment A36D look up handler in function table (M05AE) and JSR
 label A379 bas_exec_loop
 lcomment A379 main statement execution loop
 label A38E bas_exec_next
+label A3AB bas_print_rbracket
 label A3B0 bas_exec_check_break
 label A3BA bas_exec_dispatch
 label A3C3 bas_exec_keyword
@@ -1434,6 +1492,7 @@ label A652 io_find_descriptor
 label A665 io_load_device_info
 label A66B io_error_device_not_found
 label A676 io_set_device_mode
+label A69A io_set_device_ret
 label A69B io_check_file_format
 
 * --- MERGE ($A6A7) / LOAD ($A6AF) / SAVE ($A560) ---
@@ -1468,6 +1527,7 @@ label A951 bas_check_abort_rts
 label A9B8 bas_check_abort_flags
 label A9CE bas_check_init_and_resume
 label A9D6 bas_abort_check_entry
+label AA14 str_abort_msg
 
 * --- INKEY$ / TIME / DATE / DAY ($AA38-$ABB4) ---
 label AA38 bas_inkey_fn
@@ -1497,6 +1557,7 @@ label ACDF file_eval_expr
 label ACE5 io_get_device_checked
 label ACEF io_jmp_check_result2
 label ACF2 io_parse_device_mode
+label ACFE io_device_mode_table
 
 * --- LOADM ($AD01) / COPY ($AD72) / PRESET ($AD84) / LOADQ ($AE10) ---
 lcomment AD01 LOADM statement
@@ -1521,6 +1582,10 @@ lcomment AF5D FILES statement
 lcomment AF8C MOTOR statement
 label AF3A io_get_handler_ptr
 label AF41 io_list_entries
+label AFB9 io_cas_search_rts
+label AFC2 str_searching_tail
+label AFC5 str_found
+label AFCD str_skip
 label AFD5 io_device_scan
 label AFFB io_update_motor
 
@@ -1566,6 +1631,7 @@ label B00D printer_status
 label B0AD io_abort_check_jmp
 label B0DF io_check_session_end
 label B0EE printer_output_line
+label B10C printer_output_ret
 label B10D printer_call_handler
 label B111 io_send_crlf
 label B129 io_parse_device_params
@@ -1574,12 +1640,28 @@ label B175 io_parse_hex_char
 label B1C1 io_check_result
 label B200 io_pac_close
 label B212 io_list_directory
+label B3C7 chrgot_init_template
+label B425 io_device_init_data
+label B4DB io_handler_init_data
+label B4E9 bas_eval_init_template
+label B4F3 bas_fn_handler_table
+label B7F7 lcd_break_entry
 label B84E bas_error_funcall_jmp2
 label B8B8 bas_expect_comma_eval
 label B929 bas_error_funcall_jmp4
+label B99E bas_get_color_ret
 label B9F1 bas_error_funcall_jmp5
+label BAB4 mem_fill_loop
+label BABA str_bytes
+label BAC0 str_free
+label BAC8 str_memset
+label BAD2 str_ramfile
+label BB23 bas_crlf_jmp
+label BB73 io_write_byte_jmp
 label BC04 bas_error_funcall_jmp6
 label BC72 bas_error_oom_jmp
+label BE57 rom_ext_init_block
+label BE63 fkey_default_defs
 label BF41 bas_error_subscript_jmp
 
 * ============================================================
@@ -1665,6 +1747,7 @@ lcomment C17E left-normalize: shift mantissa until MSB=1
 label C1B7 fp_set_zero
 lcomment C1B7 set FAC to zero (clear exponent)
 label C1BC fp_normalize_left
+label C1E5 fp_shift_count_asl
 lcomment C1BC left-shift normalize: ASL mantissa, decrement exponent
 label C1EE fp_normalize_right
 lcomment C1EE right-shift normalize: ROR mantissa, increment exponent
@@ -1682,6 +1765,9 @@ lcomment C27C right-shift mantissa by variable count in B
 label C286 fp_shift_right
 label C29F fp_const_one
 label C2A3 fp_log_coeffs
+label C2B0 fp_const_log_half
+label C2B4 fp_const_log_adj
+label C2B8 fp_const_log_base
 label C2BC fp_const_ln2
 lcomment C286 right-shift mantissa via ASR/ROR chain
 label C2CA fp_log_setup
@@ -1786,8 +1872,13 @@ lcomment C6D3 parse decimal number from string input
 * These use polynomial approximation with constant tables.
 * Number parsing and formatting routines.
 label C2C0 bas_log_fn
+label C307 fp_log_mul_beq
+label C411 fp_const_10
+label C413 fp_zero_block
 label C47C fp_shift_store_byte
 label C5C1 fp_negate_b_rts
+label C5C2 fp_sign_to_int_entry
+label C5F7 fp_power_setup
 label C608 fp_compare_sign_mid
 label C646 fp_compare_sign
 label C6D2 fp_rts
@@ -1798,14 +1889,17 @@ label C71A fp_accum_parsed_digit
 label C71F fp_parse_number_dbl
 lcomment C71A accumulate parsed decimal digit into FAC via fp_add
 label C74E fp_parse_digit_loop
+label C752 bas_cmd_ext_default
 lcomment C74E main loop: scan next input char, branch by type
 label C76B fp_parse_exponent
+label C787 fp_parse_exp_digit
 lcomment C76B parse E-notation exponent part of number
 label C796 fp_handle_decimal_point
 lcomment C796 handle decimal point in number parsing
 label C7A5 fp_parse_type_convert
 lcomment C7A5 set precision mode during number parsing
 label C7B7 fp_apply_final_exponent
+label C7F7 fp_str_in_prefix
 label C7FD fp_print_linenum
 label C804 fp_print_int16
 label C80C fp_jmp_print_string
@@ -1820,17 +1914,28 @@ label CA41 fp_format_decimal_point
 lcomment CA3C check decimal point position during number formatting
 label CA5A fp_format_store_char
 label CA66 fp_format_number_int
+label CAA8 using_scan_format
+label CABF using_push_prefix
+label CAE3 using_pop_stack
 label CAF6 fp_format_leading_zeros
 label CB09 fp_format_check_commas
 label CB18 fp_format_pad_zeros
 label CB26 fp_format_number_sng
+label CC38 fp_fmt_const_dbl
 label CC7E fp_pow10_neg
 label CC84 fp_pow10_pos
 label CC8E fp_pow10_max
 label CC8F fp_int_max_bcd
+label CC93 fp_fmt_max_sgl
+label CC9C fp_fmt_min_sgl
+label CCA0 fp_fmt_max_sgl_exp
+label CCA4 fp_fmt_max_dbl_exp
+label CCAC fp_fmt_boundary_dbl
+label CCB4 fp_fmt_sci_threshold
 label CCBC fp_const_table
 lcomment CA5A store formatted character to output buffer at M00EE
 label CCC4 bas_sqr_fn
+label CD0B fp_exp_coeff_table
 lcomment CCC4 SQR function: square root via Newton's method
 label CD30 bas_exp_fn
 label CD69 fp_poly_eval
@@ -1869,6 +1974,7 @@ lcomment CE5C FP subtraction: FAC = FAC - ARG
 label CE6A fp_add
 label CE6F fp_add_mantissa_d
 label CE79 fp_add_overflow_adjust
+label CE86 fp_mul_accumulate
 lcomment CE6A FP addition: FAC = FAC + ARG
 label CE90 fp_mul
 label CE95 fp_int_mul_entry
@@ -1878,6 +1984,7 @@ label CED6 fp_negate_integer
 label CEE1 fp_int_mul_setup
 label CF07 fp_int_abs_fac
 label CF0B fp_negate_d
+label CF13 fp_negate_ret
 lcomment CED1 negate FAC value (type-aware sign flip)
 label CF14 fp_intdiv
 lcomment CF14 integer division operator (\)
@@ -1896,7 +2003,9 @@ label CFBB bas_tan_fn
 label CFD3 file_check_and_list
 label CFD9 fp_load_and_check_jmp
 label CFDF fp_const_pi_half
+label CFE3 fp_const_2pi
 label CFE7 fp_const_quarter
+label CFEB fp_sin_coeff_table
 lcomment CFBB TAN function: tangent (SIN/COS)
 
 * ============================================================
@@ -1927,6 +2036,7 @@ label D11D mon_display_update
 label D11E mon_enum_scan_banks
 label D14E mon_enum_list_options
 label D152 mon_enum_option_loop
+label D15B mon_enum_ret
 label D15C mon_enum_deep_scan
 label D182 mon_enum_item_count_chk
 label D190 mon_check_display_flag
@@ -1957,6 +2067,7 @@ label D2D3 mon_check_ext_rom_flag
 label D2E5 mon_exec_with_sei
 label D2F1 mon_jmp_bank0
 label D2F4 mon_jmp_bank2
+label D2F7 str_ctrl_init
 label D310 mon_enter_from_trap
 label D337 mon_enter_from_break
 label D33F mon_show_trap_msg
@@ -1969,6 +2080,7 @@ label D382 mon_cmd_read_key
 label D390 mon_cmd_wait_key
 label D398 mon_cmd_check_mode
 label D3B3 mon_cmd_table_scan
+label D3C2 mon_cmd_abort
 label D3C5 mon_parse_addr_from_line
 label D3C9 mon_parse_hex_value
 label D3D1 mon_hex_accumulate
@@ -2012,16 +2124,24 @@ label D723 mon_clear_status_line
 label D724 mon_show_lcd_string
 label D727 mon_set_cursor_pos
 label D729 mon_fill_to_eol
+label D739 str_trap
+label D740 str_mon_ok
+label D744 str_mon_error
+label D74B str_protected
+label D756 str_break_prefix
+label D75A mon_cmd_table
 label D77B mon_cmd_entry_x
 label D77E mon_cmd_table_end
 label D7AF mon_reg_table
 
 * --- Display/Graphics (D7B0-DF63) ---
 label D7B0 disp_cmd_dispatch
+label D7C3 disp_cmd_ret
 label D7C6 disp_cmd_esc_prefix
 label D7D1 disp_opcode_scan
 label D7F3 disp_cmd_exec_api
 label D7FF disp_cmd_wrapper
+label D80F disp_esc_cmd_table
 label D850 disp_handle_byte
 label D861 disp_set_cursor_pos
 label D868 disp_get_text_at
@@ -2100,6 +2220,8 @@ label DEE4 disp_render_line_loop
 label DF14 disp_render_done
 label DF2E disp_sync_cursor_hw
 label DF52 disp_read_cursor_hw
+label DF61 disp_char_handler_end
+label DFAC disp_dispatch_table2
 
 * --- System API JMP vectors at end of D-page ---
 label DFEE api_restore_display
@@ -2141,6 +2263,7 @@ label E1A7 ram_size_detect
 label E1C4 rtc_write_datetime
 label E1DB rtc_read_datetime
 label E1F7 rtc_reg_lookup
+label E207 str_rtc_prompt
 
 * ============================================================
 * LCD Display Routines (E23F-E3EC)
@@ -2171,11 +2294,15 @@ label E3DA sci_send_char
 label E3EF sci_raw_send
 label E3F8 sci_two_byte
 label E403 sci_polled_transact
+label E43D sci_wait_tdre
+label E457 sci_transact_abort
 label E45A sci_check_abort
 label E466 sci_fire_forget
 label E475 sci_buf_send_43
 label E47C sci_post_transact
+label E47F sci_post_check
 label E48E sci_baud_setup
+label E4AB sci_baud_table
 label E4BB sci_buf_init
 label E4E8 sci_start_irq_xfer
 label E4FA sci_session_rie
@@ -2187,8 +2314,10 @@ label E561 sci_rie_off_send_46
 * Serial Port I/O (E586-E68F)
 * ============================================================
 label E586 serial_read_byte
+label E5CE serial_read_done
 label E5DF serial_write_byte
 label E5F5 serial_bitbang_send
+label E625 serial_wait_ocf
 
 * ============================================================
 * Cassette SAVE Init (E690-E776)
@@ -2245,7 +2374,9 @@ label EA3E load_cas1_entry
 label EA43 load_cas1_retry
 label EA48 load_cas1_next
 label EA57 xfer_common
+label EA60 xfer_clear_status
 label EA77 xfer_wait_loop
+label EAB7 xfer_error_status
 label EAB9 xfer_finish
 label EAD0 block_xfer_init
 label EB06 block_xfer_init_err
@@ -2260,8 +2391,10 @@ label EB54 save_setup_7c
 label EB64 block_count_store_get
 label EB6F tape_seek_fwd
 label EB82 tape_seek_rev
+label EBA6 save_cleanup_jmp
 label EBA9 send_6d_pos
 label EBB4 send_6e6f_negotiate
+label EBCA save_negotiate_ret
 label EBCB save_block_loop
 label EBD7 save_send_6d
 label EBD9 save_send_7b
@@ -2277,11 +2410,13 @@ label EC5C decimal_convert
 * ============================================================
 label EC92 io_open_write
 label EC9A io_open_read
+label ECC6 io_open_dispatch
 label ECEA io_open_error
 label ECEE dev_desc_cas0
 label ECFC dev_desc_cas1
 label ED0A dev_desc_printer
 label ED14 dev_desc_serial
+label ED1A dev_desc_serial_extra
 label ED22 io_write_block
 label ED37 io_write_next_block
 label ED6F io_call_flush
@@ -2328,6 +2463,7 @@ label EF7E irq1_set_abort8
 label EF82 irq1_low_battery
 label EF85 p17_debounce_handler
 label EFE9 low_battery_check
+label F017 str_charge_battery
 
 * ============================================================
 * TF-20 Floppy Drive SCI (F028-F281)
@@ -2335,8 +2471,10 @@ label EFE9 low_battery_check
 label F028 tf20_sci_send
 label F051 tf20_send_retry
 label F086 tf20_error_jmp
+label F089 tf20_copy_params
 label F0D4 tf20_tx_byte
 label F0E8 tf20_rx_response
+label F0FF tf20_rx_response_ret
 label F100 tf20_send_block
 label F15A tf20_err_timeout
 label F15E tf20_err_retries
@@ -2345,12 +2483,15 @@ label F164 tf20_set_error
 label F16A tf20_sci_recv
 label F175 tf20_recv_init
 label F188 tf20_recv_session_loop
+label F1B5 tf20_send_nak
+label F212 tf20_session_ok
 label F213 tf20_sci_cleanup
 label F235 tf20_close_send_ack
 label F23A tf20_close_session
 label F251 tf20_rx_timeout_long
 label F254 tf20_rx_timeout
 label F265 tf20_rx_single
+label F280 tf20_rx_ret
 label F282 tf20_param_init
 label F29D mem_fill
 
@@ -2358,10 +2499,13 @@ label F29D mem_fill
 * Printer Output (F2A4-F41C)
 * ============================================================
 label F2A4 printer_buf_xfer
+label F2E9 printer_xfer_next_byte
 label F33D printer_output_check
+label F357 printer_check_ret
 label F35A printer_output_send
 label F371 p1_serial_read_byte
 label F398 printer_session_init
+label F3C1 printer_session_error
 label F3C4 lcdctl_write_trampoline
 label F3C7 printer_buf_read_block
 label F3EA printer_session_close
@@ -2372,6 +2516,7 @@ label F402 printer_send_clocks
 * Hex Parse / LCD Display (F41D-F502)
 * ============================================================
 label F41D hex_ascii_to_byte
+label F441 hex_parse_invalid
 label F44B lcd_clip_break_check
 label F463 lcd_refresh_char
 label F468 lcd_display_char
@@ -2415,16 +2560,35 @@ label F87A kbd_case_convert
 label F88B kbd_shift_convert
 label F8C2 kbd_ctrl_convert
 label F562 lcd_display_fkey_string
+label F655 kbd_repeat_reset
+label F83E kbd_jmp_indirect
+label F843 kbd_ctrl_table
+label F84F kbd_shift_table_ext
+label F85F kbd_modifier_pattern_tbl
+label F862 kbd_table_base_addr
+label F8B8 kbd_kana_check
 label F8D3 kbd_shift_table
+label F8D5 kbd_numpad_table
+label F8F2 kbd_graph_table
+label F907 kbd_ascii_table
 lcomment F562 display string from function key table via lcd_display_char loop
 label F963 kbd_timer_init
 label F9AA kbd_check_buffer
 label F9B5 kbd_input
 label F9DC kbd_read_fkey_buf
 label F9F9 kbd_fkey_expand
+label F9FF kbd_fkey_limit_check
 label FA2E kbd_fifo_dequeue
 label FA4A kbd_fifo_enqueue
 label FA6F kbd_fkey_dispatch
+label FACF kbd_fkey_exec_loop
+label FAEE kbd_fkey_dispatch_tbl
+label FB63 kbd_fkey_special_entry
+label FB68 kbd_fkey_default_data
+label FD48 gfx_cross_pattern
+label FE08 kbd_fkey_action_table
+label FE28 sci_baud_default_str
+label FF00 ram_test_pattern
 label FFD0 rom_ptr_stack_base
 label FFD2 rom_ptr_sys_area
 label FFD8 rom_ptr_printer
