@@ -291,9 +291,9 @@ body {
   background: #555;
 }
 
-/* Cassette panel */
+/* Cassette panels */
 
-#cassette-panel {
+.cassette-panel {
   margin-top: 8px;
   padding: 12px;
   background: #222;
@@ -301,27 +301,27 @@ body {
   font-size: 12px;
 }
 
-#cassette-panel.hidden {
+.cassette-panel.hidden {
   display: none;
 }
 
-#cassette-panel h3 {
+.cassette-panel h3 {
   margin-bottom: 8px;
   color: #aaa;
 }
 
-#cassette-motor {
+.cas-motor {
   color: #f84;
   font-size: 11px;
 }
 
-#cassette-current {
+.cas-current {
   color: #8cf;
   font-size: 11px;
   margin-bottom: 6px;
 }
 
-#tape-list {
+.tape-list {
   max-height: 150px;
   overflow-y: auto;
   margin-bottom: 8px;
@@ -377,12 +377,12 @@ body {
   color: #f88;
 }
 
-#cassette-controls {
+.cassette-controls {
   display: flex;
   gap: 6px;
 }
 
-#cassette-controls button {
+.cassette-controls button {
   background: #444;
   color: #ccc;
   border: 1px solid #555;
@@ -393,7 +393,7 @@ body {
   font-size: 11px;
 }
 
-#cassette-controls button:hover {
+.cassette-controls button:hover {
   background: #555;
 }
 

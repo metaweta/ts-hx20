@@ -39,11 +39,17 @@ export class Cassette {
   private currentTape: string | null = null;
   private tapeCounter = 0;
 
+  // Instance identity
+  private storageKey: string;
+  private label: string;
+
   // Callbacks
   onLibraryChange: () => void = () => {};
   onMotorChange: (on: boolean) => void = () => {};
 
-  constructor() {
+  constructor(storageKey = 'hx20-tapes', label = 'TAPE') {
+    this.storageKey = storageKey;
+    this.label = label;
     this.loadFromStorage();
   }
 
@@ -76,7 +82,7 @@ export class Cassette {
   /** Dump tape data statistics (for debugging) */
   dumpTapeStats(): void {
     if (!this.playData || this.playData.length === 0) {
-      console.log('[TAPE] No playback data');
+      console.log(`[${this.label}] No playback data`);
       return;
     }
     const numTransitions = this.playData.length / 2;
@@ -95,21 +101,21 @@ export class Cassette {
     const shortPeriods = halfPeriods.filter(p => p < 400);
     const longPeriods = halfPeriods.filter(p => p >= 400);
 
-    console.log(`[TAPE] Playback data: ${numTransitions} transitions, ` +
+    console.log(`[${this.label}] Playback data: ${numTransitions} transitions, ` +
       `${durationCycles} cycles (${(durationCycles / 614400).toFixed(2)}s)`);
-    console.log(`[TAPE] First transition: cycle=${firstCycle}, level=${this.playData[1]}`);
-    console.log(`[TAPE] Half-periods: min=${halfPeriods[0]}, max=${halfPeriods[halfPeriods.length-1]}, ` +
+    console.log(`[${this.label}] First transition: cycle=${firstCycle}, level=${this.playData[1]}`);
+    console.log(`[${this.label}] Half-periods: min=${halfPeriods[0]}, max=${halfPeriods[halfPeriods.length-1]}, ` +
       `median=${halfPeriods[Math.floor(halfPeriods.length/2)]}`);
     if (shortPeriods.length > 0 && longPeriods.length > 0) {
       const shortAvg = shortPeriods.reduce((s, v) => s + v, 0) / shortPeriods.length;
       const longAvg = longPeriods.reduce((s, v) => s + v, 0) / longPeriods.length;
-      console.log(`[TAPE] Short half-periods (1-bit, 2KHz): ${shortPeriods.length} avg=${shortAvg.toFixed(1)}`);
-      console.log(`[TAPE] Long half-periods (0-bit, 1KHz): ${longPeriods.length} avg=${longAvg.toFixed(1)}`);
-      console.log(`[TAPE] Full-cycle estimates: short=${(shortAvg*2).toFixed(0)}, long=${(longAvg*2).toFixed(0)}`);
+      console.log(`[${this.label}] Short half-periods (1-bit, 2KHz): ${shortPeriods.length} avg=${shortAvg.toFixed(1)}`);
+      console.log(`[${this.label}] Long half-periods (0-bit, 1KHz): ${longPeriods.length} avg=${longAvg.toFixed(1)}`);
+      console.log(`[${this.label}] Full-cycle estimates: short=${(shortAvg*2).toFixed(0)}, long=${(longAvg*2).toFixed(0)}`);
     }
 
     // Show first 10 transitions
-    console.log('[TAPE] First 10 transitions:');
+    console.log(`[${this.label}] First 10 transitions:`);
     for (let i = 0; i < Math.min(20, this.playData.length); i += 2) {
       const cycle = this.playData[i];
       const level = this.playData[i + 1];
@@ -188,7 +194,7 @@ export class Cassette {
         this.playIdx = this.savedPlayIdx;
         this.playCycles = this.savedPlayCycles;
         this.readLevel = true;
-        console.log(`[TAPE] Motor ON: resuming playback at idx=${this.playIdx/2} cycle=${this.playCycles}`);
+        console.log(`[${this.label}] Motor ON: resuming playback at idx=${this.playIdx/2} cycle=${this.playCycles}`);
       } else {
         // No tape — playback not possible, recording will auto-start if writes happen
         this.playing = false;
@@ -202,7 +208,7 @@ export class Cassette {
       this.savedPlayCycles = this.playCycles;
 
       // Log playback/recording summary
-      console.log(`[TAPE] Motor OFF: playTransitions=${this.playTransitions} ` +
+      console.log(`[${this.label}] Motor OFF: playTransitions=${this.playTransitions} ` +
         `ocTransitions=${this.ocTransitions} p33Transitions=${this.p33Transitions} ` +
         `recData=${this.recData.length/2} entries, playCycles=${this.playCycles} playIdx=${this.playIdx/2}`);
       this.playTransitions = 0;
@@ -252,6 +258,23 @@ export class Cassette {
     }
   }
 
+  /** Rewind tape to beginning (cassette controller command 0x88) */
+  rewind(): void {
+    this.savedPlayIdx = 0;
+    this.savedPlayCycles = 0;
+    console.log(`[${this.label}] Rewind to start`);
+  }
+
+  /** Fast-forward to end of tape (cassette controller command 0x84) */
+  fastForward(): void {
+    if (this.currentTape && this.library.has(this.currentTape)) {
+      const data = this.library.get(this.currentTape)!;
+      this.savedPlayIdx = data.length;
+      this.savedPlayCycles = data.length >= 2 ? data[data.length - 2] + 1 : 0;
+      console.log(`[${this.label}] Fast-forward to end: idx=${this.savedPlayIdx / 2}`);
+    }
+  }
+
   ejectTape(): void {
     this.currentTape = null;
   }
@@ -296,7 +319,7 @@ export class Cassette {
     try {
       const data: Record<string, number[]> = {};
       for (const [k, v] of this.library) data[k] = v;
-      localStorage.setItem('hx20-tapes', JSON.stringify({
+      localStorage.setItem(this.storageKey, JSON.stringify({
         tapes: data,
         currentTape: this.currentTape,
         counter: this.tapeCounter,
@@ -308,7 +331,7 @@ export class Cassette {
 
   loadFromStorage(): void {
     try {
-      const json = localStorage.getItem('hx20-tapes');
+      const json = localStorage.getItem(this.storageKey);
       if (!json) return;
       const s = JSON.parse(json);
       this.library.clear();

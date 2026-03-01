@@ -35,19 +35,33 @@
     </div>
 
     <div id="bottom-buttons">
-      <button id="btn-cassette-toggle">CAS</button>
+      <button id="btn-cas0-toggle">CAS0:</button>
+      <button id="btn-cas1-toggle">CAS1:</button>
       <button id="btn-debug-toggle">Show Debug</button>
     </div>
 
-    <div id="cassette-panel" class="hidden">
-      <h3>Microcassette <span id="cassette-motor"></span></h3>
-      <div id="cassette-current">No tape loaded</div>
-      <div id="tape-list"></div>
-      <div id="cassette-controls">
-        <button id="btn-tape-new">New Tape</button>
-        <button id="btn-tape-eject">Eject</button>
-        <button id="btn-tape-import">Import</button>
-        <input type="file" id="tape-file-input" accept=".json" style="display:none">
+    <div id="cas0-panel" class="cassette-panel hidden">
+      <h3>CAS0: Microcassette <span id="cas0-motor" class="cas-motor"></span></h3>
+      <div id="cas0-current" class="cas-current">No tape loaded</div>
+      <div id="cas0-tape-list" class="tape-list"></div>
+      <div class="cassette-controls">
+        <button id="btn-cas0-new">New Tape</button>
+        <button id="btn-cas0-eject">Eject</button>
+        <button id="btn-cas0-import">Import</button>
+        <input type="file" id="cas0-file-input" accept=".json" style="display:none">
+      </div>
+    </div>
+
+    <div id="cas1-panel" class="cassette-panel hidden">
+      <h3>CAS1: External Cassette <span id="cas1-motor" class="cas-motor"></span></h3>
+      <div id="cas1-current" class="cas-current">No tape loaded</div>
+      <div id="cas1-tape-list" class="tape-list"></div>
+      <div class="cassette-controls">
+        <button id="btn-cas1-new">New Tape</button>
+        <button id="btn-cas1-eject">Eject</button>
+        <button id="btn-cas1-rewind">Rewind</button>
+        <button id="btn-cas1-import">Import</button>
+        <input type="file" id="cas1-file-input" accept=".json" style="display:none">
       </div>
     </div>
 

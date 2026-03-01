@@ -14,7 +14,8 @@ export class HX20 {
   lcd: LCDDisplay;
   keyboard: Keyboard;
   rtc: MC146818;
-  cassette: Cassette;
+  cas0: Cassette;  // Internal microcassette (CAS0:)
+  cas1: Cassette;  // External cassette (CAS1:)
 
   // Main CPU memory
   mainRAM = new Uint8Array(0x4000);    // 16KB at 0x0100-0x3FFF
@@ -70,7 +71,8 @@ export class HX20 {
     this.lcd = new LCDDisplay();
     this.keyboard = new Keyboard();
     this.rtc = new MC146818();
-    this.cassette = new Cassette();
+    this.cas0 = new Cassette('hx20-tapes-cas0', 'CAS0');
+    this.cas1 = new Cassette('hx20-tapes-cas1', 'CAS1');
 
     this.wireMainCPU();
     this.wireSlaveCPU();
@@ -216,14 +218,14 @@ export class HX20 {
     // Output compare output: P21 driven by OLVL when OCR matches FRC
     // This is the FSK waveform for cassette recording
     cpu.onOCOutput = (level: boolean): void => {
-      this.cassette.setOCOutput(level);
+      this.cas0.setOCOutput(level);
     };
 
     // Port 3: cassette I/O + slave flag
     cpu.onReadPort3 = (): number => {
       let val = 0xFF;
       // P32 (bit 2): cassette read data input
-      if (!this.cassette.readLevel) val &= ~0x04;
+      if (!this.cas1.readLevel) val &= ~0x04;
       return val;
     };
 
@@ -236,12 +238,12 @@ export class HX20 {
         if (this.sciDebug) {
           console.log(`[CAS] External motor P30: ${motorOn ? 'ON' : 'OFF'} sPC=${this.slaveCPU.PC.toString(16)}`);
         }
-        this.cassette.setMotor(motorOn);
+        this.cas1.setMotor(motorOn);
       }
       // P33 (bit 3): cassette write data — external cassette FSK output
       // CAS1: FSK encoding (F709) toggles P33 for the tape signal, timed by OCR
       const p33 = !!(val & 0x08);
-      this.cassette.setWriteData(p33);
+      this.cas1.setWriteData(p33);
       // P34 (bit 4): slave flag → master P12
       this.slaveFlag = (val >> 4) & 1;
     };
@@ -313,20 +315,24 @@ export class HX20 {
       case 0x18: // Stop (alternate)
         if (this.casCtrlMotorOn) {
           this.casCtrlMotorOn = false;
-          this.cassette.setMotor(false);
+          this.cas0.setMotor(false);
         }
         break;
       case 0x81: // Record
         this.casCtrlMotorOn = true;
-        this.cassette.setMotor(true);
+        this.cas0.setMotor(true);
         break;
       case 0x82: // Play (for LOAD)
         this.casCtrlMotorOn = true;
-        this.cassette.setMotor(true);
+        this.cas0.setMotor(true);
         break;
       case 0x84: // Fast forward
+        this.casCtrlMotorOn = true;
+        this.cas0.fastForward();
+        break;
       case 0x88: // Rewind
         this.casCtrlMotorOn = true;
+        this.cas0.rewind();
         break;
       default:
         // Unknown command — still acknowledge
@@ -601,10 +607,113 @@ export class HX20 {
             } else if (sPC === 0xFDE1) {
               console.log(`[SAVE] Slave at FDE1 — cleanup path`);
             }
+
+            // --- LOAD diagnostic breakpoints ---
+            if (sPC === 0xF773) {
+              // LOAD handler entry
+              const ram = this.slaveCPU.readRAM;
+              console.log(`[LOAD] F773: LOAD handler entry, mode=0x${this.slaveCPU.A.toString(16).padStart(2,'0')}`);
+              console.log(`[LOAD] FSK timing: $9D/${(ram(0x9D)<<8|ram(0x9E)).toString(16)} ` +
+                `$9F/${(ram(0x9F)<<8|ram(0xA0)).toString(16)} ` +
+                `$A1/${(ram(0xA1)<<8|ram(0xA2)).toString(16)} ` +
+                `$A3/${(ram(0xA3)<<8|ram(0xA4)).toString(16)} ` +
+                `$A5=0x${ram(0xA5).toString(16).padStart(2,'0')}`);
+              console.log(`[LOAD] CAS0: timing: $A8/${(ram(0xA8)<<8|ram(0xA9)).toString(16)} ` +
+                `$AA/${(ram(0xAA)<<8|ram(0xAB)).toString(16)}`);
+              (this as any)._loadStartCycles = this.slaveCPU.totalCycles;
+              (this as any)._loadBytesDecoded = 0;
+              (this as any)._loadBytesSent = 0;
+              (this as any)._loadSyncFound = false;
+              (this as any)._loadLeaderRestarts = 0;
+              (this as any)._loadSyncAttempts = 0;
+              (this as any)._loadLeaderStarted = false;
+            } else if (sPC === 0xF784) {
+              // After F10A: byte count stored
+              const count = (this.slaveCPU.A << 8) | this.slaveCPU.B;
+              console.log(`[LOAD] F784: byte count from master: ${count} (0x${count.toString(16)})`);
+            } else if (sPC === 0xF78F) {
+              // Leader search start
+              if (!(this as any)._loadLeaderStarted) {
+                (this as any)._loadLeaderStarted = true;
+                console.log(`[LOAD] F78F: Starting leader search. $A5=0x${this.slaveCPU.readRAM(0xA5).toString(16).padStart(2,'0')} ` +
+                  `P32=${this.cas1.readLevel ? 'HIGH' : 'LOW'} ` +
+                  `playIdx=${Math.floor((this.cas1 as any).playIdx/2)}/${Math.floor((this.cas1 as any).playData.length/2)}`);
+                this.cas1.dumpTapeStats();
+              }
+            } else if (sPC === 0xF7D2) {
+              // Trying 7-bit sync byte decode (found a "0" bit after leader)
+              const attempts = ((this as any)._loadSyncAttempts || 0) + 1;
+              (this as any)._loadSyncAttempts = attempts;
+              if (attempts <= 20) {
+                console.log(`[LOAD] F7D2: Sync attempt #${attempts} — trying 7-bit decode`);
+              }
+            } else if (sPC === 0xF7D6) {
+              // After F833 returns: A = decoded 7-bit byte, about to INCA
+              const attempts = (this as any)._loadSyncAttempts || 0;
+              if (attempts <= 20) {
+                console.log(`[LOAD] F7D6: 7-bit result A=0x${this.slaveCPU.A.toString(16).padStart(2,'0')} ` +
+                  `(need 0xFF). INCA→0x${((this.slaveCPU.A + 1) & 0xFF).toString(16).padStart(2,'0')}`);
+              }
+            } else if (sPC === 0xF7D9) {
+              // 7-bit matched 0xFF! Now trying 8-bit decode for $AA marker
+              console.log(`[LOAD] F7D9: 7-bit sync OK (was 0xFF). Trying 8-bit decode for 0xAA`);
+            } else if (sPC === 0xF7DD) {
+              // After F838 returns: A = decoded 8-bit byte, about to EORA #$AA
+              console.log(`[LOAD] F7DD: 8-bit result A=0x${this.slaveCPU.A.toString(16).padStart(2,'0')} ` +
+                `(need 0xAA). XOR=0x${(this.slaveCPU.A ^ 0xAA).toString(16).padStart(2,'0')} ` +
+                `$82=0x${this.slaveCPU.readRAM(0x82).toString(16).padStart(2,'0')}`);
+            } else if (sPC === 0xF7E1) {
+              // Sync verified, CRC cleared — about to read data
+              const ram = this.slaveCPU.readRAM;
+              const elapsed = this.slaveCPU.totalCycles - ((this as any)._loadStartCycles || 0);
+              console.log(`[LOAD] F7E1: Sync found! $A5=0x${ram(0xA5).toString(16).padStart(2,'0')} ` +
+                `elapsed=${elapsed} (${(elapsed/614400).toFixed(2)}s) ` +
+                `restarts=${(this as any)._loadLeaderRestarts || 0} syncAttempts=${(this as any)._loadSyncAttempts || 0}`);
+            } else if (sPC === 0xF7E6) {
+              // First data byte read — also log X (byte count)
+              console.log(`[LOAD] F7E6: Reading first data byte, X=${this.slaveCPU.X} (byte count)`);
+            } else if (sPC === 0xF88C) {
+              // F838 byte decode returned — A = decoded byte
+              const n = ((this as any)._loadBytesDecoded || 0);
+              (this as any)._loadBytesDecoded = n + 1;
+              if (n < 20 || (n % 50 === 0)) {
+                console.log(`[LOAD] FSK decoded byte #${n}: 0x${this.slaveCPU.A.toString(16).padStart(2,'0')} ` +
+                  `(${this.slaveCPU.A >= 0x20 && this.slaveCPU.A < 0x7F ? String.fromCharCode(this.slaveCPU.A) : '.'}) ` +
+                  `playIdx=${Math.floor((this.cas1 as any).playIdx/2)}/${Math.floor((this.cas1 as any).playData.length/2)}`);
+              }
+            } else if (sPC === 0xF80C) {
+              // Byte sent to master via F14B
+              const n = ((this as any)._loadBytesSent || 0);
+              (this as any)._loadBytesSent = n + 1;
+              if (n < 20 || (n % 50 === 0)) {
+                console.log(`[LOAD] F80C: Sending byte #${n}: 0x${this.slaveCPU.A.toString(16).padStart(2,'0')}`);
+              }
+            } else if (sPC === 0xF82C) {
+              // LOAD success
+              const elapsed = this.slaveCPU.totalCycles - ((this as any)._loadStartCycles || 0);
+              console.log(`[LOAD] F82C: LOAD success! ${(this as any)._loadBytesDecoded} bytes decoded, ` +
+                `${(this as any)._loadBytesSent} bytes sent, ${elapsed} cycles (${(elapsed/614400).toFixed(2)}s)`);
+              (this as any)._loadLeaderStarted = false;
+            } else if (sPC === 0xF82E) {
+              // LOAD error exit
+              console.log(`[LOAD] F82E: Error exit. restarts=${(this as any)._loadLeaderRestarts || 0} ` +
+                `syncAttempts=${(this as any)._loadSyncAttempts || 0}`);
+              (this as any)._loadLeaderStarted = false;
+            } else if (sPC === 0xF793) {
+              // Leader search restart
+              const restarts = ((this as any)._loadLeaderRestarts || 0) + 1;
+              (this as any)._loadLeaderRestarts = restarts;
+              if (restarts <= 10 || restarts % 100 === 0) {
+                const elapsed = this.slaveCPU.totalCycles - ((this as any)._loadStartCycles || 0);
+                console.log(`[LOAD] F793: Restart #${restarts} at ${(elapsed/614400).toFixed(2)}s ` +
+                  `playIdx=${Math.floor((this.cas1 as any).playIdx/2)}/${Math.floor((this.cas1 as any).playData.length/2)}`);
+              }
+            }
           }
           const sc = this.slaveCPU.step();
           slaveCycles += sc;
-          this.cassette.advance(sc);
+          this.cas0.advance(sc);
+          this.cas1.advance(sc);
           this.advanceCasCtrlTimer(sc);
         }
       }
@@ -647,7 +756,8 @@ export class HX20 {
     this.mainCPU.step();
     if (this.slaveROM) {
       const sc = this.slaveCPU.step();
-      this.cassette.advance(sc);
+      this.cas0.advance(sc);
+      this.cas1.advance(sc);
       this.advanceCasCtrlTimer(sc);
     }
     this.lcd.render();

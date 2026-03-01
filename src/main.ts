@@ -1,5 +1,6 @@
 import './style.css';
 import { HX20 } from './hx20';
+import { Cassette } from './cassette';
 import { fetchROM, fetchBinaryROM, ROM_FILES } from './rom-loader';
 import { disassemble, formatDisasmLine } from './disasm';
 
@@ -28,16 +29,7 @@ const romFileInput = document.getElementById('rom-file-input') as HTMLInputEleme
 const speedSlider = document.getElementById('speed-slider') as HTMLInputElement;
 const speedDisplay = document.getElementById('speed-display')!;
 
-// Cassette panel elements
-const btnCassetteToggle = document.getElementById('btn-cassette-toggle')!;
-const cassettePanel = document.getElementById('cassette-panel')!;
-const cassetteMotor = document.getElementById('cassette-motor')!;
-const cassetteCurrent = document.getElementById('cassette-current')!;
-const tapeListEl = document.getElementById('tape-list')!;
-const btnTapeNew = document.getElementById('btn-tape-new')!;
-const btnTapeEject = document.getElementById('btn-tape-eject')!;
-const btnTapeImport = document.getElementById('btn-tape-import')!;
-const tapeFileInput = document.getElementById('tape-file-input') as HTMLInputElement;
+// Cassette panel elements are wired below via wireCassettePanel()
 
 // Attach LCD canvas
 hx20.lcd.attachCanvas(canvas);
@@ -174,92 +166,113 @@ speedSlider.addEventListener('input', () => {
 
 // --- Cassette UI ---
 
-btnCassetteToggle.addEventListener('click', () => {
-  cassettePanel.classList.toggle('hidden');
-});
+function wireCassettePanel(cas: Cassette, ids: {
+  toggle: string; panel: string; motor: string; current: string;
+  tapeList: string; btnNew: string; btnEject: string; btnImport: string;
+  fileInput: string; btnRewind?: string;
+}): void {
+  const toggleBtn = document.getElementById(ids.toggle)!;
+  const panel = document.getElementById(ids.panel)!;
+  const motorEl = document.getElementById(ids.motor)!;
+  const currentEl = document.getElementById(ids.current)!;
+  const tapeListEl = document.getElementById(ids.tapeList)!;
+  const btnNew = document.getElementById(ids.btnNew)!;
+  const btnEject = document.getElementById(ids.btnEject)!;
+  const btnImport = document.getElementById(ids.btnImport)!;
+  const fileInput = document.getElementById(ids.fileInput) as HTMLInputElement;
+  const btnRewind = ids.btnRewind ? document.getElementById(ids.btnRewind) : null;
 
-function updateTapeList(): void {
-  const names = hx20.cassette.getTapeNames();
-  const current = hx20.cassette.getCurrentTape();
-  cassetteCurrent.textContent = current ? `Loaded: ${current}` : 'No tape loaded';
+  toggleBtn.addEventListener('click', () => panel.classList.toggle('hidden'));
 
-  tapeListEl.innerHTML = '';
-  for (const name of names) {
-    const row = document.createElement('div');
-    row.className = 'tape-entry';
+  function updateList(): void {
+    const names = cas.getTapeNames();
+    const current = cas.getCurrentTape();
+    currentEl.textContent = current ? `Loaded: ${current}` : 'No tape loaded';
 
-    const btn = document.createElement('button');
-    btn.textContent = name;
-    btn.className = 'tape-name' + (name === current ? ' tape-active' : '');
-    btn.addEventListener('click', () => {
-      hx20.cassette.insertTape(name);
-      updateTapeList();
-    });
+    tapeListEl.innerHTML = '';
+    for (const name of names) {
+      const row = document.createElement('div');
+      row.className = 'tape-entry';
 
-    const dlBtn = document.createElement('button');
-    dlBtn.textContent = 'DL';
-    dlBtn.className = 'tape-action';
-    dlBtn.title = 'Download tape';
-    dlBtn.addEventListener('click', () => {
-      const json = hx20.cassette.exportTape(name);
-      if (!json) return;
-      const blob = new Blob([json], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `${name}.json`;
-      a.click();
-      URL.revokeObjectURL(a.href);
-    });
+      const btn = document.createElement('button');
+      btn.textContent = name;
+      btn.className = 'tape-name' + (name === current ? ' tape-active' : '');
+      btn.addEventListener('click', () => { cas.insertTape(name); updateList(); });
 
-    const delBtn = document.createElement('button');
-    delBtn.textContent = '\u00D7';
-    delBtn.className = 'tape-action tape-delete';
-    delBtn.title = 'Delete tape';
-    delBtn.addEventListener('click', () => {
-      hx20.cassette.deleteTape(name);
-    });
+      const dlBtn = document.createElement('button');
+      dlBtn.textContent = 'DL';
+      dlBtn.className = 'tape-action';
+      dlBtn.title = 'Download tape';
+      dlBtn.addEventListener('click', () => {
+        const json = cas.exportTape(name);
+        if (!json) return;
+        const blob = new Blob([json], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `${name}.json`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
 
-    row.appendChild(btn);
-    row.appendChild(dlBtn);
-    row.appendChild(delBtn);
-    tapeListEl.appendChild(row);
+      const delBtn = document.createElement('button');
+      delBtn.textContent = '\u00D7';
+      delBtn.className = 'tape-action tape-delete';
+      delBtn.title = 'Delete tape';
+      delBtn.addEventListener('click', () => cas.deleteTape(name));
+
+      row.appendChild(btn);
+      row.appendChild(dlBtn);
+      row.appendChild(delBtn);
+      tapeListEl.appendChild(row);
+    }
   }
+
+  cas.onLibraryChange = updateList;
+  cas.onMotorChange = (on: boolean) => { motorEl.textContent = on ? '[MOTOR]' : ''; };
+
+  btnNew.addEventListener('click', () => {
+    const name = cas.insertBlank();
+    updateList();
+    statusText.textContent = `Blank tape: ${name}`;
+  });
+
+  btnEject.addEventListener('click', () => { cas.ejectTape(); updateList(); });
+
+  btnImport.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    const json = await file.text();
+    const name = cas.importTape(json);
+    if (name) {
+      cas.insertTape(name);
+      updateList();
+      statusText.textContent = `Imported tape: ${name}`;
+    } else {
+      statusText.textContent = 'Failed to import tape';
+    }
+    fileInput.value = '';
+  });
+
+  if (btnRewind) {
+    btnRewind.addEventListener('click', () => { cas.rewind(); statusText.textContent = 'Tape rewound'; });
+  }
+
+  updateList();
 }
 
-hx20.cassette.onLibraryChange = updateTapeList;
-hx20.cassette.onMotorChange = (on: boolean) => {
-  cassetteMotor.textContent = on ? '[MOTOR]' : '';
-};
-
-btnTapeNew.addEventListener('click', () => {
-  const name = hx20.cassette.insertBlank();
-  updateTapeList();
-  statusText.textContent = `Blank tape: ${name}`;
+wireCassettePanel(hx20.cas0, {
+  toggle: 'btn-cas0-toggle', panel: 'cas0-panel', motor: 'cas0-motor',
+  current: 'cas0-current', tapeList: 'cas0-tape-list', btnNew: 'btn-cas0-new',
+  btnEject: 'btn-cas0-eject', btnImport: 'btn-cas0-import', fileInput: 'cas0-file-input',
 });
 
-btnTapeEject.addEventListener('click', () => {
-  hx20.cassette.ejectTape();
-  updateTapeList();
+wireCassettePanel(hx20.cas1, {
+  toggle: 'btn-cas1-toggle', panel: 'cas1-panel', motor: 'cas1-motor',
+  current: 'cas1-current', tapeList: 'cas1-tape-list', btnNew: 'btn-cas1-new',
+  btnEject: 'btn-cas1-eject', btnImport: 'btn-cas1-import', fileInput: 'cas1-file-input',
+  btnRewind: 'btn-cas1-rewind',
 });
-
-btnTapeImport.addEventListener('click', () => tapeFileInput.click());
-tapeFileInput.addEventListener('change', async () => {
-  const file = tapeFileInput.files?.[0];
-  if (!file) return;
-  const json = await file.text();
-  const name = hx20.cassette.importTape(json);
-  if (name) {
-    hx20.cassette.insertTape(name);
-    updateTapeList();
-    statusText.textContent = `Imported tape: ${name}`;
-  } else {
-    statusText.textContent = 'Failed to import tape';
-  }
-  tapeFileInput.value = '';
-});
-
-// Initialize tape list
-updateTapeList();
 
 // Debug: expose hx20 for console access
 (window as any).hx20 = hx20;
