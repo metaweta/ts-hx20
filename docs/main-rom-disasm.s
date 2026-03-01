@@ -579,15 +579,12 @@ const_2806 EQU     $2806
 lcd_init_dims_40x8 EQU     $2808
 const_2AFF EQU     $2AFF
 const_dash2 EQU     $2D32
-M2E4F   EQU     $2E4F
-M2FC1   EQU     $2FC1
 const_3000 EQU     $3000
 const_3020 EQU     $3020
 const_25 EQU     $3235
 ocf_abort_mask EQU     $3737
 const_3A2C EQU     $3A2C
 mon_item_limit_val EQU     $3A45
-M3BD7   EQU     $3BD7
 delay_17000 EQU     $4268
 const_EO EQU     $454F
 const_F_space EQU     $4620
@@ -600,18 +597,12 @@ const_R1 EQU     $5231
 using_default_chars EQU     $5C24
 opt_rom_signature EQU     $6001
 opt_rom_entry_vec EQU     $6004
-M610D   EQU     $610D
 cas0_cmd_channel EQU     $6404
 cas0_cmd_read EQU     $6804
 const_6E6F EQU     $6E6F
 const_7100 EQU     $7100
-M7A88   EQU     $7A88
 const_7B77 EQU     $7B77
-M7D5A   EQU     $7D5A
 const_7D77 EQU     $7D77
-M7D9A   EQU     $7D9A
-M7EDE   EQU     $7EDE
-const_7FFF EQU     $7FFF
 
 ;****************************************************
 ;* Program Code / Data Areas                        *
@@ -5041,7 +5032,7 @@ bas_ext_fn_eval_simple: JSR     bas_eval_in_parens       ;A35A: BD 88 C8       '
         CMPB    #$16                     ;A366: C1 16          '..'
         BHI     bas_ext_fn_call          ;A368: 22 03          '".'
         JSR     bas_csng_fn              ;A36A: BD CE 07       '...'
-bas_ext_fn_call: PULB                             ;A36D: 33             '3'     look up handler in function table (M05AE) and JSR
+bas_ext_fn_call: PULB                             ;A36D: 33             '3'     look up handler in function table (bas_ext_fn_table) and JSR
         LDX     bas_ext_fn_table         ;A36E: FE 05 AE       '...'
         ABX                              ;A371: 3A             ':'
         LDX     ,X                       ;A372: EE 00          '..'
@@ -6993,7 +6984,7 @@ mem_write_jmp_entry: STAA    ,X                       ;B3B6: A7 00          '..'
         DECB                             ;B3C3: 5A             'Z'
         BNE     mem_write_jmp_entry      ;B3C4: 26 F0          '&.'
         RTS                              ;B3C6: 39             '9'
-chrgot_init_template: FCB     $00                      ;B3C7: 00             '.'     6-byte init template (copied to MFFDC target)
+chrgot_init_template: FCB     $00                      ;B3C7: 00             '.'     6-byte init template (copied to rom_ptr_io_ctrl target)
         FCC     "1 "                     ;B3C8: 31 20          '1 '
         FCB     $80,$00,$80              ;B3CA: 80 00 80       '...'
 chrget: INC     >input_ptr_lo            ;B3CD: 7C 00 FC       '|..'   CHRGET: INC input_ptr, JMP chrgot — advance and get next char
@@ -8316,19 +8307,14 @@ lcd_exec_dispatch: JSR     disp_dispatch_vec        ;BF84: BD 0A 35       '..5'
         JMP     api_disp_dispatch_jmp    ;BF87: 7E FF 5E       '~.^'
 bas_print_using_dot: LDAA    #$2E                     ;BF8A: 86 2E          '..'
         JMP     using_output_fill        ;BF8C: 7E 95 7D       '~.}'
-        ROL     $74,X                    ;BF8F: 69 74          'it'
-        AIM     #$7A,$01,S               ;BF91: 61 7A 61       'aza'
-        ASR     M610D                    ;BF94: 77 61 0D       'wa.'
-        CLV                              ;BF97: 0A             '.'
-        FCB     $00                      ;BF98: 00             '.'
-        STX     const_ffff               ;BF99: FF FF FF       '...'
-        STX     MFFBD                    ;BF9C: FF FF BD       '...'
-        ORAA    fp_temp                  ;BF9F: 9A EB          '..'
-        LDD     input_ptr                ;BFA1: DC FB          '..'
+        FCC     "itazawa"                ;BF8F: 69 74 61 7A 61 77 61 'itazawa'
+        FCB     $0D,$0A,$00,$FF,$FF,$FF  ;BF96: 0D 0A 00 FF FF FF '......'
+        FCB     $FF,$FF                  ;BF9C: FF FF          '..'
+ZBF9E:  FCB     $BD,$9A,$EB,$DC,$FB      ;BF9E: BD 9A EB DC FB '.....'
 bas_randomize_prompt_loop: PSHB                             ;BFA3: 37             '7'
         PSHA                             ;BFA4: 36             '6'
         JSR     ZB6CD                    ;BFA5: BD B6 CD       '...'
-        LDX     #MC03A                   ;BFA8: CE C0 3A       '..:'
+        LDX     #str_randomize_seed      ;BFA8: CE C0 3A       '..:'
         JSR     bas_print_string         ;BFAB: BD 91 7E       '..~'
         JSR     bas_print_question_space ;BFAE: BD 91 8F       '...'
         JSR     bas_input_line_cols      ;BFB1: BD B5 75       '..u'
@@ -8366,9 +8352,9 @@ bas_rnd_test_zero: JSR     fp_test_fac_zero         ;BFF2: BD C5 B5       '...'
         STX     fac_man1                 ;BFFC: DF D6          '..'
         LDAA    fp_rng_seed_byte         ;BFFE: B6 04 E7       '...'
         STAA    fac_man3                 ;C001: 97 D8          '..'
-fp_atn_setup: LDX     fp_rng_multiplier        ;C003: FE C0 38       '..8'   ATN setup: load coefficients from MC038 into ARG
+fp_atn_setup: LDX     fp_rng_multiplier        ;C003: FE C0 38       '..8'   ATN setup: load coefficients from fp_rng_multiplier into ARG
         STX     arg_man1                 ;C006: DF E4          '..'
-        LDAA    MC03A                    ;C008: B6 C0 3A       '..:'
+        LDAA    str_randomize_seed       ;C008: B6 C0 3A       '..:'
         STAA    arg_man3                 ;C00B: 97 E6          '..'
         JSR     fp_clear_mult_accum      ;C00D: BD C3 0C       '...'
         LDD     fp_rng_seed_lo           ;C010: FC 04 E9       '...'
@@ -8402,7 +8388,7 @@ fp_atn_check_exp: LDAA    fac_exp                  ;C047: 96 D5          '..'
         BCS     fp_atn_poly_eval         ;C04C: 25 06          '%.'
         LDX     #fp_const_one            ;C04E: CE C2 9F       '...'
         JSR     fp_load_and_check_jmp    ;C051: BD CF D9       '...'
-fp_atn_poly_eval: LDX     #fp_atn_coefficients     ;C054: CE C0 6D       '..m'   ATN polynomial evaluation using coefficient table at MC06D
+fp_atn_poly_eval: LDX     #fp_atn_coefficients     ;C054: CE C0 6D       '..m'   ATN polynomial evaluation using coefficient table at fp_atn_coefficients
         JSR     fp_poly_eval_series      ;C057: BD CF B8       '...'
         PULA                             ;C05A: 32             '2'
         CMPA    #$81                     ;C05B: 81 81          '..'
@@ -8414,24 +8400,26 @@ fp_atn_restore_sign: PULA                             ;C065: 32             '2'
         BPL     fp_atn_ret               ;C067: 2A 03          '*.'
 fp_domain_error: JMP     WARMS                    ;C069: 7E CD 03       '~..'   domain error: JMP WARMS
 fp_atn_ret: RTS                              ;C06C: 39             '9'
-fp_atn_coefficients: INX                              ;C06D: 08             '.'
-        ASL     M3BD7                    ;C06E: 78 3B D7       'x;.'
-        DECA                             ;C071: 4A             'J'
-        TIM     #$84,mon_mode_flag       ;C072: 7B 84 6E       '{.n'
+fp_atn_coefficients: FCB     $08                      ;C06D: 08             '.'
+        FCC     "x;"                     ;C06E: 78 3B          'x;'
+        FCB     $D7                      ;C070: D7             '.'
+        FCC     "J{"                     ;C071: 4A 7B          'J{'
+        FCB     $84                      ;C073: 84             '.'
+        FCC     "n"                      ;C074: 6E             'n'
         FCB     $02                      ;C075: 02             '.'
-        INC     M2FC1                    ;C076: 7C 2F C1       '|/.'
-        LDX     M7D9A                    ;C079: FE 7D 9A       '.}.'
-        INS                              ;C07C: 31             '1'
-        LSR     M7D5A                    ;C07D: 74 7D 5A       't}Z'
-LINBUF: MUL                              ;C080: 3D             '='
-        ANDA    #$7E                     ;C081: 84 7E          '.~'
-        CMPA    sys_config2              ;C083: 91 7F          '..'
-        EORB    #$7E                     ;C085: C8 7E          '.~'
-        INCA                             ;C087: 4C             'L'
-        ADDA    sci_post_check           ;C088: BB E4 7F       '...'
-        ORAA    $AA,X                    ;C08B: AA AA          '..'
-        INC     $81,X                    ;C08D: 6C 81          'l.'
-        FCB     $00                      ;C08F: 00             '.'
+        FCC     "|/"                     ;C076: 7C 2F          '|/'
+        FCB     $C1,$FE                  ;C078: C1 FE          '..'
+        FCC     "}"                      ;C07A: 7D             '}'
+        FCB     $9A                      ;C07B: 9A             '.'
+        FCC     "1t}Z"                   ;C07C: 31 74 7D 5A    '1t}Z'
+LINBUF: FCC     "="                      ;C080: 3D             '='
+        FCB     $84                      ;C081: 84             '.'
+        FCC     "~"                      ;C082: 7E             '~'
+        FCB     $91,$7F,$C8              ;C083: 91 7F C8       '...'
+        FCC     "~L"                     ;C086: 7E 4C          '~L'
+        FCB     $BB,$E4,$7F,$AA,$AA      ;C088: BB E4 7F AA AA '.....'
+        FCC     "l"                      ;C08D: 6C             'l'
+        FCB     $81,$00                  ;C08E: 81 00          '..'
         FCB     $00                      ;C090: 00             '.'
         FCB     $00                      ;C091: 00             '.'
         JSR     fp_store_d_to_man        ;C092: BD CE 67       '..g'
@@ -8652,7 +8640,7 @@ fp_inc_man2: LDX     fac_man2                 ;C241: DE D7          '..'
 fp_increment_mantissa_ret: RTS                              ;C24B: 39             '9'
 fp_overflow_error: LDAB    #$06                     ;C24C: C6 06          '..'    overflow error: LDAB #$06 (OV), JMP error
         JMP     fp_error_funcall         ;C24E: 7E C4 1B       '~..'
-fp_init_mult_accum: LDX     #fp_mult_ext0            ;C251: CE 00 92       '...'   initialize multiply accumulator at M0092-M0099
+fp_init_mult_accum: LDX     #fp_mult_ext0            ;C251: CE 00 92       '...'   initialize multiply accumulator at fp_mult_ext0-fp_mult_ext7
 fp_shift_accum_byte: LDAA    $03,X                    ;C254: A6 03          '..'
         STAA    fp_shift_count           ;C256: 97 ED          '..'
         LDAA    fp_precision_bytes       ;C258: 96 83          '..'
@@ -8737,11 +8725,11 @@ fp_log_setup: LDX     #fp_const_log_half       ;C2CA: CE C2 B0       '...'   LOG
         JSR     fp_normalize_precision   ;C2F8: BD CE 1E       '...'
         LDX     #mem_top                 ;C2FB: CE 00 C4       '...'
         JSR     fp_load_fac_from_mem     ;C2FE: BD C1 01       '...'
-fp_load_ln2: LDX     #fp_const_ln2            ;C301: CE C2 BC       '...'   load ln(2) constant from MC2BC
+fp_load_ln2: LDX     #fp_const_ln2            ;C301: CE C2 BC       '...'   load ln(2) constant from fp_const_ln2
 fp_load_const: JSR     fp_load_from_mem         ;C304: BD C3 A6       '...'   load FP constant from table at X (JSR fp_load_from_mem)
 fp_log_mul_beq: BEQ     fp_shift_right_ret       ;C307: 27 95          ''.'
         JSR     fp_adjust_result_exp     ;C309: BD C3 D6       '...'
-fp_clear_mult_accum: LDX     #P1DDR                   ;C30C: CE 00 00       '...'   clear multiply accumulator M0093-M0095 and setup
+fp_clear_mult_accum: LDX     #P1DDR                   ;C30C: CE 00 00       '...'   clear multiply accumulator fp_mult_ext1-fp_mult_ext3 and setup
         STX     fp_mult_ext1             ;C30F: DF 93          '..'
         STX     fp_mult_accum            ;C311: DF 94          '..'
         LDAA    fp_precision_bytes       ;C313: 96 83          '..'
@@ -8976,7 +8964,7 @@ fp_div_final_shift: RORB                             ;C4E4: 56             'V'
         STAB    fp_shift_count           ;C4E7: D7 ED          '..'
         BSR     fp_copy_accum_to_fac     ;C4E9: 8D 03          '..'
         JMP     fp_normalize_entry       ;C4EB: 7E C1 7D       '~.}'
-fp_copy_accum_to_fac: LDX     fp_mult_ext1             ;C4EE: DE 93          '..'    copy multiply accumulator M0093-M0095 to FAC mantissa
+fp_copy_accum_to_fac: LDX     fp_mult_ext1             ;C4EE: DE 93          '..'    copy multiply accumulator fp_mult_ext1-fp_mult_ext3 to FAC mantissa
         STX     fac_man1                 ;C4F0: DF D6          '..'
         LDAA    fp_mult_ext3             ;C4F2: 96 95          '..'
         STAA    fac_man3                 ;C4F4: 97 D8          '..'
@@ -9357,7 +9345,7 @@ fp_print_int16: JSR     LINBUF+$12               ;C804: BD C0 92       '...'
         JSR     fp_int_to_float          ;C807: BD CE 37       '..7'
         BSR     fp_num_to_string         ;C80A: 8D 03          '..'
 fp_jmp_print_string: JMP     bas_print_string         ;C80C: 7E 91 7E       '~.~'
-fp_num_to_string: CLR     using_format_flags       ;C80F: 7F 04 ED       '...'   convert FAC to ASCII string in M04BD buffer
+fp_num_to_string: CLR     using_format_flags       ;C80F: 7F 04 ED       '...'   convert FAC to ASCII string in fp_out_buf buffer
 fp_num_to_string_entry: LDX     #fp_out_buf              ;C812: CE 04 BD       '...'
         STX     fp_work_ptr              ;C815: DF EE          '..'
         JSR     fp_check_precision       ;C817: BD CD DF       '...'
@@ -9655,7 +9643,7 @@ fp_format_comma_check: DEC     >fp_decimal_count        ;CA4F: 7A 00 C9       'z
         LDAA    #$03                     ;CA54: 86 03          '..'
         STAA    fp_decimal_count         ;CA56: 97 C9          '..'
         LDAA    #$2C                     ;CA58: 86 2C          '.,'
-fp_format_store_char: STX     ptr_temp                 ;CA5A: DF 8F          '..'    store formatted character to output buffer at M00EE
+fp_format_store_char: STX     ptr_temp                 ;CA5A: DF 8F          '..'    store formatted character to output buffer at fp_work_ptr
         LDX     fp_work_ptr              ;CA5C: DE EE          '..'
         STAA    ,X                       ;CA5E: A7 00          '..'
         INX                              ;CA60: 08             '.'
@@ -9994,21 +9982,24 @@ WARMS:  LDAA    fac_exp                  ;CD03: 96 D5          '..'
         BEQ     fp_pow_negate_ret        ;CD05: 27 03          ''.'
         COM     >fac_sign                ;CD07: 73 00 DD       's..'
 fp_pow_negate_ret: RTS                              ;CD0A: 39             '9'
-fp_exp_coeff_table: CMPA    #$38                     ;CD0B: 81 38          '.8'
-        ORAA    $3B,X                    ;CD0D: AA 3B          '.;'
-OUTCH:  TPA                              ;CD0F: 07             '.'
-        LSR     M942E                    ;CD10: 74 94 2E       't..'
-        NEGA                             ;CD13: 40             '@'
-        ASR     M2E4F                    ;CD14: 77 2E 4F       'w.O'
-        NEG     M7A88                    ;CD17: 70 7A 88       'pz.'
-        FCB     $02                      ;CD1A: 02             '.'
-INBUFF: JMP     $7C,X                    ;CD1B: 6E 7C          'n|'
-        BPL     fp_sqrt_const_byte4      ;CD1D: 2A A0          '*.'
-        LDAB    $7E,X                    ;CD1F: E6 7E          '.~'
-CLASS:  ORAA    $AA,X                    ;CD21: AA AA          '..'
-        NEGB                             ;CD23: 50             'P'
-PCRLF:  CLR     const_7FFF               ;CD24: 7F 7F FF       '...'
-NXTCH:  STX     bas_keyword_tokens2      ;CD27: FF 81 80       '...'
+fp_exp_coeff_table: FCB     $81                      ;CD0B: 81             '.'
+INCH2:  FCC     "8"                      ;CD0C: 38             '8'
+        FCB     $AA                      ;CD0D: AA             '.'
+        FCC     ";"                      ;CD0E: 3B             ';'
+OUTCH:  FCB     $07                      ;CD0F: 07             '.'
+        FCC     "t"                      ;CD10: 74             't'
+        FCB     $94                      ;CD11: 94             '.'
+OUTCH2: FCC     ".@w"                    ;CD12: 2E 40 77       '.@w'
+GETCHR: FCC     ".Op"                    ;CD15: 2E 4F 70       '.Op'
+PUTCHR: FCC     "z"                      ;CD18: 7A             'z'
+        FCB     $88,$02                  ;CD19: 88 02          '..'
+INBUFF: FCC     "n|*"                    ;CD1B: 6E 7C 2A       'n|*'
+PSTRNG: FCB     $A0,$E6                  ;CD1E: A0 E6          '..'
+        FCC     "~"                      ;CD20: 7E             '~'
+CLASS:  FCB     $AA,$AA                  ;CD21: AA AA          '..'
+        FCC     "P"                      ;CD23: 50             'P'
+PCRLF:  FCB     $7F,$7F,$FF              ;CD24: 7F 7F FF       '...'
+NXTCH:  FCB     $FF,$81,$80              ;CD27: FF 81 80       '...'
 RSTRIO: FCB     $00                      ;CD2A: 00             '.'
         FCB     $00                      ;CD2B: 00             '.'
         CMPA    #$00                     ;CD2C: 81 00          '..'
@@ -10095,7 +10086,7 @@ fp_error_type_mismatch: LDAB    #$0D                     ;CDD5: C6 0D          '
 fp_require_numeric: BSR     fp_check_precision       ;CDDA: 8D 03          '..'    require numeric type (error if string), RTS if OK
         BEQ     fp_error_type_mismatch   ;CDDC: 27 F7          ''.'
         RTS                              ;CDDE: 39             '9'
-fp_check_precision: LDAA    var_type                 ;CDDF: 96 85          '..'    check precision mode: A=M0085, compare #$08 (double)
+fp_check_precision: LDAA    var_type                 ;CDDF: 96 85          '..'    check precision mode: A=var_type, compare #$08 (double)
 fp_compare_precision: CMPA    #$08                     ;CDE1: 81 08          '..'
         DECA                             ;CDE3: 4A             'J'
         DECA                             ;CDE4: 4A             'J'
@@ -12326,11 +12317,10 @@ disp_dispatch_table2: FCB     $00,$D8                  ;DFAC: 00 D8          '..
         FCC     "6"                      ;DFE1: 36             '6'
         FCB     $0D,$DD,$93,$0A,$DD,$A9  ;DFE2: 0D DD 93 0A DD A9 '......'
         FCB     $00,$DD                  ;DFE8: 00 DD          '..'
-        FCC     "`"                      ;DFEA: 60             '`'
-        NEG     $FF,X                    ;DFEB: 60 FF          '`.'
-        STX     M7EDE                    ;DFED: FF 7E DE       '.~.'
-        CMPB    dip_switches             ;DFF0: D1 7E          '.~'
-        STAB    disp_cmd_param           ;DFF2: D7 FF          '..'
+        FCC     "``"                     ;DFEA: 60 60          '``'
+        FCB     $FF,$FF                  ;DFEC: FF FF          '..'
+api_restore_display: JMP     disp_render_visible      ;DFEE: 7E DE D1       '~..'
+api_disp_cmd_wrapper: JMP     disp_cmd_wrapper         ;DFF1: 7E D7 FF       '~..'
 api_disp_dispatch: JMP     disp_cmd_dispatch        ;DFF4: 7E D7 B0       '~..'
 api_mon_cmd_end: JMP     mon_cmd_table_end        ;DFF7: 7E D7 7E       '~.~'
 api_mon_enter_trap: JMP     mon_enter_from_trap      ;DFFA: 7E D3 10       '~..'
@@ -14663,7 +14653,7 @@ tf20_close_session: CLR     sci_session_flag         ;F23A: 7F 01 C5       '...'
         BNE     tf20_session_ok          ;F24A: 26 C6          '&.'
         JSR     tf20_tx_byte             ;F24C: BD F0 D4       '...'
         BRA     tf20_session_ok          ;F24F: 20 C1          ' .'
-tf20_rx_timeout_long: LDAA    tf20_rx_timeout_hi       ;F251: B6 01 CB       '...'   SCI RX with M01CB retries (for data bytes)
+tf20_rx_timeout_long: LDAA    tf20_rx_timeout_hi       ;F251: B6 01 CB       '...'   SCI RX with tf20_rx_timeout_hi retries (for data bytes)
 tf20_rx_timeout: PSHB                             ;F254: 37             '7'     SCI RX with A retries; V=1 all retries exhausted
         TAB                              ;F255: 16             '.'
 tf20_rx_timeout_retry: BSR     tf20_rx_single           ;F256: 8D 0D          '..'
