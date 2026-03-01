@@ -1036,6 +1036,13 @@ label 1010 lcdctl_idle_mode
 label 2008 file_init_pattern
 label 2402 cas1_cmd_channel
 label 6404 cas0_cmd_channel
+label 8000 bas_rom_header
+label 8004 bas_rom_name_ptr
+label 8015 bas_stmt_dispatch
+label 804F bas_stmt_dispatch2
+label 8080 bas_fn_dispatch
+label 8104 bas_keyword_tokens
+label 8180 bas_keyword_tokens2
 label 84CB bas_ready_print
 * Token $AA: NEW
 label 85CD bas_new
@@ -2423,6 +2430,7 @@ label FFD2 rom_ptr_sys_area
 label FFD8 rom_ptr_printer
 label FFDC rom_ptr_io_ctrl
 label FFDE rom_ptr_device_num
+label FFFF const_ffff
 
 * ============================================================
 * Inline Comments
