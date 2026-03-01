@@ -399,6 +399,7 @@ label 04B2 mem_size
 label 04B4 login_slot_num
 lcomment 04B4 current program slot number (1-5)
 label 04B5 prog_area_ptr
+label 04B7 fp_format_precision_flag
 lcomment 04B5 pointer to current program storage area
 label 04BA bas_num_buf
 label 04BB using_format_buf
@@ -407,7 +408,10 @@ lcomment 04BA numeric conversion buffer (used by HEX$/OCT$)
 label 04BD fp_out_buf
 lcomment 04BD FP number-to-string output buffer
 label 04E4 kw_table_ptr
+label 04E5 fp_rng_seed_hi
 label 04E6 cmd_ext_ptr
+label 04E8 fp_rng_seed_mid
+label 04E9 fp_rng_seed_lo
 label 04EB using_decimal_pos
 lcomment 04EB PRINT USING decimal point position counter
 label 04EC using_format_pos
@@ -417,7 +421,9 @@ label 04EE using_format_ptr
 label 04F0 using_sign_flag
 label 04F1 using_field_width
 label 04F2 using_fill_char
+label 04F3 using_format_char
 label 04F4 using_total_width
+label 04F5 using_currency_char
 label 04F6 using_work_area
 lcomment 04ED PRINT USING format flags
 label 04F8 file_record_size
@@ -426,10 +432,14 @@ lcomment 04F8 PUT/GET record size
 label 0500 io_device_table
 lcomment 0500 I/O device descriptor table base
 label 04FE var_end
+label 0502 io_channel_table
+label 059C bas_keyword_table1
+label 05A1 bas_keyword_table2
 label 05A2 file_base_addr
 label 05A4 str_work_ptr
 lcomment 05A2 PUT/GET file base address
 label 05A9 stmt_dispatch_ptr
+label 05AE bas_ext_fn_table
 label 0639 bas_check_break_vec
 lcomment 0639 RAM vector: check for Ctrl-C / break
 label 0677 bas_on_error_ptr
@@ -872,30 +882,45 @@ label BFCD bas_randomize
 label 0651 bas_while_vec
 * Token $A9: WEND — RAM indirect vector ($0654)
 label 0654 bas_wend_vec
+label 0657 io_handler_table
 label 068B file_io_status
+label 068D io_device_count
+label 068F io_device_params
 label 0697 file_eof_flag
 label 0698 io_read_ptr
+label 06D0 io_crlf_descriptor
 label 06E5 io_open_flag
+label 074D printer_width_flag
+label 0753 bas_init_flag
 label 0856 bas_stack_limit
 label 0859 bas_patch_addr
+label 085A bas_patch_addr_hi
 label 085B bas_patch_char
 label 085C bas_varname_buf
 label 086C bas_str_temp_buf
+label 0874 bas_deftype_table
 label 088A bas_dim_limit
+label 088C bas_stop_break_flag
+label 088D bas_input_separator
 label 088E bas_dim_count
 label 088F dim_element_size
 label 0890 bas_for_flag
+label 0892 str_source_len
 label 0893 str_mid_len
 label 0897 str_mid_start
 label 089B bas_line_start
+label 089D auto_step_size
 label 08A3 bas_line_end
 label 08A5 bas_using_temp
 label 08AE bas_error_resume_flag
 label 08AF bas_cont_save
 label 08B1 bas_error_line
+label 08B3 bas_relop_save_ptr
+label 08CF bas_fn_dispatch_table
 label 08E7 io_ctrl_block
 label 08E9 io_ctrl_block2
 label 08EC io_date_year
+label 08ED io_date_dow
 label 08F3 io_filename_buf
 label 08FB io_buf_ptr
 label 08FD io_end_ptr
@@ -905,16 +930,23 @@ label 090D file_list_flag
 label 090E io_suppress_flag
 label 090F io_session_flag
 label 0913 file_device_save
+label 0914 file_merge_ptr
 label 0917 io_string_ptr
 label 0919 io_xfer_ptr
 label 091C sci_irq_handler_ptr
+label 0A25 io_response_code
 label 0A26 lcd_cursor_x
 label 0A28 io_device_timeout
+label 0A2A lcd_line_height
+label 0A2C gfx_last_x2
+label 0A2E gfx_last_y2
 label 0A34 bas_renum_flag
 label 0A40 io_work_buffer
 label 0F08 lcd_display_buffer
+label 84CB bas_ready_print
 * Token $AA: NEW
 label 85CD bas_new
+label 882E bas_exec_next
 * Token $AB: ERASE
 label 9F07 bas_erase
 label 9FA4 bas_input_prompt_line
@@ -1094,6 +1126,7 @@ label 8E00 str_space_alloc
 label 8E2C str_garbage_collect
 label 8E7E str_gc_scan_var_entry
 label 8E97 str_gc_check_range
+label 8EB9 str_gc_skip_3
 label 8EBB str_gc_skip_b
 label 8EBE str_gc_compact
 label 8EDD str_concat
@@ -1110,6 +1143,7 @@ label 8F5F str_get_len_test
 * --- String functions ($8F63-$8FC9) ---
 label 8F63 bas_chr_fn
 label 8F66 str_alloc_one_char
+label 8F72 str_cleanup_stack
 label 8F77 bas_asc_fn
 label 8F7B str_get_first_byte
 label 8F82 bas_left_fn
@@ -1429,15 +1463,24 @@ lcomment B3E5 6-byte template copied to $00FA: LDAA <addr>, JMP B3D8
 
 * --- Printer / device output ($B00D-$B175) ---
 label B00D printer_status
+label B0AD io_abort_check_jmp
 label B0DF io_check_session_end
 label B0EE printer_output_line
 label B10D printer_call_handler
 label B111 io_send_crlf
 label B129 io_parse_device_params
+label B172 bas_error_funcall_jmp3
 label B175 io_parse_hex_char
 label B1C1 io_check_result
 label B200 io_pac_close
 label B212 io_list_directory
+label B84E bas_error_funcall_jmp2
+label B8B8 bas_expect_comma_eval
+label B929 bas_error_funcall_jmp4
+label B9F1 bas_error_funcall_jmp5
+label BC04 bas_error_funcall_jmp6
+label BC72 bas_error_oom_jmp
+label BF41 bas_error_subscript_jmp
 
 * ============================================================
 * LCD / Display / Graphics ($B500-$B7CE)
@@ -1494,12 +1537,14 @@ lcomment BFE6 RND function: generate pseudo-random number
 label C003 fp_atn_setup
 lcomment C003 ATN setup: load coefficients from MC038 into ARG
 label C024 fp_load_fac_from_var
+label C038 fp_rng_multiplier
 lcomment C024 load FAC from variable pointer (kw_table_ptr)
 label C040 bas_atn_fn
 lcomment C040 ATN function: arctangent via polynomial approximation
 label C054 fp_atn_poly_eval
 lcomment C054 ATN polynomial evaluation using coefficient table at MC06D
 label C069 fp_domain_error
+label C06D fp_atn_coefficients
 lcomment C069 domain error: JMP WARMS
 label C101 fp_load_fac_from_mem
 lcomment C101 load FAC from memory at X (JSR fp_load_from_mem wrapper)
@@ -1537,6 +1582,7 @@ lcomment C27C right-shift mantissa by variable count in B
 label C286 fp_shift_right
 label C29F fp_const_one
 label C2A3 fp_log_coeffs
+label C2BC fp_const_ln2
 lcomment C286 right-shift mantissa via ASR/ROR chain
 label C2CA fp_log_setup
 lcomment C2CA LOG setup: save exponent, normalize to [0.5, 1.0)
@@ -1640,6 +1686,10 @@ lcomment C6D3 parse decimal number from string input
 * These use polynomial approximation with constant tables.
 * Number parsing and formatting routines.
 label C2C0 bas_log_fn
+label C47C fp_shift_store_byte
+label C5C1 fp_negate_b_rts
+label C646 fp_compare_sign
+label C6D2 fp_rts
 lcomment C2C0 LOG function: natural logarithm
 label C706 fp_normalize_result
 lcomment C706 normalize FAC result after arithmetic
@@ -1699,6 +1749,7 @@ lcomment CDD1 require double precision type, error $0D if string/zero
 label CDDA fp_require_numeric
 lcomment CDDA require numeric type (error if string), RTS if OK
 label CDDF fp_check_precision
+label CDEB fp_compare_rts
 lcomment CDDF check precision mode: A=M0085, compare #$08 (double)
 label CDEC fp_type_dispatch
 lcomment CDEC dispatch by type: integer→CINT, single→CSNG, double→CDBL
@@ -1771,6 +1822,7 @@ label D0E6 mon_reset_rom_base
 label D0EC mon_enumerate_roms
 label D0F6 mon_enum_next_entry
 label D113 mon_enum_follow_link
+label D11D mon_display_update
 label D11E mon_enum_scan_banks
 label D14E mon_enum_list_options
 label D152 mon_enum_option_loop
@@ -1885,6 +1937,7 @@ label D95F disp_get_cursor_pos_cmd
 label D967 disp_plot_pixel
 label D987 disp_read_pixel
 label D9B8 disp_pixel_setup
+label D9E0 disp_store_result
 label D9E6 disp_plot_with_style
 label D9FE disp_line_delta_setup
 label DA17 disp_draw_line
@@ -2180,6 +2233,7 @@ label EFE9 low_battery_check
 * ============================================================
 label F028 tf20_sci_send
 label F051 tf20_send_retry
+label F086 tf20_error_jmp
 label F0D4 tf20_tx_byte
 label F0E8 tf20_rx_response
 label F100 tf20_send_block
