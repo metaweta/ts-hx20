@@ -552,6 +552,7 @@ label 867C bas_stop_restore_stack
 label 9722 bas_for
 * Token $82: NEXT
 label 97EA bas_next
+label 98C5 bas_for_check_step
 * Token $83: DATA (skip to delimiter, advance)
 label 8721 bas_data
 label 8729 bas_scan_to_colon
@@ -610,6 +611,10 @@ label 9A1F bas_resume
 label 94E1 bas_auto
 * Token $9F: DELETE
 label 9497 bas_delete
+label 9499 bas_error_illegal_fn_jmp
+label 94AD bas_delete_range_setup
+label 94D0 bas_delete_and_relink
+label 94D2 bas_relink_and_adjust
 * Token $A0: DEF
 label 9AA1 bas_def
 * Token $A1: POKE
@@ -637,10 +642,13 @@ label 0654 bas_wend_vec
 label 85CD bas_new
 * Token $AB: ERASE
 label 9F07 bas_erase
+label 9FA4 bas_input_prompt_line
 * Token $AC: LOADM
 label AD01 bas_loadm
+label AD3C io_check_device_type
 * Token $AD: LOAD?
 label AE10 bas_loadq
+label AE29 io_find_and_close
 * Token $AE: SAVEM
 label AC8D bas_savem
 * Token $AF: SAVE
@@ -684,6 +692,8 @@ label B7CF bas_locate
 label B844 bas_cls
 * Token $BF: KEY
 label AA4E bas_key
+label AADC io_jmp_write_byte
+label AADF bas_lprint_init_error_mode
 * Token $C0: WIDTH
 label B851 bas_width
 label B8BD bas_eval_nonzero_byte
@@ -880,15 +890,20 @@ label 9383 bas_hex_oct_accum
 
 * --- End-of-statement check ($943C) ---
 label 943C bas_check_end_stmt
+label 943E bas_jmp_syntax_error
 lcomment 943C if Z flag: RTS; else: syntax error
 
 * --- LIST output helpers ($939D-$9442) ---
 label 939D bas_list_line
 label 93E7 bas_list_setup
+label 9417 bas_auto_check_range
 label 9442 bas_parse_linenum
+label 944B bas_jmp_chrget
 
 * --- PRINT USING ($9585-$9721) ---
 label 9585 bas_print_using
+label 9698 bas_using_advance_format
+label 9715 bas_using_format_sign
 
 * --- FOR / NEXT ($9722-$97EA) ---
 * (main for/next labels defined in dispatch table section above)
@@ -908,6 +923,7 @@ label 9A3F bas_resume_find_handler
 
 * --- SWAP ($9A63-$9AA0) ---
 label 9A7F bas_swap_copy_loop
+label 9A8C bas_swap_bytes_loop
 lcomment 9A63 SWAP statement: exchange two variables
 
 * --- DEF FN / DEF USR ($9AA1-$9C97) ---
@@ -916,6 +932,7 @@ label 9AD9 bas_def_parse_name
 label 9AEB bas_def_check_direct
 label 9AF5 bas_def_fn_body
 label 9B48 bas_def_fn_eval
+label 9B5F bas_def_fn_swap_input_ptr
 label 9C44 bas_defusr
 lcomment 9C44 DEF USR: set USR function address
 label 9C5E bas_parse_digit
@@ -923,12 +940,14 @@ lcomment 9C5E parse digit 0-9, return in B
 label 9C29 bas_varptr_fn
 lcomment 9C29 VARPTR function: return address of variable storage
 label 9C71 bas_var_lookup_typed
+label 9C8A bas_get_linenum_with_flags
 
 * --- RENUM ($9C98-$9EF0) ---
 lcomment 9C98 RENUM: renumber program lines
 label 9CA7 bas_renum_parse_args
 label 9CFC bas_renum_mem_check
 label 9D1D bas_renum_assign
+label 9D3D bas_renum_check_line_empty
 label 9D48 bas_renum_scan_refs
 label 9DA3 bas_renum_update_refs
 label 9E97 bas_renum_verify
@@ -939,7 +958,9 @@ lcomment 9F07 ERASE: remove array from variable table
 * --- READ / DATA ($9FF6-$A132) ---
 lcomment 9FF6 READ: read values from DATA statements
 label A00E bas_read_dispatch
+label A024 bas_read_data_start
 label A067 bas_read_data_scan
+label A0CB bas_read_scan_comma
 label A0E8 bas_read_array_init
 label A10E bas_read_finish
 
@@ -947,11 +968,14 @@ label A10E bas_read_finish
 label A13B bas_tokenize
 lcomment A13B tokenize BASIC text line into token stream
 label A14E bas_tokenize_loop
+label A1F8 bas_read_input_assign
+label A222 bas_tokenize_store_advance
 label A23E bas_tokenize_store
 label A248 bas_tokenize_special
 label A25B bas_detokenize_line
 label A267 bas_tokenize_string
 label A280 bas_tokenize_keyword
+label A2CA bas_tokenize_check_keyword
 label A30E bas_to_upper
 lcomment A30E convert lowercase to uppercase
 label A31E bas_ext_fn_dispatch
@@ -963,6 +987,7 @@ lcomment A36D look up handler in function table (M05AE) and JSR
 label A379 bas_exec_loop
 lcomment A379 main statement execution loop
 label A38E bas_exec_next
+label A3B0 bas_exec_check_break
 label A3BA bas_exec_dispatch
 label A3C3 bas_exec_keyword
 label A3E1 bas_exec_fn_call
@@ -971,6 +996,8 @@ label A3FF bas_exec_line_end
 * --- Variable assignment ($A412-$A4FE) ---
 label A412 bas_assign_init
 label A415 bas_assign_parse
+label A44D bas_assign_restore_stack
+label A471 bas_error_bad_file_number
 
 * --- LIST (token $A4) ---
 lcomment A4FF LIST statement
@@ -980,6 +1007,7 @@ label A50F file_setup_init
 lcomment A50F init file operation state (error_mode, device, CRC)
 label A522 file_parse_filename
 label A538 file_merge_check_mode
+label A541 file_list_setup
 label A57B file_check_device
 label A5BA file_setup_device_state
 label A5F0 io_close_all_devices
@@ -1025,6 +1053,12 @@ label A8AD io_eval_channel_byte
 label A8B0 io_check_channel_bounds
 label A8BA bas_pos_fn
 label A8D2 bas_input_fn
+label A925 bas_session_close_clear
+label A92B bas_break_check_and_scan
+label A951 bas_check_abort_rts
+label A9B8 bas_check_abort_flags
+label A9CE bas_check_init_and_resume
+label A9D6 bas_abort_check_entry
 
 * --- INKEY$ / TIME / DATE / DAY ($AA38-$ABB4) ---
 label AA38 bas_inkey_fn
@@ -1052,6 +1086,7 @@ label AC85 file_close_cleanup
 label ACA2 file_savem_range_check
 label ACDF file_eval_expr
 label ACE5 io_get_device_checked
+label ACEF io_jmp_check_result2
 label ACF2 io_parse_device_mode
 
 * --- LOADM ($AD01) / COPY ($AD72) / PRESET ($AD84) / LOADQ ($AE10) ---
@@ -1061,12 +1096,15 @@ lcomment AD84 PRESET statement
 
 * --- Device handler dispatch ($ADC8-$AE10) ---
 label AD9D io_update_flags
+label ADA4 io_jmp_check_result
 label ADC8 io_get_state
+label ADEE io_device_motor_update
 label AE03 io_write_control
 label AE05 io_call_handler
 
 * --- I/O device session helpers ($AE20-$AF5C) ---
 label AE50 io_close_device
+label AE62 io_clear_direct_and_call
 label AE95 io_read_next_byte
 
 * --- FILES ($AF5D) / MOTOR ($AF8C) ---
@@ -1839,6 +1877,7 @@ label EF26 sci_irq_restart
 * IRQ1 Multiplexer (EF2C-EFE8)
 * ============================================================
 label EF2C irq1_handler
+label EF42 irq1_timer_check
 label EF4C irq1_jmp_p14
 label EF4F irq1_pwsw_off
 label EF64 irq1_check_mode
@@ -1882,6 +1921,7 @@ label F33D printer_output_check
 label F35A printer_output_send
 label F371 p1_serial_read_byte
 label F398 printer_session_init
+label F3C4 lcdctl_write_trampoline
 label F3C7 printer_buf_read_block
 label F3EA printer_session_close
 label F3FA printer_seek
@@ -1906,7 +1946,10 @@ label F4E8 lcd_compute_row_col
 * ============================================================
 label F503 sio_lcdctl_setup
 label F50D sio_send_byte
+label F524 sio_wait_busy_lcdctl
+label F52C lcd_init
 label F53F sio_multi_send
+label F555 lcd_clear_screen
 
 * ============================================================
 * Timer / Keyboard (F580-FA6F)
