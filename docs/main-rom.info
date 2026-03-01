@@ -153,6 +153,7 @@ label 9B stack_limit_lo
 lcomment 9A stack limit for overflow check (STS/CPX)
 label 9C prog_start
 label 9E mem_size_ptr
+label 9F mem_size_ptr_lo
 lcomment 9E pointer to top of available memory
 label A2 var_start
 label A4 str_pool_start
@@ -160,6 +161,8 @@ lcomment A4 start of string pool (grows downward)
 label A6 str_pool_end
 lcomment A6 current end of string pool
 label A0 array_start
+label A5 str_pool_start_lo
+label A7 str_pool_end_lo
 lcomment A0 start of array storage area
 label A8 var_table_end
 label AA line_buf_ptr
@@ -180,6 +183,7 @@ lcomment BA FOR/NEXT nesting pointer
 label BC var_name_byte2
 lcomment BC second byte of variable name during lookup
 label BD var_ptr
+label BE var_ptr_lo
 lcomment BD pointer to current variable data
 label BF search_ptr
 label C0 search_ptr_lo
@@ -256,6 +260,7 @@ label F9 chrget_lo
 lcomment F8 print zone width
 label FA chrgot
 label FB input_ptr
+label FF disp_cmd_param
 
 * ============================================================
 * RAM Interrupt Vectors (JMP instructions at boot)
@@ -375,6 +380,7 @@ label 020B printer_write_ptr
 label 020D printer_read_ptr
 label 020F data_read_ptr
 label 0211 data_end_ptr
+label 0213 io_block_base_addr
 label 0217 io_type_code
 label 0219 io_context_ptr
 label 021B active_session_mask
@@ -407,8 +413,10 @@ lcomment 0280 monitor: saved A register / workspace byte
 label 0286 lcd_desc_table
 label 028E disp_esc_prefix
 label 0293 disp_cmd_buf
+label 0294 disp_cmd_param_byte
 label 02A0 mon_break_addr
 label 02A2 mon_break_saved_opcode
+label 02A3 mon_saved_reg_a
 label 02A4 mon_reg_mode_flag
 label 02A5 mon_io_ctrl_ptr
 label 02AF mon_io_start
@@ -989,6 +997,10 @@ label 0A2E gfx_last_y2
 label 0A34 bas_renum_flag
 label 0A40 io_work_buffer
 label 0F08 lcd_display_buffer
+label 1010 lcdctl_idle_mode
+label 2008 file_init_pattern
+label 2402 cas1_cmd_channel
+label 6404 cas0_cmd_channel
 label 84CB bas_ready_print
 * Token $AA: NEW
 label 85CD bas_new
@@ -1734,6 +1746,7 @@ lcomment C6D3 parse decimal number from string input
 label C2C0 bas_log_fn
 label C47C fp_shift_store_byte
 label C5C1 fp_negate_b_rts
+label C608 fp_compare_sign_mid
 label C646 fp_compare_sign
 label C6D2 fp_rts
 lcomment C2C0 LOG function: natural logarithm

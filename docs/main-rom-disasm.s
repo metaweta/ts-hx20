@@ -118,13 +118,13 @@ stack_limit EQU     $009A                    ; stack limit for overflow check (S
 stack_limit_lo EQU     $009B
 prog_start EQU     $009C
 mem_size_ptr EQU     $009E                    ; pointer to top of available memory
-M009F   EQU     $009F
+mem_size_ptr_lo EQU     $009F
 array_start EQU     $00A0                    ; start of array storage area
 var_start EQU     $00A2
 str_pool_start EQU     $00A4                    ; start of string pool (grows downward)
-M00A5   EQU     $00A5
+str_pool_start_lo EQU     $00A5
 str_pool_end EQU     $00A6                    ; current end of string pool
-M00A7   EQU     $00A7
+str_pool_end_lo EQU     $00A7
 var_table_end EQU     $00A8                    ; end of variable/array table
 line_buf_ptr EQU     $00AA
 line_num EQU     $00AC
@@ -139,7 +139,7 @@ auto_step EQU     $00B8                    ; AUTO mode step increment
 for_nest_ptr EQU     $00BA                    ; FOR/NEXT nesting pointer
 var_name_byte2 EQU     $00BC                    ; second byte of variable name during lookup
 var_ptr EQU     $00BD                    ; pointer to current variable data
-M00BE   EQU     $00BE
+var_ptr_lo EQU     $00BE
 search_ptr EQU     $00BF
 search_ptr_lo EQU     $00C0
 op_precedence EQU     $00C1
@@ -197,7 +197,7 @@ chrget_lo EQU     $00F9
 chrgot  EQU     $00FA
 input_ptr EQU     $00FB
 M00FC   EQU     $00FC
-M00FF   EQU     $00FF
+disp_cmd_param EQU     $00FF
 ram_sub_rtc EQU     $0100
 M0101   EQU     $0101
 M0102   EQU     $0102
@@ -287,7 +287,7 @@ printer_write_ptr EQU     $020B
 printer_read_ptr EQU     $020D
 data_read_ptr EQU     $020F
 data_end_ptr EQU     $0211
-M0213   EQU     $0213
+io_block_base_addr EQU     $0213
 M0215   EQU     $0215
 io_type_code EQU     $0217
 io_context_ptr EQU     $0219
@@ -311,10 +311,10 @@ mon_reg_save_a EQU     $0280                    ; monitor: saved A register / wo
 lcd_desc_table EQU     $0286
 disp_esc_prefix EQU     $028E
 disp_cmd_buf EQU     $0293
-M0294   EQU     $0294
+disp_cmd_param_byte EQU     $0294
 mon_break_addr EQU     $02A0
 mon_break_saved_opcode EQU     $02A2
-M02A3   EQU     $02A3
+mon_saved_reg_a EQU     $02A3
 mon_reg_mode_flag EQU     $02A4
 mon_io_ctrl_ptr EQU     $02A5
 M02A6   EQU     $02A6
@@ -555,7 +555,7 @@ M0E00   EQU     $0E00
 lcd_display_buffer EQU     $0F08
 M0F80   EQU     $0F80
 M1000   EQU     $1000
-M1010   EQU     $1010
+lcdctl_idle_mode EQU     $1010
 M103B   EQU     $103B
 M1303   EQU     $1303
 M1387   EQU     $1387
@@ -563,14 +563,14 @@ M1404   EQU     $1404
 M1792   EQU     $1792
 M2000   EQU     $2000
 M2001   EQU     $2001
-M2008   EQU     $2008
+file_init_pattern EQU     $2008
 M200A   EQU     $200A
 M200B   EQU     $200B
 M2010   EQU     $2010
 M2018   EQU     $2018
 M2040   EQU     $2040
 M2284   EQU     $2284
-M2402   EQU     $2402
+cas1_cmd_channel EQU     $2402
 M2509   EQU     $2509
 M2624   EQU     $2624
 M2710   EQU     $2710
@@ -601,7 +601,7 @@ M5C24   EQU     $5C24
 M6001   EQU     $6001
 M6004   EQU     $6004
 M610D   EQU     $610D
-M6404   EQU     $6404
+cas0_cmd_channel EQU     $6404
 M6804   EQU     $6804
 M6E6F   EQU     $6E6F
 M7100   EQU     $7100
@@ -1480,7 +1480,7 @@ bas_return: BNE     Z86FB                    ;86FC: 26 FD          '&.'
         CMPA    #$50                     ;8709: 81 50          '.P'
         BEQ     Z8718                    ;870B: 27 0B          ''.'
         LDAB    #$03                     ;870D: C6 03          '..'
-        CPX     #MC608                   ;870F: 8C C6 08       '...'
+        CPX     #fp_compare_sign_mid     ;870F: 8C C6 08       '...'
         JMP     bas_error_b              ;8712: 7E 84 33       '~.3'
 Z8715:  JMP     bas_syntax_error         ;8715: 7E 88 DF       '~..'
 Z8718:  PULA                             ;8718: 32             '2'
@@ -1605,13 +1605,13 @@ Z8802:  LDX     fac_man2                 ;8802: DE D7          '..'
         CMPA    str_pool_start           ;8809: 91 A4          '..'
         BCS     bas_exec_next            ;880B: 25 21          '%!'
         BNE     Z8813                    ;880D: 26 04          '&.'
-        CMPB    M00A5                    ;880F: D1 A5          '..'
+        CMPB    str_pool_start_lo        ;880F: D1 A5          '..'
         BLS     bas_exec_next            ;8811: 23 1B          '#.'
 Z8813:  LDAA    mem_size_ptr             ;8813: 96 9E          '..'
         CMPA    fac_man2                 ;8815: 91 D7          '..'
         BHI     bas_exec_next            ;8817: 22 15          '".'
         BCS     Z8821                    ;8819: 25 06          '%.'
-        LDAB    M009F                    ;881B: D6 9F          '..'
+        LDAB    mem_size_ptr_lo          ;881B: D6 9F          '..'
         CMPB    fac_man3                 ;881D: D1 D8          '..'
         BHI     bas_exec_next            ;881F: 22 0D          '".'
 Z8821:  LDAB    ,X                       ;8821: E6 00          '..'
@@ -2376,12 +2376,12 @@ str_space_alloc: CLR     >mon_option_mask         ;8E00: 7F 00 86       '...'   
 Z8E03:  PSHB                             ;8E03: 37             '7'
         COMB                             ;8E04: 53             'S'
         LDAA    #$FF                     ;8E05: 86 FF          '..'
-        ADCB    M00A7                    ;8E07: D9 A7          '..'
+        ADCB    str_pool_end_lo          ;8E07: D9 A7          '..'
         ADCA    str_pool_end             ;8E09: 99 A6          '..'
         CMPA    str_pool_start           ;8E0B: 91 A4          '..'
         BCS     Z8E1E                    ;8E0D: 25 0F          '%.'
         BHI     Z8E15                    ;8E0F: 22 04          '".'
-        CMPB    M00A5                    ;8E11: D1 A5          '..'
+        CMPB    str_pool_start_lo        ;8E11: D1 A5          '..'
         BCS     Z8E1E                    ;8E13: 25 09          '%.'
 Z8E15:  STD     str_pool_end             ;8E15: DD A6          '..'
         LDX     str_pool_end             ;8E17: DE A6          '..'
@@ -2463,7 +2463,7 @@ str_gc_check_range: LDAA    ,X                       ;8E97: A6 00          '..'
         BHI     str_gc_skip_3            ;8E9F: 22 18          '".'
         LDAB    $02,X                    ;8EA1: E6 02          '..'
         BCS     Z8EAB                    ;8EA3: 25 06          '%.'
-        CMPB    M00A7                    ;8EA5: D1 A7          '..'
+        CMPB    str_pool_end_lo          ;8EA5: D1 A7          '..'
         BEQ     Z8EAB                    ;8EA7: 27 02          ''.'
         BCC     str_gc_skip_3            ;8EA9: 24 0E          '$.'
 Z8EAB:  CMPA    end_ptr                  ;8EAB: 91 CA          '..'
@@ -3162,7 +3162,7 @@ Z9453:  JMP     >chrgot                  ;9453: 7E 00 FA       '~..'
 bas_defstr: LDAB    #$03                     ;9456: C6 03          '..'
         CPX     #fp_compare_fac_x        ;9458: 8C C6 02       '...'
         CPX     #MC604                   ;945B: 8C C6 04       '...'
-        CPX     #MC608                   ;945E: 8C C6 08       '...'
+        CPX     #fp_compare_sign_mid     ;945E: 8C C6 08       '...'
         PSHB                             ;9461: 37             '7'
 Z9462:  JSR     bas_is_alpha             ;9462: BD 8A FE       '...'
         BCS     bas_jmp_syntax_error     ;9465: 25 D7          '%.'
@@ -4016,7 +4016,7 @@ Z9B14:  JSR     bas_var_lookup           ;9B14: BD 8B 07       '...'
         LDX     #M9B47                   ;9B41: CE 9B 47       '..G'
         JMP     LINBUF+$2E               ;9B44: 7E C0 AE       '~..'
 M9B47:  PULA                             ;9B47: 32             '2'
-bas_def_fn_eval: LDAB    M00BE                    ;9B48: D6 BE          '..'
+bas_def_fn_eval: LDAB    var_ptr_lo               ;9B48: D6 BE          '..'
         PSHB                             ;9B4A: 37             '7'
         LDAB    var_ptr                  ;9B4B: D6 BD          '..'
         PSHB                             ;9B4D: 37             '7'
@@ -4493,7 +4493,7 @@ Z9EE8:  TSTB                             ;9EE8: 5D             ']'
 M9EFB:  ORAA    #$9D                     ;9EFB: 8A 9D          '..'
         ORAB    ptr_temp                 ;9EFD: DA 8F          '..'
         EORA    #$A4                     ;9EFF: 88 A4          '..'
-        LDS     M009F                    ;9F01: 9E 9F          '..'
+        LDS     mem_size_ptr_lo          ;9F01: 9E 9F          '..'
         ADDA    var_ptr                  ;9F03: 9B BD          '..'
         EORA    #$D3                     ;9F05: 88 D3          '..'
 bas_erase: LDAA    #$01                     ;9F07: 86 01          '..'    ERASE: remove array from variable table
@@ -7264,7 +7264,7 @@ ZB659:  LDD     io_device_desc_buf       ;B659: FC 08 EA       '...'
         ADDB    io_device_desc_buf       ;B66A: FB 08 EA       '...'
         ADCA    #$00                     ;B66D: 89 00          '..'
         BEQ     ZB674                    ;B66F: 27 03          ''.'
-        LDD     #M00FF                   ;B671: CC 00 FF       '...'
+        LDD     #disp_cmd_param          ;B671: CC 00 FF       '...'
 ZB674:  STAB    M0759                    ;B674: F7 07 59       '..Y'
         ADDD    #line_input_buf          ;B677: C3 07 57       '..W'
         PSHB                             ;B67A: 37             '7'
@@ -7760,7 +7760,7 @@ ZBAA8:  PULX                             ;BAA8: 38             '8'
 ZBAAC:  LDX     prog_area_ptr            ;BAAC: FE 04 B5       '...'
         INX                              ;BAAF: 08             '.'
         INX                              ;BAB0: 08             '.'
-        LDD     #M2008                   ;BAB1: CC 20 08       '. .'
+        LDD     #file_init_pattern       ;BAB1: CC 20 08       '. .'
 ZBAB4:  STAA    ,X                       ;BAB4: A7 00          '..'
         INX                              ;BAB6: 08             '.'
         DECB                             ;BAB7: 5A             'Z'
@@ -8079,7 +8079,7 @@ ZBD52:  LDD     #ICR_L                   ;BD52: CC 00 0E       '...'
         STD     ,X                       ;BD55: ED 00          '..'
         INX                              ;BD57: 08             '.'
         INX                              ;BD58: 08             '.'
-        LDD     #M2008                   ;BD59: CC 20 08       '. .'
+        LDD     #file_init_pattern       ;BD59: CC 20 08       '. .'
 ZBD5C:  STAA    ,X                       ;BD5C: A7 00          '..'
         INX                              ;BD5E: 08             '.'
         DECB                             ;BD5F: 5A             'Z'
@@ -9118,7 +9118,7 @@ MC5F7:  LDAA    fp_temp                  ;C5F7: 96 EB          '..'
 fp_compare_fac_x: LDAB    ,X                       ;C602: E6 00          '..'    compare FAC with FP at X (load exp, compare)
 MC604:  BEQ     fp_test_fac_zero         ;C604: 27 AF          ''.'
         LDAB    $01,X                    ;C606: E6 01          '..'
-MC608:  EORB    fac_sign                 ;C608: D8 DD          '..'
+fp_compare_sign_mid: EORB    fac_sign                 ;C608: D8 DD          '..'
         BMI     fp_get_fac_sign          ;C60A: 2B AD          '+.'
 fp_compare_exp_mem: LDAB    fac_exp                  ;C60C: D6 D5          '..'    compare FAC exponent with value at X
         CMPB    ,X                       ;C60E: E1 00          '..'
@@ -9695,7 +9695,7 @@ ZCAA2:  CLRA                             ;CAA2: 4F             'O'
         LDX     #using_decimal_pos       ;CAA5: CE 04 BC       '...'
 ZCAA8:  INX                              ;CAA8: 08             '.'
         STX     ptr_temp                 ;CAA9: DF 8F          '..'
-        LDAA    M00BE                    ;CAAB: 96 BE          '..'
+        LDAA    var_ptr_lo               ;CAAB: 96 BE          '..'
         SUBA    ptr_temp_lo              ;CAAD: 90 90          '..'
         SUBA    using_format_pos         ;CAAF: B0 04 EC       '...'
         BEQ     ZCA65                    ;CAB2: 27 B1          ''.'
@@ -10757,7 +10757,7 @@ mon_save_sp_show_regs: STS     mon_saved_sp             ;D347: BF 02 BF       '.
         JSR     mon_show_all_regs        ;D34A: BD D6 71       '..q'
         BRA     mon_cmd_prompt           ;D34D: 20 24          ' $'
 mon_save_system_state: LDAA    mon_reg_save_a           ;D34F: B6 02 80       '...'
-        STAA    M02A3                    ;D352: B7 02 A3       '...'
+        STAA    mon_saved_reg_a          ;D352: B7 02 A3       '...'
         LDAA    system_mode              ;D355: 96 7B          '.{'
         STAA    mon_saved_system_mode    ;D357: B7 02 C5       '...'
         OIM     #$40,system_mode         ;D35A: 72 40 7B       'r@{'
@@ -10879,7 +10879,7 @@ mon_restore_and_rti: LDAA    mon_saved_system_mode    ;D41C: B6 02 C5       '...
         TSTB                             ;D432: 5D             ']'
         BNE     ZD441                    ;D433: 26 0C          '&.'
 mon_cleanup_display: JSR     mon_clear_status_line    ;D435: BD D7 23       '..#'
-        LDAA    M02A3                    ;D438: B6 02 A3       '...'
+        LDAA    mon_saved_reg_a          ;D438: B6 02 A3       '...'
         STAA    mon_reg_save_a           ;D43B: B7 02 80       '...'
         JSR     api_restore_display      ;D43E: BD DF EE       '...'
 ZD441:  RTI                              ;D441: 3B             ';'
@@ -11359,10 +11359,10 @@ ZD7FC:  PULX                             ;D7FC: 38             '8'
         BRA     ZD7C3                    ;D7FD: 20 C4          ' .'
 disp_cmd_wrapper: LDAB    #$92                     ;D7FF: C6 92          '..'
         STAB    disp_cmd_buf             ;D801: F7 02 93       '...'
-        STAA    M0294                    ;D804: B7 02 94       '...'
+        STAA    disp_cmd_param_byte      ;D804: B7 02 94       '...'
         LDX     #disp_cmd_buf            ;D807: CE 02 93       '...'
         JSR     disp_cmd_dispatch        ;D80A: BD D7 B0       '...'
-        LDX     M0294                    ;D80D: FE 02 94       '...'
+        LDX     disp_cmd_param_byte      ;D80D: FE 02 94       '...'
         RTS                              ;D810: 39             '9'
         FCB     $85,$00,$86,$00,$87,$03  ;D811: 85 00 86 00 87 03 '......'
         FCB     $88,$00,$89,$00,$C0,$01  ;D817: 88 00 89 00 C0 01 '......'
@@ -12330,7 +12330,7 @@ MDFAC:  FCB     $00,$D8                  ;DFAC: 00 D8          '..'
         NEG     $FF,X                    ;DFEB: 60 FF          '`.'
         STX     M7EDE                    ;DFED: FF 7E DE       '.~.'
         CMPB    dip_switches             ;DFF0: D1 7E          '.~'
-        STAB    M00FF                    ;DFF2: D7 FF          '..'
+        STAB    disp_cmd_param           ;DFF2: D7 FF          '..'
 api_disp_dispatch: JMP     disp_cmd_dispatch        ;DFF4: 7E D7 B0       '~..'
 api_mon_cmd_end: JMP     mon_cmd_table_end        ;DFF7: 7E D7 7E       '~.~'
 api_mon_enter_trap: JMP     mon_enter_from_trap      ;DFFA: 7E D3 10       '~..'
@@ -13178,13 +13178,13 @@ save_cas0_init: STX     io_desc_ptr              ;E690: DF 58          '.X'    C
         JSR     save_setup_7c            ;E697: BD EB 54       '..T'
         BEQ     ZE69D                    ;E69A: 27 01          ''.'
         RTS                              ;E69C: 39             '9'
-ZE69D:  LDD     #M6404                   ;E69D: CC 64 04       '.d.'
+ZE69D:  LDD     #cas0_cmd_channel        ;E69D: CC 64 04       '.d.'
         LDX     #cb_cas0                 ;E6A0: CE 01 EC       '...'
         BRA     save_cas_common          ;E6A3: 20 0D          ' .'
 save_cas1_init: STX     io_desc_ptr              ;E6A5: DF 58          '.X'    CAS1: SAVE init: buf=$02D0, cmd=$24, ch=$02, ctrl=cb_cas1
         LDD     #cas1_tape_buffer        ;E6A7: CC 02 D0       '...'
         STD     tape_buf_base            ;E6AA: DD 5A          '.Z'
-        LDD     #M2402                   ;E6AC: CC 24 02       '.$.'
+        LDD     #cas1_cmd_channel        ;E6AC: CC 24 02       '.$.'
         LDX     #cb_cas1                 ;E6AF: CE 01 D5       '...'
 save_cas_common: STAA    slave_cmd                ;E6B2: 97 53          '.S'    common SAVE init: build tape header (HD/R1/HX-2/filename/date)
         STAB    device_channel           ;E6B4: D7 57          '.W'
@@ -13366,12 +13366,12 @@ ZE80D:  JMP     xfer_finish              ;E80D: 7E EA B9       '~..'
 cas0_write_char: PSHX                             ;E810: 3C             '<'     CAS0: buffered write, auto-flush when full
         LDX     #cb_cas0                 ;E811: CE 01 EC       '...'
         PSHA                             ;E814: 36             '6'
-        LDD     #M6404                   ;E815: CC 64 04       '.d.'
+        LDD     #cas0_cmd_channel        ;E815: CC 64 04       '.d.'
         BRA     cas_write_common         ;E818: 20 08          ' .'
 cas1_write_char: PSHX                             ;E81A: 3C             '<'     CAS1: buffered write, auto-flush when full
         LDX     #cb_cas1                 ;E81B: CE 01 D5       '...'
         PSHA                             ;E81E: 36             '6'
-        LDD     #M2402                   ;E81F: CC 24 02       '.$.'
+        LDD     #cas1_cmd_channel        ;E81F: CC 24 02       '.$.'
 cas_write_common: STAB    device_channel           ;E822: D7 57          '.W'    common write: verify mode, check errors, store byte, advance
         STAA    slave_cmd                ;E824: 97 53          '.S'
         STX     ctrl_block_ptr           ;E826: DF 54          '.T'
@@ -13412,12 +13412,12 @@ ZE85C:  PULA                             ;E85C: 32             '2'
 cas0_close_write: LDX     #cas0_tape_buffer        ;E85F: CE 03 24       '..$'   CAS0: close SAVE: flush + EOF + $7B+$77 cleanup
         STX     tape_buf_base            ;E862: DF 5A          '.Z'
         LDX     #cb_cas0                 ;E864: CE 01 EC       '...'
-        LDD     #M6404                   ;E867: CC 64 04       '.d.'
+        LDD     #cas0_cmd_channel        ;E867: CC 64 04       '.d.'
         BRA     cas_close_common         ;E86A: 20 0B          ' .'
 cas1_close_write: LDX     #cas1_tape_buffer        ;E86C: CE 02 D0       '...'   CAS1: close SAVE: flush + EOF + close transact
         STX     tape_buf_base            ;E86F: DF 5A          '.Z'
         LDX     #cb_cas1                 ;E871: CE 01 D5       '...'
-        LDD     #M2402                   ;E874: CC 24 02       '.$.'
+        LDD     #cas1_cmd_channel        ;E874: CC 24 02       '.$.'
 cas_close_common: STX     ctrl_block_ptr           ;E877: DF 54          '.T'
         STAA    slave_cmd                ;E879: 97 53          '.S'
         STAB    device_channel           ;E87B: D7 57          '.W'
@@ -14041,7 +14041,7 @@ ZED50:  STAB    io_op_code               ;ED50: D7 5E          '.^'
         STAB    checksum_accum           ;ED54: D7 5F          '._'
         BSR     io_write_byte_cksum      ;ED56: 8D 21          '.!'
         LDD     data_read_ptr            ;ED58: FC 02 0F       '...'
-        ADDD    M0213                    ;ED5B: F3 02 13       '...'
+        ADDD    io_block_base_addr       ;ED5B: F3 02 13       '...'
         STAB    disp_line_count          ;ED5E: D7 5D          '.]'
         BSR     io_write_byte_cksum      ;ED60: 8D 17          '..'
         LDAA    disp_line_count          ;ED62: 96 5D          '.]'
@@ -14080,7 +14080,7 @@ io_read_block: CLRB                             ;ED91: 5F             '_'     re
         BSR     io_read_byte_cksum       ;ED9C: 8D 38          '.8'
         TAB                              ;ED9E: 16             '.'
         LDAA    disp_line_count          ;ED9F: 96 5D          '.]'
-        ADDD    M0213                    ;EDA1: F3 02 13       '...'
+        ADDD    io_block_base_addr       ;EDA1: F3 02 13       '...'
         XGDX                             ;EDA4: 18             '.'
         LDAA    io_op_code               ;EDA5: 96 5E          '.^'
         BEQ     io_call_flush            ;EDA7: 27 C6          ''.'
@@ -15153,7 +15153,7 @@ ZF5B6:  JSR     kbd_debounce_edges       ;F5B6: BD F7 6D       '..m'
         LDX     #kbd_modifier_flags      ;F5BA: CE 01 69       '..i'
         AIM     #$7F,$00,X               ;F5BD: 61 7F 00       'a..'
         JSR     kbd_copy_cur_to_prev     ;F5C0: BD F7 AD       '...'
-        LDD     #M1010                   ;F5C3: CC 10 10       '...'
+        LDD     #lcdctl_idle_mode        ;F5C3: CC 10 10       '...'
         JSR     lcdctl_write             ;F5C6: BD E3 14       '...'
         RTI                              ;F5C9: 3B             ';'
 ocf_key_pressed: JSR     kbd_debounce_edges       ;F5CA: BD F7 6D       '..m'   key pressed: identify col/row, compute scancode
@@ -15603,7 +15603,7 @@ kbd_timer_init: LDX     #kbd_vec_init            ;F963: CE 01 20       '.. '   i
         JSR     kbd_matrix_scan          ;F99B: BD F7 06       '...'
         JSR     kbd_copy_cur_to_prev     ;F99E: BD F7 AD       '...'
         JSR     kbd_debounce_init        ;F9A1: BD F7 69       '..i'
-        LDD     #M1010                   ;F9A4: CC 10 10       '...'
+        LDD     #lcdctl_idle_mode        ;F9A4: CC 10 10       '...'
         JMP     lcdctl_write             ;F9A7: 7E E3 14       '~..'
 kbd_check_buffer: LDAA    kbd_buf_count            ;F9AA: B6 01 68       '..h'
         SEC                              ;F9AD: 0D             '.'
