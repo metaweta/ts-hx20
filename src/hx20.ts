@@ -43,10 +43,15 @@ export class HX20 {
   private casCtrlTimer = 0;        // Slave cycles until P46 returns to HIGH
   private casCtrlBitCount = 0;     // Bit counter for bit-bang receive
   private casCtrlData = 0;         // Accumulated command byte
-  private casCtrlLastP44 = false;  // P44 state for rising-edge detection
+  private casCtrlLastP44 = true;   // P44 state for rising-edge detection (init HIGH so first AIM #$E3 can arm)
   private casCtrlArmed = false;    // true after AIM #$E3 clears P42/P43/P44 (bit-bang start)
   private casCtrlMotorOn = false;  // Motor running (after 0x81 record command)
   private extMotorOn = false;      // External cassette motor (P30, active low)
+  // MI1 (microcassette index) signal simulation: toggles while CAS0 motor runs.
+  // Period of 21845 cycles gives exactly 3 toggles per 65536-cycle TOF period (odd),
+  // ensuring the debounce handler (EF85) always sees a state change.
+  private mi1Phase = false;
+  private mi1Counter = 0;
 
   // Running state
   running = false;
@@ -72,6 +77,8 @@ export class HX20 {
     this.keyboard = new Keyboard();
     this.rtc = new MC146818();
     this.cas0 = new Cassette('hx20-tapes-cas0', 'CAS0');
+    this.cas0.autoRewindAfterSave = false;  // CAS0 has position counter UI (ctrl-PF1)
+    this.cas0.invertPlayback = true;  // Cassette mechanism inverts signal between P21 write and P20 read
     this.cas1 = new Cassette('hx20-tapes-cas1', 'CAS1');
 
     this.wireMainCPU();
@@ -149,9 +156,16 @@ export class HX20 {
 
     // Port 1 read: various status inputs
     cpu.onReadPort1 = (): number => {
-      let val = 0x98; // defaults: bit 4 (PWA)=1, bit 3 (INT_EX)=1
-      // Bit 7: cartridge MI1 (1 = microcassette present)
-      val |= 0x80;
+      let val = 0x18; // defaults: bit 4 (PWA)=1, bit 3 (INT_EX)=1
+      // Bit 7: MI1 — microcassette index signal
+      // Toggles while CAS0 motor runs (simulates tape motion past sensor).
+      // The debounce handler (EF85) monitors P17: if unchanged for 9 TOF periods
+      // (~590K cycles), it sends 0x7D abort. Toggling prevents this false abort.
+      if (this.casCtrlMotorOn) {
+        if (this.mi1Phase) val |= 0x80;
+      } else {
+        val |= 0x80; // Motor off: high (cassette present, not moving)
+      }
       // Bit 5: keyboard request (active low: 0 = request pending)
       if (!this.keyboard.irqPending) val |= 0x20;
       // Bit 2: slave flag (slave P34 → master P12)
@@ -206,7 +220,7 @@ export class HX20 {
     cpu.onReadPort2 = (): number => {
       let val = 0xE0; // mode pins (P25-P27)
       val |= 0x08; // Bit 3: SCI RX line (high idle)
-      val |= 0x01; // Bit 0: cassette mechanism ready (checked by ROM before cassette ops)
+      if (this.cas0.readLevel) val |= 0x01; // Bit 0: P20 — CAS0 tape FSK input
       return val;
     };
 
@@ -266,16 +280,29 @@ export class HX20 {
       const p44 = !!(val & 0x10);
 
       // The bit-bang routine (FBFA) starts each iteration with AIM #$E3, $07
-      // which clears P42, P43, P44 simultaneously. Detect this pattern to
-      // distinguish real bit-bang clocks from other P44 writes (e.g. OIM #$30).
-      if ((val & 0x1C) === 0) {
-        // P42/P43/P44 all low — this is the AIM #$E3 pattern
+      // which clears P42, P43, P44 simultaneously from a state where P44 was HIGH.
+      // Detect this specific P44 HIGH→LOW transition with P42/P43 also clearing.
+      // Without the P44-was-HIGH check, non-bit-bang writes (e.g. cmd_50's AIM #$F3
+      // when P44 is already LOW) would spuriously arm the detector, causing the next
+      // P44 rising edge to count a phantom bit and cascade-corrupt all subsequent
+      // bit-bang commands.
+      //
+      // IMPORTANT: casCtrlLastP44 is ONLY updated inside the arming/counting code
+      // paths (not on every PORT4 write). This prevents AIM #$EF during P46 polling
+      // (which clears P44 but keeps P42 set) from corrupting the arming state.
+      // Without this, cas_ctrl_stop's fall-through to cas_ctrl_cmd (which sends a
+      // phantom 0x00 reset) would lose its first bit — the 7 remaining bits would
+      // merge with the next real command, producing corrupt command bytes.
+      if ((val & 0x1C) === 0 && this.casCtrlLastP44) {
+        // P44 HIGH→LOW with P42/P43 also LOW — this is the AIM #$E3 pattern
         this.casCtrlArmed = true;
+        this.casCtrlLastP44 = false;
       }
 
       // Only count P44 rising edges that follow the AIM #$E3 clear pattern
       if (p44 && !this.casCtrlLastP44 && this.casCtrlArmed) {
         this.casCtrlArmed = false;
+        this.casCtrlLastP44 = true;
         const dataBit = (val >> 3) & 1;
         this.casCtrlData = (this.casCtrlData << 1) | dataBit;
         this.casCtrlBitCount++;
@@ -295,7 +322,6 @@ export class HX20 {
           this.casCtrlData = 0;
         }
       }
-      this.casCtrlLastP44 = p44;
     };
   }
 
@@ -318,13 +344,13 @@ export class HX20 {
           this.cas0.setMotor(false);
         }
         break;
-      case 0x81: // Record
+      case 0x01: // Play (for LOAD — sent at FE62)
         this.casCtrlMotorOn = true;
         this.cas0.setMotor(true);
         break;
-      case 0x82: // Play (for LOAD)
+      case 0x81: // Record (for SAVE — sent at FD15)
         this.casCtrlMotorOn = true;
-        this.cas0.setMotor(true);
+        this.cas0.setMotor(true, true);  // recordMode: suppress playback
         break;
       case 0x84: // Fast forward
         this.casCtrlMotorOn = true;
@@ -464,10 +490,12 @@ export class HX20 {
     this.casCtrlTimer = 0;
     this.casCtrlBitCount = 0;
     this.casCtrlData = 0;
-    this.casCtrlLastP44 = false;
+    this.casCtrlLastP44 = true;  // Init HIGH so first AIM #$E3 can arm
     this.casCtrlArmed = false;
     this.casCtrlMotorOn = false;
     this.extMotorOn = false;
+    this.mi1Phase = false;
+    this.mi1Counter = 0;
 
     this.lcd.reset();
     this.keyboard.reset();
@@ -511,13 +539,46 @@ export class HX20 {
           console.log(`[MASTER] EF1A: Sending cleanup cmd=0x${this.mainCPU.A.toString(16).padStart(2,'0')} via E403`);
         } else if (mPC === 0xE4F5) {
           console.log(`[MASTER] E4F5: Enabling RIE (IRQ-driven data transfer starts)`);
+        } else if (mPC === 0xEF85) {
+          const counter = this.mainRAM[0x0206 - 0x0100];
+          const lastCmd = this.mainRAM[0x0205 - 0x0100];
+          const ss = this.mainCPU.saveState();
+          console.log(`[MASTER] EF85: p17_debounce_handler entry — counter=$${counter.toString(16)} lastCmd=$${lastCmd.toString(16)} TCSR=$${(ss.tcsr as number).toString(16).padStart(2,'0')} (TOF=${((ss.tcsr as number)>>5)&1} ETOI=${((ss.tcsr as number)>>2)&1}) mi1Phase=${this.mi1Phase} mi1Counter=${this.mi1Counter} motorOn=${this.casCtrlMotorOn}`);
+        } else if (mPC === 0xEFD4) {
+          console.log(`[MASTER] EFD4: SENDING 0x7D+0x77 via sci_two_byte!`);
+        } else if (mPC === 0xEFE5) {
+          const counter = this.mainRAM[0x0206 - 0x0100];
+          console.log(`[MASTER] EFE5: p17_rearm — counter=$${counter.toString(16)}`);
+        } else if (mPC === 0xEB0A) {
+          console.log(`[MASTER] EB0A: set_timer_vec_ef85 called`);
+        } else if (mPC === 0xE7D4) {
+          const counter = this.mainRAM[0x0206 - 0x0100];
+          const ss = this.mainCPU.saveState();
+          console.log(`[MASTER] E7D4: Enable ETOI — counter=$${counter.toString(16)} TCSR=$${(ss.tcsr as number).toString(16).padStart(2,'0')} (TOF=${((ss.tcsr as number)>>5)&1})`);
         }
       }
-      mainCycles += this.mainCPU.step();
+      const mc = this.mainCPU.step();
+      mainCycles += mc;
+
+      // Advance MI1 (microcassette index) counter while CAS0 motor runs
+      if (this.casCtrlMotorOn) {
+        this.mi1Counter += mc;
+        if (this.mi1Counter >= 21845) {
+          this.mi1Counter -= 21845;
+          this.mi1Phase = !this.mi1Phase;
+        }
+      }
 
       // Run slave CPU to keep in sync with main
       if (this.slaveROM) {
         while (slaveCycles < mainCycles) {
+          // CAS1: auto-rewind on LOAD entry (no position counter UI)
+          // CAS0: does NOT auto-rewind — user controls position via ctrl-PF1/PF1-5
+          if (this.slaveCPU.PC === 0xF773) {
+            if (this.cas1.motorOn) this.cas1.setMotor(false);
+            this.cas1.rewind();
+          }
+
           // Diagnostic breakpoints for SAVE debugging (only when sciDebug is on)
           if (this.sciDebug) {
             const sPC = this.slaveCPU.PC;
@@ -608,7 +669,91 @@ export class HX20 {
               console.log(`[SAVE] Slave at FDE1 — cleanup path`);
             }
 
-            // --- LOAD diagnostic breakpoints ---
+            // --- CAS0 LOAD diagnostic breakpoints ---
+            if (sPC === 0xFE55) {
+              // CAS0 LOAD handler entry (cas0_load mode)
+              const ram = this.slaveCPU.readRAM;
+              console.log(`[CAS0-LOAD] FE55: CAS0 LOAD handler entry, mode=$81=0x${ram(0x81).toString(16).padStart(2,'0')}`);
+              console.log(`[CAS0-LOAD] FSK timing: $A6/${(ram(0xA6)<<8|ram(0xA7)).toString(16)} ` +
+                `$A8/${(ram(0xA8)<<8|ram(0xA9)).toString(16)} ` +
+                `$AA/${(ram(0xAA)<<8|ram(0xAB)).toString(16)} ` +
+                `$AC/${(ram(0xAC)<<8|ram(0xAD)).toString(16)}`);
+              console.log(`[CAS0-LOAD] fsk_flags=$A5=0x${ram(0xA5).toString(16).padStart(2,'0')}`);
+              (this as any)._cas0LoadStart = this.slaveCPU.totalCycles;
+              (this as any)._cas0LoadBytes = 0;
+              (this as any)._cas0LeaderRestarts = 0;
+              this.cas0.dumpTapeStats();
+            } else if (sPC === 0xFEA1) {
+              // CAS0 leader search (re)start — only log first + every 500th to avoid console flood
+              const restarts = ((this as any)._cas0LeaderRestarts || 0) + 1;
+              (this as any)._cas0LeaderRestarts = restarts;
+              if (restarts === 1 || restarts % 500 === 0) {
+                const elapsed = this.slaveCPU.totalCycles - ((this as any)._cas0LoadStart || 0);
+                const ss = this.slaveCPU.saveState();
+                const tcsr = ss.tcsr as number;
+                const ram = this.slaveCPU.readRAM;
+                console.log(`[CAS0-LOAD] FEA1: Leader search restart #${restarts}, elapsed=${elapsed} ` +
+                  `IEDG=${(tcsr & 0x02) ? '1(rising)' : '0(falling)'} TCSR=0x${tcsr.toString(16).padStart(2,'0')} ` +
+                  `fsk_flags=0x${ram(0xA5).toString(16).padStart(2,'0')} ` +
+                  `P20=${this.cas0.readLevel ? 'HIGH' : 'LOW'} ` +
+                  `playIdx=${Math.floor((this.cas0 as any).playIdx/2)}/${Math.floor((this.cas0 as any).playData.length/2)}`);
+              }
+            } else if (sPC === 0xFEC6) {
+              // CAS0 leader count reached 0 — entering sync phase
+              const elapsed = this.slaveCPU.totalCycles - ((this as any)._cas0LoadStart || 0);
+              const ss = this.slaveCPU.saveState();
+              console.log(`[CAS0-LOAD] FEC6: Leader found! 40 short periods counted. ` +
+                `elapsed=${elapsed} (${(elapsed/614400).toFixed(2)}s) ` +
+                `restarts=${(this as any)._cas0LeaderRestarts || 0} ` +
+                `ICR=0x${(ss.icr as number).toString(16)} FRC=0x${(ss.frc as number).toString(16)} ` +
+                `playIdx=${Math.floor((this.cas0 as any).playIdx/2)}/${Math.floor((this.cas0 as any).playData.length/2)}`);
+            } else if (sPC === 0xFEE7) {
+              // CAS0 sync: long period found, decode 7-bit byte (should be $FF)
+              console.log(`[CAS0-LOAD] FEE7: Sync — long period detected, decoding 7-bit byte (expect $FF)`);
+            } else if (sPC === 0xFEEC) {
+              // After cas0_fsk_decode_7 returns: A = decoded byte, about to INCA
+              console.log(`[CAS0-LOAD] FEEC: 7-bit decode result A=0x${this.slaveCPU.A.toString(16).padStart(2,'0')} ` +
+                `(need $FF, INCA→0x${((this.slaveCPU.A + 1) & 0xFF).toString(16).padStart(2,'0')})`);
+            } else if (sPC === 0xFEEF) {
+              // Sync: now decode 8-bit byte (should be $AA)
+              console.log(`[CAS0-LOAD] FEEF: Decoding 8-bit sync marker (expect $AA)`);
+            } else if (sPC === 0xFEF4) {
+              // After decode_8: A = decoded byte, about to EORA #$AA
+              console.log(`[CAS0-LOAD] FEF4: 8-bit decode result A=0x${this.slaveCPU.A.toString(16).padStart(2,'0')} ` +
+                `(need $AA, XOR=0x${(this.slaveCPU.A ^ 0xAA).toString(16).padStart(2,'0')})`);
+            } else if (sPC === 0xFEFD) {
+              // Sync verified, decoding first data byte
+              const elapsed = this.slaveCPU.totalCycles - ((this as any)._cas0LoadStart || 0);
+              console.log(`[CAS0-LOAD] FEFD: Sync matched! Decoding first data byte. ` +
+                `elapsed=${elapsed} (${(elapsed/614400).toFixed(2)}s) ` +
+                `X=${this.slaveCPU.X} (byte count)`);
+            } else if (sPC === 0xFF92) {
+              // CAS0 FSK decode entry (cas0_fsk_decode_8)
+              const n = ((this as any)._cas0LoadBytes || 0);
+              (this as any)._cas0LoadBytes = n + 1;
+              if (n < 20 || n % 50 === 0) {
+                const ss = this.slaveCPU.saveState();
+                console.log(`[CAS0-LOAD] FF92: FSK decode byte #${n}, ` +
+                  `ICR=0x${(ss.icr as number).toString(16)} ` +
+                  `TCSR=0x${(ss.tcsr as number).toString(16)}`);
+              }
+            } else if (sPC === 0xFF3B) {
+              // Block complete (send 0x62)
+              const elapsed = this.slaveCPU.totalCycles - ((this as any)._cas0LoadStart || 0);
+              console.log(`[CAS0-LOAD] FF3B: Block complete! ${(this as any)._cas0LoadBytes} bytes decoded, ` +
+                `elapsed=${elapsed} (${(elapsed/614400).toFixed(2)}s)`);
+            } else if (sPC === 0xFF4F) {
+              // Timeout error
+              console.log(`[CAS0-LOAD] FF4F: Timeout error (OCF)`);
+            } else if (sPC === 0xFF4A) {
+              // CRC error
+              console.log(`[CAS0-LOAD] FF4A: CRC error`);
+            } else if (sPC === 0xFF57) {
+              // No tape error
+              console.log(`[CAS0-LOAD] FF57: No tape / motor stopped error`);
+            }
+
+            // --- CAS1 LOAD diagnostic breakpoints ---
             if (sPC === 0xF773) {
               // LOAD handler entry
               const ram = this.slaveCPU.readRAM;
@@ -713,6 +858,7 @@ export class HX20 {
           const sc = this.slaveCPU.step();
           slaveCycles += sc;
           this.cas0.advance(sc);
+          this.slaveCPU.setP20Input(this.cas0.readLevel);  // Inversion handled inside Cassette.advance()
           this.cas1.advance(sc);
           this.advanceCasCtrlTimer(sc);
         }
@@ -753,10 +899,23 @@ export class HX20 {
   }
 
   stepOne(): void {
-    this.mainCPU.step();
+    const mc = this.mainCPU.step();
+    if (this.casCtrlMotorOn) {
+      this.mi1Counter += mc;
+      if (this.mi1Counter >= 21845) {
+        this.mi1Counter -= 21845;
+        this.mi1Phase = !this.mi1Phase;
+      }
+    }
     if (this.slaveROM) {
+      // CAS1: auto-rewind on LOAD entry (no position counter UI)
+      if (this.slaveCPU.PC === 0xF773) {
+        if (this.cas1.motorOn) this.cas1.setMotor(false);
+        this.cas1.rewind();
+      }
       const sc = this.slaveCPU.step();
       this.cas0.advance(sc);
+      this.slaveCPU.setP20Input(this.cas0.readLevel);  // Inversion handled inside Cassette.advance()
       this.cas1.advance(sc);
       this.advanceCasCtrlTimer(sc);
     }

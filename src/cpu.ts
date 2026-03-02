@@ -38,11 +38,17 @@ export class HD6301 {
   private rdr = 0;
   private tdr = 0;
   private ramcr = 0x40;
-  private tcsrRead = false;
+  // TCSR two-step flag clearing: bitmask of flags armed for clearing
+  // After reading TCSR with a flag set, the appropriate second step clears it:
+  //   ICF (bit 7): read ICR_H    OCF (bit 6): write OCR_L    TOF (bit 5): read FRC_H
+  private tcsrArmed = 0;
 
   // SCI serial receive buffer and RDRF two-step clearing
   private sciRecvBuf: number[] = [];
   private rdrfClearStep = 0;
+
+  // Input capture: P20 level tracking for edge detection
+  private lastP20 = true;  // P20 input level (default high = idle)
 
   // SCI TX timing: TDRE stays clear for sciTxTimer cycles after TDR write,
   // modeling the real ~160-cycle transmission time at 38400 baud.
@@ -84,14 +90,15 @@ export class HD6301 {
   // Receive a serial byte (models real SCI shift register + RDR double buffering)
   // Real SCI has: shift register (1 byte receiving) + RDR (1 byte ready to read)
   // sciRecvBuf models the shift register (max 1 byte).
-  // Overrun occurs when shift register already has a pending byte.
+  // Overrun occurs when shift register has a pending byte OR RDR hasn't been read (RDRF set).
+  // On real hardware: shift register completes while RDRF set → ORFE, new byte lost.
   serialRecv(data: number): void {
-    if (this.sciRecvBuf.length > 0) {
-      // Shift register already full — overrun, new byte lost
+    if (this.sciRecvBuf.length > 0 || (this.trcsr & 0x80)) {
+      // Shift register full or RDR unread — overrun, new byte lost
       this.trcsr |= 0x40; // Set ORFE (bit 6)
       console.warn(`${this.name}: SCI OVERRUN (ORFE) at PC=0x${this.PC.toString(16).padStart(4,'0')}, ` +
         `lost byte=0x${(data & 0xFF).toString(16).padStart(2,'0')}, ` +
-        `pending=0x${this.sciRecvBuf[0].toString(16).padStart(2,'0')}`);
+        `reason=${this.sciRecvBuf.length > 0 ? 'shift_reg_full(0x' + this.sciRecvBuf[0].toString(16) + ')' : 'RDRF_set'}`);
     } else {
       this.sciRecvBuf.push(data & 0xFF);
     }
@@ -163,13 +170,17 @@ export class HD6301 {
       case 0x05: return this.p4ddr;
       case 0x06: return (this.p3out & this.p3ddr) | (this.onReadPort3() & ~this.p3ddr);
       case 0x07: return (this.p4out & this.p4ddr) | (this.onReadPort4() & ~this.p4ddr);
-      case 0x08: this.tcsrRead = true; return this.tcsr;
-      case 0x09: this.frcLatch = this.frc; return (this.frc >> 8) & 0xFF;
+      case 0x08: this.tcsrArmed = this.tcsr & 0xE0; return this.tcsr;
+      case 0x09:
+        if (this.tcsrArmed & 0x20) {
+          this.tcsr &= ~0x20; this.tcsrArmed &= ~0x20;
+        } // Clear TOF
+        this.frcLatch = this.frc; return (this.frc >> 8) & 0xFF;
       case 0x0A: return this.frcLatch & 0xFF;
       case 0x0B: return (this.ocr >> 8) & 0xFF;
       case 0x0C: return this.ocr & 0xFF;
       case 0x0D:
-        if (this.tcsrRead) { this.tcsr &= ~0x80; this.tcsrRead = false; }
+        if (this.tcsrArmed & 0x80) { this.tcsr &= ~0x80; this.tcsrArmed &= ~0x80; } // Clear ICF
         return (this.icr >> 8) & 0xFF;
       case 0x0E: return this.icr & 0xFF;
       case 0x0F: return this.p3csr;
@@ -211,7 +222,7 @@ export class HD6301 {
       case 0x0B: this.ocrH = val; break;
       case 0x0C:
         this.ocr = (this.ocrH << 8) | val;
-        if (this.tcsrRead) { this.tcsr &= ~0x40; this.tcsrRead = false; }
+        if (this.tcsrArmed & 0x40) { this.tcsr &= ~0x40; this.tcsrArmed &= ~0x40; } // Clear OCF
         break;
       case 0x0F: this.p3csr = val; break;
       case 0x10: this.rmcr = val & 0x0F; break;
@@ -647,6 +658,19 @@ export class HD6301 {
   setNMI(state: boolean): void {
     if (!this.nmiLine && state) this.nmiPending = true;
     this.nmiLine = state;
+  }
+
+  /** Update P20 input level for input capture edge detection.
+   *  When an edge matching IEDG polarity is detected, captures FRC→ICR and sets ICF. */
+  setP20Input(level: boolean): void {
+    if (level === this.lastP20) return;
+    const iedg = this.tcsr & 0x02;  // IEDG bit: 1=rising, 0=falling
+    const rising = level && !this.lastP20;
+    if ((iedg && rising) || (!iedg && !rising)) {
+      this.icr = this.frc;    // Capture FRC value
+      this.tcsr |= 0x80;      // Set ICF
+    }
+    this.lastP20 = level;
   }
 
   // --- Step ---
@@ -1128,12 +1152,13 @@ export class HD6301 {
       tcsr: this.tcsr, frc: this.frc, frcLatch: this.frcLatch,
       ocr: this.ocr, ocrH: this.ocrH, icr: this.icr,
       p3csr: this.p3csr, rmcr: this.rmcr, trcsr: this.trcsr,
-      rdr: this.rdr, tdr: this.tdr, ramcr: this.ramcr, tcsrRead: this.tcsrRead,
+      rdr: this.rdr, tdr: this.tdr, ramcr: this.ramcr, tcsrArmed: this.tcsrArmed,
       sciRecvBuf: this.sciRecvBuf.slice(),
       rdrfClearStep: this.rdrfClearStep,
       sciTxTimer: this.sciTxTimer,
       sciTxPending: this.sciTxPending,
       sciTxByte: this.sciTxByte,
+      lastP20: this.lastP20,
       ram: btoa(String.fromCharCode(...this.ram)),
     };
   }
@@ -1156,12 +1181,14 @@ export class HD6301 {
     this.icr = s.icr as number; this.p3csr = s.p3csr as number;
     this.rmcr = s.rmcr as number; this.trcsr = s.trcsr as number;
     this.rdr = s.rdr as number; this.tdr = s.tdr as number;
-    this.ramcr = s.ramcr as number; this.tcsrRead = s.tcsrRead as boolean;
+    this.ramcr = s.ramcr as number;
+    this.tcsrArmed = (s.tcsrArmed as number) ?? (s.tcsrRead ? (this.tcsr & 0xE0) : 0);
     this.sciRecvBuf = (s.sciRecvBuf as number[]).slice();
     this.rdrfClearStep = s.rdrfClearStep as number;
     this.sciTxTimer = (s.sciTxTimer as number) || 0;
     this.sciTxPending = (s.sciTxPending as boolean) || false;
     this.sciTxByte = (s.sciTxByte as number) || 0;
+    this.lastP20 = (s.lastP20 as boolean) ?? true;
     const ramStr = atob(s.ram as string);
     for (let i = 0; i < ramStr.length; i++) this.ram[i] = ramStr.charCodeAt(i);
   }

@@ -43,6 +43,12 @@ export class Cassette {
   private storageKey: string;
   private label: string;
 
+  // Auto-rewind after SAVE completes (CAS1 yes, CAS0 no — has position counter UI)
+  autoRewindAfterSave = true;
+
+  // Invert playback levels (CAS0: cassette mechanism inverts signal between P21 write and P20 read)
+  invertPlayback = false;
+
   // Callbacks
   onLibraryChange: () => void = () => {};
   onMotorChange: (on: boolean) => void = () => {};
@@ -65,7 +71,8 @@ export class Cassette {
       // Advance playback index to current cycle position
       while (this.playIdx + 1 < this.playData.length) {
         if (this.playData[this.playIdx] > this.playCycles) break;
-        const newLevel = this.playData[this.playIdx + 1] !== 0;
+        let newLevel = this.playData[this.playIdx + 1] !== 0;
+        if (this.invertPlayback) newLevel = !newLevel;
         if (newLevel !== this.readLevel) {
           this.playTransitions++;
         }
@@ -174,9 +181,14 @@ export class Cassette {
     this.p33Transitions++;
   }
 
-  /** Motor control — called when slave CPU drives P30 or P42 */
-  setMotor(on: boolean): void {
-    if (on === this.motorOn) return;
+  /** Motor control — called when slave CPU drives P30 or P42
+   *  recordMode: true for SAVE (cmd 0x81) — suppresses playback readLevel updates
+   *  since the real cassette mechanism disables the read amplifier during record */
+  setMotor(on: boolean, recordMode = false): void {
+    if (on === this.motorOn) {
+      console.log(`[${this.label}] setMotor(${on}) — already ${on ? 'ON' : 'OFF'}, skipping`);
+      return;
+    }
     this.motorOn = on;
 
     if (on) {
@@ -186,7 +198,14 @@ export class Cassette {
       this.lastP21Level = false;
       this.lastP33Level = false;
 
-      if (this.currentTape && this.library.has(this.currentTape)) {
+      if (recordMode) {
+        // Record mode: don't start playback (read amplifier is disabled on real hardware)
+        this.playing = false;
+        this.readLevel = true;
+        this.recData = [];
+        this.recCycles = 0;
+        console.log(`[${this.label}] Motor ON (record mode)`);
+      } else if (this.currentTape && this.library.has(this.currentTape)) {
         // Start playback on P32 (for LOAD), restoring saved position
         const existing = this.library.get(this.currentTape)!;
         this.playing = true;
@@ -227,6 +246,14 @@ export class Cassette {
         }
         this.saveToStorage();
         this.onLibraryChange();
+        if (this.autoRewindAfterSave) {
+          // Auto-rewind after recording so next LOAD starts from beginning
+          this.savedPlayIdx = 0;
+          this.savedPlayCycles = 0;
+          console.log(`[${this.label}] Recording saved, auto-rewound for LOAD`);
+        } else {
+          console.log(`[${this.label}] Recording saved (no auto-rewind)`);
+        }
       }
       this.recording = false;
       this.playing = false;
