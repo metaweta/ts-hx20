@@ -6,6 +6,7 @@ import { LCDDisplay } from './lcd';
 import { Keyboard } from './keyboard';
 import { MC146818 } from './rtc';
 import { Cassette } from './cassette';
+import { MicrocassetteDrive } from './microcassette-drive';
 import { loadIntelHexIntoBuffer, loadBinaryIntoBuffer } from './rom-loader';
 
 export class HX20 {
@@ -36,22 +37,16 @@ export class HX20 {
   private ksc = 0;           // keyboard scan column
   private rtcIrq = false;
 
-  // Cassette controller state (emulates the cassette mechanism controller IC)
-  // The slave CPU bit-bangs commands via P43 (data) and P44 (clock)
-  // The controller responds on P46 (LOW = acknowledged)
-  private casCtrlP46 = true;       // P46 status: HIGH=idle, LOW=acknowledged
-  private casCtrlTimer = 0;        // Slave cycles until P46 returns to HIGH
+  // Microcassette drive mechanism (CAS0: internal)
+  drive = new MicrocassetteDrive();
+  // Bit-bang decode state (P43=data, P44=clock → 8-bit command)
   private casCtrlBitCount = 0;     // Bit counter for bit-bang receive
   private casCtrlData = 0;         // Accumulated command byte
   private casCtrlLastP44 = true;   // P44 state for rising-edge detection (init HIGH so first AIM #$E3 can arm)
   private casCtrlArmed = false;    // true after AIM #$E3 clears P42/P43/P44 (bit-bang start)
-  private casCtrlMotorOn = false;  // Motor running (after 0x81 record command)
   private extMotorOn = false;      // External cassette motor (P30, active low)
-  // MI1 (microcassette index) signal simulation: toggles while CAS0 motor runs.
-  // Period of 21845 cycles gives exactly 3 toggles per 65536-cycle TOF period (odd),
-  // ensuring the debounce handler (EF85) always sees a state change.
-  private mi1Phase = false;
-  private mi1Counter = 0;
+  // Current P44 output level — tracked for P46 mux at read time
+  private p44Level = true;
 
   // Running state
   running = false;
@@ -80,6 +75,15 @@ export class HX20 {
     this.cas0.autoRewindAfterSave = false;  // CAS0 has position counter UI (ctrl-PF1)
     this.cas0.invertPlayback = true;  // Cassette mechanism inverts signal between P21 write and P20 read
     this.cas1 = new Cassette('hx20-tapes-cas1', 'CAS1');
+
+    // Wire microcassette drive callbacks to CAS0 cassette
+    this.drive.onMotorChange = (on, rec) => {
+      if (on) this.cas0.setMotor(true, rec);
+      else this.cas0.setMotor(false);
+    };
+    this.drive.onRewind = () => this.cas0.rewind();
+    this.drive.onFastForward = () => this.cas0.fastForward();
+    this.drive.onPositionAdjust = (d) => this.cas0.adjustPosition(d);
 
     this.wireMainCPU();
     this.wireSlaveCPU();
@@ -161,11 +165,7 @@ export class HX20 {
       // Toggles while CAS0 motor runs (simulates tape motion past sensor).
       // The debounce handler (EF85) monitors P17: if unchanged for 9 TOF periods
       // (~590K cycles), it sends 0x7D abort. Toggling prevents this false abort.
-      if (this.casCtrlMotorOn) {
-        if (this.mi1Phase) val |= 0x80;
-      } else {
-        val |= 0x80; // Motor off: high (cassette present, not moving)
-      }
+      if (this.drive.getMI1()) val |= 0x80;
       // Bit 5: keyboard request (active low: 0 = request pending)
       if (!this.keyboard.irqPending) val |= 0x20;
       // Bit 2: slave flag (slave P34 → master P12)
@@ -265,11 +265,11 @@ export class HX20 {
     // Port 4: cassette power/command, RS-232 select
     cpu.onReadPort4 = (): number => {
       // P40 (bit 0): tape running indicator (1 = motor on and tape moving)
-      // P46 (bit 6): cassette controller status (LOW = command acknowledged)
+      // P46 (bit 6): multiplexed by P44 — CNT (P44 LOW) or HSW (P44 HIGH)
       // P47 (bit 7): CD (carrier detect) — HIGH = no carrier
       let val = 0x80; // P47 high (no carrier)
-      if (this.casCtrlMotorOn || this.extMotorOn) val |= 0x01;   // P40: tape running (either motor)
-      if (this.casCtrlP46) val |= 0x40;        // P46: HIGH = idle
+      if (this.drive.getP40() || this.extMotorOn) val |= 0x01;   // P40: tape running (either motor)
+      if (this.drive.getP46(this.p44Level)) val |= 0x40;         // P46: multiplexed output
       return val;
     };
     cpu.onWritePort4 = (val: number): void => {
@@ -278,6 +278,7 @@ export class HX20 {
       // P44 (bit 4): cassette controller clock (bit-bang serial)
       // P45 (bit 5): cassette/RS-232 select
       const p44 = !!(val & 0x10);
+      this.p44Level = p44;  // Track for P46 mux at read time
 
       // The bit-bang routine (FBFA) starts each iteration with AIM #$E3, $07
       // which clears P42, P43, P44 simultaneously from a state where P44 was HIGH.
@@ -317,7 +318,7 @@ export class HX20 {
           if (this.sciDebug) {
             console.log(`[CAS] Controller cmd: 0x${cmd.toString(16).padStart(2,'0')} sPC=${this.slaveCPU.PC.toString(16)}`);
           }
-          this.processCasCtrlCommand(cmd);
+          this.drive.processCommand(cmd);
           this.casCtrlBitCount = 0;
           this.casCtrlData = 0;
         }
@@ -325,57 +326,6 @@ export class HX20 {
     };
   }
 
-  /** Process a complete command byte received by the cassette controller IC */
-  private processCasCtrlCommand(cmd: number): void {
-    // Pull P46 LOW to acknowledge receipt
-    this.casCtrlP46 = false;
-
-    // Timer: how long P46 stays LOW before returning to HIGH (idle).
-    // The ROM's retry loop checks P46 every ~614 cycles (1ms OCF) and needs
-    // 4 consecutive matches. Use 5000 cycles (~8ms) so the first check succeeds,
-    // and the retry mechanism handles edge cases.
-    this.casCtrlTimer = 5000;
-
-    switch (cmd) {
-      case 0x00: // Stop
-      case 0x18: // Stop (alternate)
-        if (this.casCtrlMotorOn) {
-          this.casCtrlMotorOn = false;
-          this.cas0.setMotor(false);
-        }
-        break;
-      case 0x01: // Play (for LOAD — sent at FE62)
-        this.casCtrlMotorOn = true;
-        this.cas0.setMotor(true);
-        break;
-      case 0x81: // Record (for SAVE — sent at FD15)
-        this.casCtrlMotorOn = true;
-        this.cas0.setMotor(true, true);  // recordMode: suppress playback
-        break;
-      case 0x84: // Fast forward
-        this.casCtrlMotorOn = true;
-        this.cas0.fastForward();
-        break;
-      case 0x88: // Rewind
-        this.casCtrlMotorOn = true;
-        this.cas0.rewind();
-        break;
-      default:
-        // Unknown command — still acknowledge
-        break;
-    }
-  }
-
-  /** Advance cassette controller timer (called each slave CPU step) */
-  advanceCasCtrlTimer(cycles: number): void {
-    if (this.casCtrlTimer > 0) {
-      this.casCtrlTimer -= cycles;
-      if (this.casCtrlTimer <= 0) {
-        this.casCtrlTimer = 0;
-        this.casCtrlP46 = true; // Return P46 to HIGH (idle)
-      }
-    }
-  }
 
   // Debug: set to true to log SCI traffic
   sciDebug = false;
@@ -486,16 +436,13 @@ export class HX20 {
     this.rtcIrq = false;
 
     // Reset cassette controller state
-    this.casCtrlP46 = true;
-    this.casCtrlTimer = 0;
+    this.drive.reset();
     this.casCtrlBitCount = 0;
     this.casCtrlData = 0;
     this.casCtrlLastP44 = true;  // Init HIGH so first AIM #$E3 can arm
     this.casCtrlArmed = false;
-    this.casCtrlMotorOn = false;
     this.extMotorOn = false;
-    this.mi1Phase = false;
-    this.mi1Counter = 0;
+    this.p44Level = true;
 
     this.lcd.reset();
     this.keyboard.reset();
@@ -543,7 +490,7 @@ export class HX20 {
           const counter = this.mainRAM[0x0206 - 0x0100];
           const lastCmd = this.mainRAM[0x0205 - 0x0100];
           const ss = this.mainCPU.saveState();
-          console.log(`[MASTER] EF85: p17_debounce_handler entry — counter=$${counter.toString(16)} lastCmd=$${lastCmd.toString(16)} TCSR=$${(ss.tcsr as number).toString(16).padStart(2,'0')} (TOF=${((ss.tcsr as number)>>5)&1} ETOI=${((ss.tcsr as number)>>2)&1}) mi1Phase=${this.mi1Phase} mi1Counter=${this.mi1Counter} motorOn=${this.casCtrlMotorOn}`);
+          console.log(`[MASTER] EF85: p17_debounce_handler entry — counter=$${counter.toString(16)} lastCmd=$${lastCmd.toString(16)} TCSR=$${(ss.tcsr as number).toString(16).padStart(2,'0')} (TOF=${((ss.tcsr as number)>>5)&1} ETOI=${((ss.tcsr as number)>>2)&1}) mi1=${this.drive.getMI1()} motorOn=${this.drive.getP40()}`);
         } else if (mPC === 0xEFD4) {
           console.log(`[MASTER] EFD4: SENDING 0x7D+0x77 via sci_two_byte!`);
         } else if (mPC === 0xEFE5) {
@@ -559,15 +506,6 @@ export class HX20 {
       }
       const mc = this.mainCPU.step();
       mainCycles += mc;
-
-      // Advance MI1 (microcassette index) counter while CAS0 motor runs
-      if (this.casCtrlMotorOn) {
-        this.mi1Counter += mc;
-        if (this.mi1Counter >= 21845) {
-          this.mi1Counter -= 21845;
-          this.mi1Phase = !this.mi1Phase;
-        }
-      }
 
       // Run slave CPU to keep in sync with main
       if (this.slaveROM) {
@@ -860,7 +798,7 @@ export class HX20 {
           this.cas0.advance(sc);
           this.slaveCPU.setP20Input(this.cas0.readLevel);  // Inversion handled inside Cassette.advance()
           this.cas1.advance(sc);
-          this.advanceCasCtrlTimer(sc);
+          this.drive.advance(sc);
         }
       }
     }
@@ -899,14 +837,7 @@ export class HX20 {
   }
 
   stepOne(): void {
-    const mc = this.mainCPU.step();
-    if (this.casCtrlMotorOn) {
-      this.mi1Counter += mc;
-      if (this.mi1Counter >= 21845) {
-        this.mi1Counter -= 21845;
-        this.mi1Phase = !this.mi1Phase;
-      }
-    }
+    this.mainCPU.step();
     if (this.slaveROM) {
       // CAS1: auto-rewind on LOAD entry (no position counter UI)
       if (this.slaveCPU.PC === 0xF773) {
@@ -917,7 +848,7 @@ export class HX20 {
       this.cas0.advance(sc);
       this.slaveCPU.setP20Input(this.cas0.readLevel);  // Inversion handled inside Cassette.advance()
       this.cas1.advance(sc);
-      this.advanceCasCtrlTimer(sc);
+      this.drive.advance(sc);
     }
     this.lcd.render();
     this.onRegistersUpdate(this.mainCPU.dumpRegisters());
