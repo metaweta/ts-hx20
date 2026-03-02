@@ -175,13 +175,16 @@ export class MicrocassetteDrive {
 
   /** Get P46 output, multiplexed by P44 level
    *  P44 LOW: CNT (count pulses) — toggles while motor runs
-   *  P44 HIGH: HSW (head switch) — LOW when head engaged */
+   *  P44 HIGH: HSW (head switch) — LOW during ack, HIGH otherwise */
   getP46(p44High: boolean): boolean {
     if (p44High) {
-      // HSW channel: ack pulse and head switch status
-      // During ack: LOW (acknowledge). After ack: LOW = head engaged, HIGH = head off.
-      if (this.ackActive) return false;
-      return !this.headEngaged;
+      // HSW channel: reflects command ack only.
+      // LOW during ack pulse (cas_ctrl_check/FC31 reads this right after motor cmd).
+      // HIGH when idle (cas_ctrl_init/FC2D expects this before/between blocks).
+      // We don't model continuous head engagement on HSW because the ROM's
+      // multi-block SAVE calls FC2D between blocks without stopping the motor,
+      // expecting P46 = HIGH even though the head was previously engaged.
+      return !this.ackActive;
     } else {
       // CNT channel: count pulses only — ack does NOT appear here
       // (P44 mux physically separates HSW and CNT on the cable set)
