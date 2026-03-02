@@ -302,6 +302,18 @@ export class Cassette {
     }
   }
 
+  /** Adjust tape position by delta entries (positive = forward, negative = rewind).
+   *  Used by emulator transport controls for continuous FF/REW. */
+  adjustPosition(delta: number): void {
+    if (!this.currentTape || !this.library.has(this.currentTape)) return;
+    const data = this.library.get(this.currentTape)!;
+    if (data.length < 2) return;
+    // Move by delta pairs (each entry is 2 elements: cycle + level)
+    const newIdx = Math.max(0, Math.min(this.savedPlayIdx + delta * 2, data.length));
+    this.savedPlayIdx = newIdx;
+    this.savedPlayCycles = newIdx >= 2 ? data[newIdx - 2] : 0;
+  }
+
   ejectTape(): void {
     this.currentTape = null;
   }
