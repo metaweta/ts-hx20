@@ -17,7 +17,15 @@
         <input type="file" id="rom-file-input" multiple accept=".hex,.bin,.rom" style="display:none">
         <label id="speed-label">Speed: <span id="speed-display">1x</span></label>
         <input type="range" id="speed-slider" min="1" max="10" value="1">
-
+        <button id="btn-paste" title="Paste text from clipboard">PASTE</button>
+        <label id="ram-label">RAM:
+          <select id="ram-select" title="RAM expansion (requires reset)">
+            <option value="0">16KB</option>
+            <option value="1">32KB</option>
+            <option value="4">64KB</option>
+            <option value="8">128KB</option>
+          </select>
+        </label>
       </div>
     </div>
 

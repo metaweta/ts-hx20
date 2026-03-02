@@ -28,6 +28,7 @@ const btnLoadRom = document.getElementById('btn-load-rom')!;
 const romFileInput = document.getElementById('rom-file-input') as HTMLInputElement;
 const speedSlider = document.getElementById('speed-slider') as HTMLInputElement;
 const speedDisplay = document.getElementById('speed-display')!;
+const ramSelect = document.getElementById('ram-select') as HTMLSelectElement;
 
 // Cassette panel elements are wired below via wireCassettePanel()
 
@@ -51,8 +52,30 @@ hx20.onRegistersUpdate = (text: string) => {
 // Keyboard input from physical keyboard
 document.addEventListener('keydown', (e) => {
   if (e.target instanceof HTMLInputElement) return;
+  // Let Cmd/Ctrl+V pass through so the browser paste event fires
+  if (e.metaKey) return;
+  if (e.ctrlKey && e.code === 'KeyV') return;
+  // Escape cancels an in-progress paste
+  if (e.code === 'Escape' && hx20.keyboard.isPasting) {
+    hx20.keyboard.cancelPaste();
+    statusText.textContent = 'Paste cancelled';
+    e.preventDefault();
+    return;
+  }
   hx20.keyboard.keyDown(e.code, e.key);
   e.preventDefault();
+});
+
+// Paste: Cmd+V / Ctrl+V feeds clipboard text into the keyboard matrix
+document.addEventListener('paste', (e) => {
+  if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+  e.preventDefault();
+  const text = e.clipboardData?.getData('text');
+  if (text) {
+    hx20.keyboard.typeText(text);
+    statusText.textContent = `Pasting ${text.length} chars...`;
+    hx20.keyboard.onPasteFinish = () => { statusText.textContent = 'Paste complete'; };
+  }
 });
 
 document.addEventListener('keyup', (e) => {
@@ -162,6 +185,48 @@ speedSlider.addEventListener('input', () => {
   const val = parseInt(speedSlider.value);
   hx20.speedMultiplier = val;
   speedDisplay.textContent = `${val}x`;
+});
+
+// --- Paste button ---
+const btnPaste = document.getElementById('btn-paste')!;
+btnPaste.addEventListener('click', async () => {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (text) {
+      hx20.keyboard.typeText(text);
+      statusText.textContent = `Pasting ${text.length} chars...`;
+      hx20.keyboard.onPasteFinish = () => { statusText.textContent = 'Paste complete'; };
+    }
+  } catch {
+    statusText.textContent = 'Clipboard access denied — use Cmd+V instead';
+  }
+});
+
+// --- RAM expansion ---
+const RAM_STORAGE_KEY = 'hx20-ram-banks';
+
+function applyRAMConfig(): void {
+  const banks = parseInt(ramSelect.value, 10) || 0;
+  hx20.setExpansionRAM(banks);
+}
+
+// Restore saved RAM config
+const savedBanks = localStorage.getItem(RAM_STORAGE_KEY);
+if (savedBanks && ramSelect.querySelector(`option[value="${savedBanks}"]`)) {
+  ramSelect.value = savedBanks;
+}
+applyRAMConfig();
+
+ramSelect.addEventListener('change', () => {
+  localStorage.setItem(RAM_STORAGE_KEY, ramSelect.value);
+  applyRAMConfig();
+  if (hx20.isROMLoaded()) {
+    hx20.stop();
+    hx20.reset();
+    hx20.start();
+    startAutoSave();
+    statusText.textContent = `RAM: ${ramSelect.options[ramSelect.selectedIndex].text} — Reset`;
+  }
 });
 
 // --- Cassette UI ---

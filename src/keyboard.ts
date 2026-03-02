@@ -131,17 +131,15 @@ const CODE_MAP: Record<string, KeyMapping> = {
   'ControlLeft': { col: 6, row: 9 },
   'ControlRight': { col: 6, row: 9 },
 
-  // Function keys
-  'F1': { col: 0, row: 8 },
-  'F2': { col: 1, row: 8 },
-  'F3': { col: 2, row: 8 },
-  'F4': { col: 3, row: 8 },
-  'F5': { col: 4, row: 8 },
-
-  // Extra mappings
-  'F10': { col: 6, row: 5 },  // NUM
-  'F11': { col: 6, row: 6 },  // GRPH
-  'F12': { col: 7, row: 1 },  // SCRN
+  // Virtual keyboard only (no physical F-key bindings)
+  'HX_PF1': { col: 0, row: 8 },
+  'HX_PF2': { col: 1, row: 8 },
+  'HX_PF3': { col: 2, row: 8 },
+  'HX_PF4': { col: 3, row: 8 },
+  'HX_PF5': { col: 4, row: 8 },
+  'HX_Num': { col: 6, row: 5 },   // NUM
+  'HX_Grph': { col: 6, row: 6 },  // GRPH
+  'HX_Scrn': { col: 7, row: 1 },  // SCRN
 
   // Physical key positions (digits) — used by virtual keyboard
   'Digit0': { col: 0, row: 0 },
@@ -184,6 +182,44 @@ const CODE_MAP: Record<string, KeyMapping> = {
   'Space': { col: 6, row: 1 },
 };
 
+// GRPH character map: HX-20 byte value (0x80-0x9F) → matrix position.
+// From the HX-20 user manual. GRPH key (col 6, row 6) must be held simultaneously.
+// GRPH+digits produce 0xE0-0xE9, not listed here (those are above 0x9F).
+const GRPH_MAP: Record<number, { col: number; row: number }> = {
+  0x80: { col: 4, row: 3 }, // GRPH+S
+  0x81: { col: 5, row: 0 }, // GRPH+X
+  0x82: { col: 4, row: 7 }, // GRPH+W
+  0x83: { col: 2, row: 4 }, // GRPH+D
+  0x84: { col: 2, row: 1 }, // GRPH+A
+  0x85: { col: 4, row: 4 }, // GRPH+T
+  0x86: { col: 4, row: 2 }, // GRPH+R
+  0x87: { col: 4, row: 1 }, // GRPH+Q
+  0x88: { col: 2, row: 5 }, // GRPH+E
+  0x89: { col: 5, row: 2 }, // GRPH+Z
+  0x8A: { col: 2, row: 3 }, // GRPH+C
+  0x8B: { col: 3, row: 2 }, // GRPH+J
+  0x8C: { col: 2, row: 6 }, // GRPH+F
+  0x8D: { col: 2, row: 7 }, // GRPH+G
+  0x8E: { col: 3, row: 0 }, // GRPH+H
+  0x8F: { col: 5, row: 1 }, // GRPH+Y
+  0x90: { col: 4, row: 5 }, // GRPH+U
+  0x91: { col: 3, row: 1 }, // GRPH+I
+  0x92: { col: 3, row: 7 }, // GRPH+O
+  0x93: { col: 4, row: 0 }, // GRPH+P
+  0x94: { col: 2, row: 0 }, // GRPH+@
+  0x95: { col: 3, row: 3 }, // GRPH+K
+  0x96: { col: 4, row: 6 }, // GRPH+V
+  0x97: { col: 1, row: 4 }, // GRPH+,
+  0x98: { col: 3, row: 5 }, // GRPH+M
+  0x99: { col: 3, row: 6 }, // GRPH+N
+  0x9A: { col: 2, row: 2 }, // GRPH+B
+  0x9B: { col: 1, row: 3 }, // GRPH+;
+  0x9C: { col: 1, row: 6 }, // GRPH+.
+  0x9D: { col: 1, row: 2 }, // GRPH+:
+  0x9E: { col: 1, row: 7 }, // GRPH+/
+  0x9F: { col: 3, row: 4 }, // GRPH+L
+};
+
 export class Keyboard {
   // 8 columns x 10 rows, active low (0xFF = no keys pressed)
   private matrix: Uint8Array = new Uint8Array(8);
@@ -196,6 +232,10 @@ export class Keyboard {
   // Keyboard interrupt latch: set when key state changes, cleared by KRTN read
   private irqLatch = false;
 
+  // Track firmware CAPS state for paste shift-inversion.
+  // HX-20 defaults to CAPS ON: unshifted=uppercase, shifted=lowercase.
+  private capsLockOn = true;
+
   constructor() {
     this.reset();
   }
@@ -204,6 +244,7 @@ export class Keyboard {
     this.matrix.fill(0xFF);
     this.kbrequest = false;
     this.irqLatch = false;
+    this.capsLockOn = true;
   }
 
   // Read keyboard return lines for given column selection
@@ -289,7 +330,8 @@ export class Keyboard {
   }
 
   // Process PC keyboard events (key = e.key, code = e.code)
-  keyDown(code: string, key?: string): void {
+  // virtual=true for on-screen keyboard buttons (PF keys are sticky toggles)
+  keyDown(code: string, key?: string, virtual = false): void {
     const k = key ?? code;
 
     // ArrowUp = Shift + LEFT, ArrowDown = Shift + RIGHT
@@ -306,6 +348,9 @@ export class Keyboard {
     // Modifier keys
     if (code === 'ShiftLeft' || code === 'ShiftRight') { this.isShiftPressed = true; this.kbrequest = true; this.irqLatch = true; return; }
     if (code === 'ControlLeft' || code === 'ControlRight') { this.isCtrlPressed = true; this.kbrequest = true; this.irqLatch = true; return; }
+
+    // Track CAPS state (firmware toggle) for paste shift-inversion
+    if (code === 'CapsLock') this.capsLockOn = !this.capsLockOn;
 
     const mapping = this.resolve(k, code);
     if (!mapping) return;
@@ -327,6 +372,17 @@ export class Keyboard {
       this.kbrequest = true;
       this.irqLatch = true;
     } else if (mapping.row === 8) {
+      // CTRL+PF1: toggle Manual Microcassette Mode
+      if (this.isCtrlPressed && code === 'HX_PF1') {
+        this.setMMCM(!this.mmcmActive);
+        return;  // setMMCM sends CTRL+PF1 / PF5 pulse to ROM
+      }
+      // PF5 in MMCM: exit (also sends PF5 pulse to ROM)
+      if (this.mmcmActive && code === 'HX_PF5') {
+        this.setMMCM(false);
+        return;
+      }
+      // All PF keys: pass to ROM keyboard matrix (same in normal and MMCM mode)
       this.row8State[mapping.col] = true;
       this.kbrequest = true;
       this.irqLatch = true;
@@ -371,8 +427,58 @@ export class Keyboard {
   // Sticky modifier state for on-screen keyboard
   private stickyCtrl = false;
   private stickyShift = false;
+  private stickyGrph = false;
   private stickyCtrlBtn: HTMLElement | null = null;
   private stickyShiftBtns: HTMLElement[] = [];
+  private stickyGrphBtn: HTMLElement | null = null;
+
+  // --- Manual Microcassette Mode (MMCM) ---
+  // Entered via CTRL+PF1. Swaps PF button labels to show transport functions:
+  // PF1=FF, PF2=PLAY, PF3=STOP, PF4=REW, PF5=EXIT.
+  // All PF keys are momentary pulses — the ROM handles motor engagement/disengagement.
+  // CTRL+PF1 sends the keystroke to the ROM which enters its own cassette control mode.
+  mmcmActive = false;
+  private pfButtons = new Map<string, HTMLElement>();  // PF button refs for label swap
+
+  private static readonly MMCM_LABELS: Record<string, string> = {
+    'HX_PF1': 'FF', 'HX_PF2': 'PLAY', 'HX_PF3': 'STOP', 'HX_PF4': 'REW', 'HX_PF5': 'EXIT'
+  };
+
+  private setMMCM(active: boolean): void {
+    const debug = (globalThis as any).hx20?.sciDebug;
+    this.mmcmActive = active;
+    // Update virtual keyboard button labels
+    for (const [code, btn] of this.pfButtons) {
+      if (active) {
+        if (!btn.dataset.originalLabel) {
+          btn.dataset.originalLabel = btn.textContent || '';
+        }
+        btn.textContent = Keyboard.MMCM_LABELS[code] || btn.textContent;
+      } else {
+        btn.textContent = btn.dataset.originalLabel || btn.textContent;
+      }
+    }
+    if (active) {
+      // Send CTRL+PF1 to ROM so it enters cassette control mode
+      // isCtrlPressed is already true from the sticky CTRL or physical CTRL
+      this.row8State[0] = true;  // PF1
+      this.kbrequest = true;
+      this.irqLatch = true;
+      // Release PF1 and modifiers after ROM has scanned (~60ms = 3 OCF cycles)
+      setTimeout(() => {
+        this.row8State[0] = false;
+        this.releaseStickyModifiers();
+      }, 60);
+    } else {
+      // Send PF5 to ROM to exit cassette control mode
+      this.row8State[4] = true;  // PF5
+      this.kbrequest = true;
+      this.irqLatch = true;
+      setTimeout(() => { this.row8State[4] = false; }, 60);
+      this.releaseStickyModifiers();
+    }
+    if (debug) console.log(`[MMCM] ${active ? 'ENTER' : 'EXIT'}`);
+  }
 
   // Release sticky modifiers after a non-modifier key is pressed on the virtual keyboard
   private releaseStickyModifiers(): void {
@@ -386,6 +492,102 @@ export class Keyboard {
       this.isShiftPressed = false;
       this.stickyShiftBtns.forEach(b => b.classList.remove('pressed'));
     }
+    if (this.stickyGrph) {
+      this.stickyGrph = false;
+      this.matrix[6] |= (1 << 6); // release GRPH (col 6, row 6)
+      this.stickyGrphBtn?.classList.remove('pressed');
+    }
+  }
+
+  // --- Paste / type-in support ---
+  private pasteQueue: string[] = [];
+  private pasteActive = false;
+  onPasteFinish: (() => void) | null = null;
+
+  /** Feed a string into the keyboard matrix one character at a time. */
+  typeText(text: string): void {
+    const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    this.pasteQueue.push(...normalized);
+    if (!this.pasteActive) this.feedNextChar();
+  }
+
+  cancelPaste(): void {
+    this.pasteQueue.length = 0;
+    this.pasteActive = false;
+  }
+
+  get isPasting(): boolean {
+    return this.pasteActive;
+  }
+
+  private feedNextChar(): void {
+    if (this.pasteQueue.length === 0) {
+      this.pasteActive = false;
+      this.onPasteFinish?.();
+      return;
+    }
+    this.pasteActive = true;
+    const ch = this.pasteQueue.shift()!;
+    const code = ch.charCodeAt(0);
+
+    // GRPH characters (0x80-0x9F): press GRPH + key simultaneously
+    const grphMapping = (code >= 0x80 && code <= 0x9F) ? GRPH_MAP[code] : undefined;
+    if (grphMapping) {
+      this.matrix[6] &= ~(1 << 6); // GRPH down
+      this.matrix[grphMapping.col] &= ~(1 << grphMapping.row);
+      this.kbrequest = true;
+      this.irqLatch = true;
+      setTimeout(() => {
+        this.matrix[grphMapping.col] |= (1 << grphMapping.row);
+        this.matrix[6] |= (1 << 6); // GRPH up
+        setTimeout(() => this.feedNextChar(), 30);
+      }, 50);
+      return;
+    }
+
+    let mapping: KeyMapping | null = null;
+    let isEnter = false;
+
+    if (ch === '\n') {
+      mapping = CODE_MAP['Enter'];
+      isEnter = true;
+    } else if (ch === '\t') {
+      mapping = CODE_MAP['Tab'];
+    } else {
+      mapping = CHAR_MAP[ch] || null;
+    }
+
+    if (!mapping || mapping.row >= 8) {
+      // Skip unmappable characters (control chars, emoji, etc.)
+      setTimeout(() => this.feedNextChar(), 0);
+      return;
+    }
+
+    // Determine effective shift state.
+    // In CAPS mode the HX-20 inverts shift for letters (unshifted=upper, shifted=lower),
+    // so we must invert our shift override for letters to produce the correct case.
+    let effectiveShift = mapping.shift;
+    const isLetter = ch.toLowerCase() !== ch.toUpperCase();
+    if (this.capsLockOn && isLetter) {
+      effectiveShift = (ch === ch.toLowerCase()); // lowercase needs shift, uppercase doesn't
+    }
+
+    const savedShift = this.isShiftPressed;
+    if (effectiveShift === true) this.isShiftPressed = true;
+    else if (effectiveShift === false) this.isShiftPressed = false;
+
+    // Press key into matrix
+    this.matrix[mapping.col] &= ~(1 << mapping.row);
+    this.kbrequest = true;
+    this.irqLatch = true;
+
+    // Hold 50ms, then release; longer gap after Enter for BASIC line processing
+    setTimeout(() => {
+      this.matrix[mapping!.col] |= (1 << mapping!.row);
+      this.isShiftPressed = savedShift;
+      const gap = isEnter ? 200 : 30;
+      setTimeout(() => this.feedNextChar(), gap);
+    }, 50);
   }
 
   // Build the on-screen keyboard
@@ -398,15 +600,15 @@ export class Keyboard {
         { label: 'PAUSE', code: 'Pause', cls: 'key-light' },
         { label: 'MENU', code: 'End', cls: 'key-light' },
         { label: 'BREAK', code: 'Escape', cls: 'key-red' },
-        { label: 'PF1', code: 'F1', cls: 'key-light' },
-        { label: 'PF2', code: 'F2', cls: 'key-light' },
-        { label: 'PF3', code: 'F3', cls: 'key-light' },
-        { label: 'PF4', code: 'F4', cls: 'key-light' },
-        { label: 'PF5', code: 'F5', cls: 'key-light' },
+        { label: 'PF1', code: 'HX_PF1', cls: 'key-light' },
+        { label: 'PF2', code: 'HX_PF2', cls: 'key-light' },
+        { label: 'PF3', code: 'HX_PF3', cls: 'key-light' },
+        { label: 'PF4', code: 'HX_PF4', cls: 'key-light' },
+        { label: 'PF5', code: 'HX_PF5', cls: 'key-light' },
         null,
-        { label: 'NUM', code: 'F10', cls: 'key-light' },
+        { label: 'NUM', code: 'HX_Num', cls: 'key-light' },
         { label: 'HOME', code: 'Home', cls: 'key-light' },
-        { label: 'SCRN', code: 'F12', cls: 'key-light' },
+        { label: 'SCRN', code: 'HX_Scrn', cls: 'key-light' },
         { label: 'DEL', code: 'Backspace', cls: 'key-light' },
       ],
       // Row 2: Number/symbol row
@@ -460,7 +662,7 @@ export class Keyboard {
         { label: ', <', code: 'Comma' }, { label: '. >', code: 'Period' },
         { label: '/ ?', code: 'Slash' },
         { label: 'SHIFT', code: 'ShiftRight', cls: 'key-light' },
-        { label: 'GRPH', code: 'F11', cls: 'key-light' },
+        { label: 'GRPH', code: 'HX_Grph', cls: 'key-light' },
       ],
       // Row 6: Space row (centered)
       [
@@ -488,8 +690,42 @@ export class Keyboard {
 
         const isModifier = key.code === 'ControlLeft' || key.code === 'ControlRight' ||
                            key.code === 'ShiftLeft' || key.code === 'ShiftRight';
+        const isGrph = key.code === 'HX_Grph';
+        const isPFKey = /^HX_PF[1-5]$/.test(key.code);
 
-        if (isModifier) {
+        if (isGrph) {
+          // GRPH: sticky toggle (hold-modifier behavior via click)
+          this.stickyGrphBtn = btn;
+          btn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            this.stickyGrph = !this.stickyGrph;
+            if (this.stickyGrph) {
+              this.matrix[6] &= ~(1 << 6); // press GRPH (col 6, row 6)
+            } else {
+              this.matrix[6] |= (1 << 6);  // release GRPH
+            }
+            btn.classList.toggle('pressed', this.stickyGrph);
+            this.kbrequest = true;
+            this.irqLatch = true;
+          });
+        } else if (isPFKey) {
+          // PF keys: pass to ROM keyboard matrix (labels swap in MMCM)
+          this.pfButtons.set(key.code, btn);
+          btn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            this.keyDown(key.code, undefined, true);
+            btn.classList.add('pressed');
+          });
+          btn.addEventListener('mouseup', () => {
+            this.keyUp(key.code);
+            btn.classList.remove('pressed');
+            this.releaseStickyModifiers();
+          });
+          btn.addEventListener('mouseleave', () => {
+            this.keyUp(key.code);
+            btn.classList.remove('pressed');
+          });
+        } else if (isModifier) {
           // Track button references for sticky visual feedback
           if (key.code === 'ControlLeft' || key.code === 'ControlRight') this.stickyCtrlBtn = btn;
           if (key.code === 'ShiftLeft' || key.code === 'ShiftRight') this.stickyShiftBtns.push(btn);

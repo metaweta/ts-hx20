@@ -19,10 +19,14 @@ export class HX20 {
   cas1: Cassette;  // External cassette (CAS1:)
 
   // Main CPU memory
-  mainRAM = new Uint8Array(0x4000);    // 16KB at 0x0100-0x3FFF
+  mainRAM = new Uint8Array(0x4000);    // 16KB base at 0x0100-0x3FFF
   mainROM = new Uint8Array(0x8000);    // 32KB at 0x8000-0xFFFF
   optionROM = new Uint8Array(0x2000);  // 8KB at 0x6000-0x7FFF
   hasOptionROM = false;
+
+  // RAM expansion (bank-switched at 0x4000-0x7FFF)
+  expansionBanks: Uint8Array[] = [];   // Each bank is 16KB
+  private bankRegister = 0;            // Selected bank (written via 0x0030)
 
   // Slave CPU memory (internal 4KB ROM loaded separately)
   slaveROM: Uint8Array | null = null;
@@ -99,7 +103,14 @@ export class HX20 {
     cpu.onRead = (addr: number): number => {
       if (addr >= 0x8000) return this.mainROM[addr - 0x8000];
       if (addr >= 0x6000 && addr < 0x8000) {
-        return this.hasOptionROM ? this.optionROM[addr - 0x6000] : 0x00;
+        if (this.hasOptionROM) return this.optionROM[addr - 0x6000];
+        if (this.expansionBanks.length > 0) {
+          return this.expansionBanks[this.bankRegister % this.expansionBanks.length][addr - 0x4000];
+        }
+        return 0x00;
+      }
+      if (addr >= 0x4000 && addr < 0x6000 && this.expansionBanks.length > 0) {
+        return this.expansionBanks[this.bankRegister % this.expansionBanks.length][addr - 0x4000];
       }
       if (addr >= 0x0100 && addr < 0x4000) return this.mainRAM[addr - 0x0100];
 
@@ -126,8 +137,10 @@ export class HX20 {
           this.lcd.clockLCD();
           return 0xFF;
         case 0x002C: return 0xFF; // interrupt mask
-        case 0x0030: case 0x0031: case 0x0032: case 0x0033:
-          return 0xFF; // bank switching
+        case 0x0030:
+          return this.expansionBanks.length > 0 ? this.bankRegister : 0xFF;
+        case 0x0031: case 0x0032: case 0x0033:
+          return 0xFF; // bank switching (reserved)
       }
 
       return 0xFF;
@@ -137,6 +150,11 @@ export class HX20 {
     cpu.onWrite = (addr: number, val: number): void => {
       if (addr >= 0x0100 && addr < 0x4000) {
         this.mainRAM[addr - 0x0100] = val;
+        return;
+      }
+      if (addr >= 0x4000 && addr < 0x8000 && this.expansionBanks.length > 0) {
+        if (addr >= 0x6000 && this.hasOptionROM) return; // can't write to ROM
+        this.expansionBanks[this.bankRegister % this.expansionBanks.length][addr - 0x4000] = val;
         return;
       }
       if (addr >= 0x0040 && addr < 0x0080) {
@@ -153,8 +171,11 @@ export class HX20 {
           this.lcd.writeLCDData(val);
           break;
         case 0x002C: break; // interrupt mask sleep mode
-        case 0x0030: case 0x0031: case 0x0032: case 0x0033:
-          break; // bank switching
+        case 0x0030:
+          if (this.expansionBanks.length > 0) this.bankRegister = val;
+          break;
+        case 0x0031: case 0x0032: case 0x0033:
+          break; // bank switching (reserved)
       }
     };
 
@@ -390,6 +411,15 @@ export class HX20 {
     this.mainCPU.irq1Line = irq;
   }
 
+  /** Configure expansion RAM. Each bank adds 16KB bank-switchable at 0x4000-0x7FFF. */
+  setExpansionRAM(bankCount: number): void {
+    this.expansionBanks = [];
+    for (let i = 0; i < bankCount; i++) {
+      this.expansionBanks.push(new Uint8Array(0x4000));
+    }
+    this.bankRegister = 0;
+  }
+
   // Load ROMs from Intel HEX strings
   loadMainROM(hexData: string): void {
     loadIntelHexIntoBuffer(hexData, this.mainROM, 0x8000);
@@ -420,9 +450,15 @@ export class HX20 {
 
   reset(): void {
     this.mainRAM.fill(0);
+    for (const bank of this.expansionBanks) bank.fill(0);
+    this.bankRegister = 0;
 
     // Pre-initialize battery-backed RAM values that the ROM expects.
-    const ramEnd = 0x4000;
+    // With expansion RAM, BASIC sees flat memory up to 0x6000 (or 0x8000 if no option ROM).
+    let ramEnd = 0x4000;  // base 16KB
+    if (this.expansionBanks.length > 0) {
+      ramEnd = this.hasOptionROM ? 0x6000 : 0x8000;
+    }
     this.mainRAM[0x0134 - 0x0100] = (ramEnd >> 8) & 0xFF;
     this.mainRAM[0x0135 - 0x0100] = ramEnd & 0xFF;
     this.mainRAM[0x012C - 0x0100] = (ramEnd >> 8) & 0xFF;
@@ -865,6 +901,8 @@ export class HX20 {
       mainCPU: this.mainCPU.saveState(),
       slaveCPU: this.slaveROM ? this.slaveCPU.saveState() : null,
       mainRAM: btoa(String.fromCharCode(...this.mainRAM)),
+      expansionBanks: this.expansionBanks.map(b => btoa(String.fromCharCode(...b))),
+      bankRegister: this.bankRegister,
       mainROM: btoa(String.fromCharCode(...this.mainROM)),
       slaveROM: this.slaveROM ? btoa(String.fromCharCode(...this.slaveROM)) : null,
       lcd: lcdControllers,
@@ -894,6 +932,17 @@ export class HX20 {
     // Restore RAM
     const ramStr = atob(s.mainRAM);
     for (let i = 0; i < ramStr.length; i++) this.mainRAM[i] = ramStr.charCodeAt(i);
+
+    // Restore expansion RAM (optional — absent in pre-expansion states)
+    if (s.expansionBanks && Array.isArray(s.expansionBanks)) {
+      this.expansionBanks = s.expansionBanks.map((b64: string) => {
+        const str = atob(b64);
+        const arr = new Uint8Array(str.length);
+        for (let i = 0; i < str.length; i++) arr[i] = str.charCodeAt(i);
+        return arr;
+      });
+      this.bankRegister = s.bankRegister || 0;
+    }
 
     // Restore slave ROM (must happen before slave CPU restore)
     if (s.slaveROM) {
