@@ -646,11 +646,12 @@ export class EPSPDisplay {
   }
 
   // 0xC7: Set pixel in graphics mode
+  // Data: [X_hi, X_lo, Y_hi, Y_lo, color] — 5 bytes, 16-bit big-endian coords
   private cmdSetPixel(data: number[]): void {
-    if (data.length >= 3) {
-      const x = data[0];
-      const y = data[1];
-      const color = data[2];
+    if (data.length >= 5) {
+      const x = (data[0] << 8) | data[1];
+      const y = (data[2] << 8) | data[3];
+      const color = data[4];
       if (x < GFX_WIDTH && y < GFX_HEIGHT) {
         this.graphicsBuffer[y * GFX_WIDTH + x] = color & 0x03;
         this.dirty = true;
@@ -659,11 +660,14 @@ export class EPSPDisplay {
   }
 
   // 0xC8: Draw line (Bresenham's algorithm)
+  // Data: [X0_hi, X0_lo, Y0_hi, Y0_lo, X1_hi, X1_lo, Y1_hi, Y1_lo, draw_mode] — 9 bytes
   private cmdDrawLine(data: number[]): void {
-    if (data.length >= 5) {
-      let x0 = data[0], y0 = data[1];
-      const x1 = data[2], y1 = data[3];
-      const color = data[4] & 0x03;
+    if (data.length >= 9) {
+      let x0 = (data[0] << 8) | data[1];
+      let y0 = (data[2] << 8) | data[3];
+      const x1 = (data[4] << 8) | data[5];
+      const y1 = (data[6] << 8) | data[7];
+      const color = data[8] & 0x03;
       // Bresenham
       const dx = Math.abs(x1 - x0);
       const dy = -Math.abs(y1 - y0);
@@ -759,13 +763,11 @@ export class EPSPDisplay {
 
     const pixels = this.imageData.data;
 
-    if (this.displayMode <= 1) {
-      // Mode 0 = default, Mode 1 = SCREEN 1 (text CRT)
-      this.renderText(pixels);
-    } else {
-      // Mode 2+ = SCREEN 2 (graphics CRT)
-      this.renderGraphics(pixels);
-    }
+    // Render text as base layer, then overlay graphics pixels.
+    // SCREEN 0,1 sends graphics commands to the CRT without changing display mode,
+    // so we always composite both layers (text buffer is spaces when unused).
+    this.renderText(pixels);
+    this.overlayGraphics(pixels);
 
     this.ctx.putImageData(this.imageData, 0, 0);
   }
@@ -815,6 +817,30 @@ export class EPSPDisplay {
             const p = (y * CANVAS_W + x) * 4;
             pixels[p] = fgR; pixels[p + 1] = fgG; pixels[p + 2] = fgB;
           }
+        }
+      }
+    }
+  }
+
+  private overlayGraphics(pixels: Uint8ClampedArray): void {
+    // Overlay non-zero graphics pixels on top of the text layer.
+    // Scale: GFX_WIDTH=128 → CANVAS_W=320 (2.5x), GFX_HEIGHT=96 → CANVAS_H=192 (2x)
+    const palette = [
+      null,                    // 0 = transparent (don't overlay)
+      [0x33, 0xFF, 0x33],     // 1 = green
+      [0xFF, 0xFF, 0x33],     // 2 = yellow
+      [0xFF, 0xFF, 0xFF],     // 3 = white
+    ];
+
+    for (let cy = 0; cy < CANVAS_H; cy++) {
+      const gy = Math.floor(cy * GFX_HEIGHT / CANVAS_H);
+      for (let cx = 0; cx < CANVAS_W; cx++) {
+        const gx = Math.floor(cx * GFX_WIDTH / CANVAS_W);
+        const colorIdx = this.graphicsBuffer[gy * GFX_WIDTH + gx] & 0x03;
+        if (colorIdx !== 0) {
+          const [r, g, b] = palette[colorIdx]!;
+          const p = (cy * CANVAS_W + cx) * 4;
+          pixels[p] = r; pixels[p + 1] = g; pixels[p + 2] = b; pixels[p + 3] = 0xFF;
         }
       }
     }
