@@ -30,10 +30,18 @@ const speedSlider = document.getElementById('speed-slider') as HTMLInputElement;
 const speedDisplay = document.getElementById('speed-display')!;
 const ramSelect = document.getElementById('ram-select') as HTMLSelectElement;
 
+// CRT display panel
+const btnCrtToggle = document.getElementById('btn-crt-toggle')!;
+const crtPanel = document.getElementById('crt-panel')!;
+const crtCanvas = document.getElementById('crt-canvas') as HTMLCanvasElement;
+
 // Cassette panel elements are wired below via wireCassettePanel()
 
 // Attach LCD canvas
 hx20.lcd.attachCanvas(canvas);
+
+// Attach CRT canvas
+hx20.epspDisplay.attachCanvas(crtCanvas);
 
 // Build on-screen keyboard
 hx20.keyboard.buildUI(keyboardEl);
@@ -87,6 +95,22 @@ document.addEventListener('keyup', (e) => {
 btnDebugToggle.addEventListener('click', () => {
   debugPanel.classList.toggle('hidden');
   btnDebugToggle.textContent = debugPanel.classList.contains('hidden') ? 'Show Debug' : 'Hide Debug';
+});
+
+// CRT toggle — opening the CRT panel enables DIP SW4 (TF-20 mode)
+btnCrtToggle.addEventListener('click', () => {
+  const wasHidden = crtPanel.classList.contains('hidden');
+  crtPanel.classList.toggle('hidden');
+  if (wasHidden) {
+    // Enable TF-20 DIP switch (SW4) so ROM initializes EPSP
+    hx20.keyboard.setDipSwitches(0, true);
+    if (hx20.isROMLoaded()) {
+      statusText.textContent = 'CRT enabled — reset required for SCREEN 1';
+    }
+  } else {
+    // Disable TF-20 DIP switch
+    hx20.keyboard.setDipSwitches(0, false);
+  }
 });
 
 // Debug controls

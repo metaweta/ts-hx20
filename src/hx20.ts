@@ -7,6 +7,7 @@ import { Keyboard } from './keyboard';
 import { MC146818 } from './rtc';
 import { Cassette } from './cassette';
 import { MicrocassetteDrive } from './microcassette-drive';
+import { EPSPDisplay } from './epsp-display';
 import { loadIntelHexIntoBuffer, loadBinaryIntoBuffer } from './rom-loader';
 
 export class HX20 {
@@ -17,6 +18,7 @@ export class HX20 {
   rtc: MC146818;
   cas0: Cassette;  // Internal microcassette (CAS0:)
   cas1: Cassette;  // External cassette (CAS1:)
+  epspDisplay: EPSPDisplay;
 
   // Main CPU memory
   mainRAM = new Uint8Array(0x4000);    // 16KB base at 0x0100-0x3FFF
@@ -79,6 +81,7 @@ export class HX20 {
     this.cas0.autoRewindAfterSave = false;  // CAS0 has position counter UI (ctrl-PF1)
     this.cas0.invertPlayback = true;  // Cassette mechanism inverts signal between P21 write and P20 read
     this.cas1 = new Cassette('hx20-tapes-cas1', 'CAS1');
+    this.epspDisplay = new EPSPDisplay();
 
     // Wire microcassette drive callbacks to CAS0 cassette
     this.drive.onMotorChange = (on, rec) => {
@@ -94,6 +97,11 @@ export class HX20 {
     this.wireRTC();
     this.wireSerial();
     this.wireSIO();
+
+    // EPSP display response → main CPU SCI RX
+    this.epspDisplay.onSendByte = (data: number) => {
+      this.mainCPU.serialRecv(data);
+    };
   }
 
   private wireMainCPU(): void {
@@ -366,8 +374,10 @@ export class HX20 {
       if (this.slaveSio) {
         // Main CPU TX → Slave CPU RX
         this.slaveCPU.serialRecv(data);
+      } else {
+        // External SIO bus → EPSP display controller
+        this.epspDisplay.recvByte(data);
       }
-      // else: data goes to external SIO bus (not implemented)
     };
 
     this.slaveCPU.onSerialSend = (data: number) => {
@@ -483,6 +493,7 @@ export class HX20 {
     this.lcd.reset();
     this.keyboard.reset();
     this.rtc.reset();
+    this.epspDisplay.reset();
     this.mainCPU.reset();
     if (this.slaveROM) {
       this.slaveCPU.reset();
@@ -835,6 +846,7 @@ export class HX20 {
           this.slaveCPU.setP20Input(this.cas0.readLevel);  // Inversion handled inside Cassette.advance()
           this.cas1.advance(sc);
           this.drive.advance(sc);
+          this.epspDisplay.advance(sc);
         }
       }
     }
@@ -842,8 +854,9 @@ export class HX20 {
     // Periodic RTC tick
     this.rtc.tick();
 
-    // Render LCD
+    // Render LCD and CRT
     this.lcd.render();
+    this.epspDisplay.render();
   }
 
   start(): void {
@@ -885,8 +898,10 @@ export class HX20 {
       this.slaveCPU.setP20Input(this.cas0.readLevel);  // Inversion handled inside Cassette.advance()
       this.cas1.advance(sc);
       this.drive.advance(sc);
+      this.epspDisplay.advance(sc);
     }
     this.lcd.render();
+    this.epspDisplay.render();
     this.onRegistersUpdate(this.mainCPU.dumpRegisters());
   }
 
@@ -912,6 +927,7 @@ export class HX20 {
       slaveFlag: this.slaveFlag,
       slaveSio: this.slaveSio,
       ksc: this.ksc,
+      epspDisplay: this.epspDisplay.saveState(),
     };
     return JSON.stringify(state);
   }
@@ -981,6 +997,13 @@ export class HX20 {
       this.rtc.loadState(s.rtc);
     } else {
       this.rtc.reset();
+    }
+
+    // Restore EPSP display state (optional — absent in older states)
+    if (s.epspDisplay) {
+      this.epspDisplay.loadState(s.epspDisplay);
+    } else {
+      this.epspDisplay.reset();
     }
 
     // Reset transient subsystems

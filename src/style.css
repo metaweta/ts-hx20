@@ -291,6 +291,42 @@ body {
   background: #555;
 }
 
+/* CRT display panel */
+
+#crt-panel {
+  margin-top: 8px;
+  padding: 12px;
+  background: #1a1a1a;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+#crt-panel.hidden {
+  display: none;
+}
+
+#crt-panel h3 {
+  margin-bottom: 8px;
+  color: #aaa;
+}
+
+#crt-bezel {
+  background: #0a0a0a;
+  border: 3px solid #333;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  justify-content: center;
+}
+
+#crt-canvas {
+  width: 640px;
+  height: 384px;
+  image-rendering: pixelated;
+  background: #001100;
+  border: 1px solid #222;
+}
+
 /* Cassette panels */
 
 .cassette-panel {
