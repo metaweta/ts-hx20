@@ -250,6 +250,14 @@ export class EPSPDisplay {
   virtualRows = TEXT_ROWS;
   dirty = true;
 
+  // Virtual coordinate origin — the ROM uses $08EB (low byte of line_buf_ptr+2)
+  // as the row value in FNC 0xC2. On the LCD, FNC 0x87 sets the virtual origin
+  // so the mapping is transparent. On the CRT, FNC 0x87 may not be sent during
+  // SCREEN 1 init, so we auto-detect the origin from the first FNC 0xC2.
+  private rowOrigin = 0;
+  private originDetected = false;
+  private hasWrittenChars = false;
+
   // EPSP protocol state
   private state = EPSPState.IDLE;
   private enquiryBuf: number[] = [];
@@ -267,6 +275,9 @@ export class EPSPDisplay {
   // EPSP response state (for commands that require a response packet)
   private responseFnc = 0;
   private responseData: number[] = [];
+  private savedCharUnderCursor = 0x20;  // char at cursor before command execution
+  private savedPixelColor = 0;          // pixel color for FNC 0x8F response
+  private savedScreenLine: number[] = [];  // screen text for FNC 0x97 response
 
   // Callbacks
   onSendByte: ((data: number) => void) | null = null;
@@ -300,6 +311,10 @@ export class EPSPDisplay {
     this.txCycleCounter = 0;
     this.responseFnc = 0;
     this.responseData = [];
+    this.savedScreenLine = [];
+    this.rowOrigin = 0;
+    this.originDetected = false;
+    this.hasWrittenChars = false;
   }
 
   attachCanvas(canvas: HTMLCanvasElement): void {
@@ -471,8 +486,20 @@ export class EPSPDisplay {
   // Get response data bytes for a given command
   private getResponseData(fnc: number): number[] {
     switch (fnc) {
+      case 0x85: // CRT init → status
+      case 0x88: // Set line width → status
+      case 0x8C: // Set scroll mode → status
+        return [0x00];
       case 0x89: // Get physical screen size → [cols-1, rows-1]
         return [TEXT_COLS - 1, TEXT_ROWS - 1];
+      case 0x8F: // Read pixel at position → pixel color
+        return [this.savedPixelColor];
+      case 0x91: // Clear to end of line → return char that was at cursor before clear
+      case 0x92: // Write character → return char that was at cursor before write
+      case 0x98: // Echo input character → return char that was at cursor
+        return [this.savedCharUnderCursor];
+      case 0x97: // Read screen line → return text buffer contents
+        return this.savedScreenLine;
       default:   // Most commands → single status byte (0x00 = success)
         return [0x00];
     }
@@ -517,6 +544,18 @@ export class EPSPDisplay {
 
   // Command dispatch
   private executeCommand(fnc: number, data: number[]): void {
+    // Save character at cursor before execution (used for 0x92/0x98 response)
+    if (this.cursorX < TEXT_COLS && this.cursorY < TEXT_ROWS) {
+      this.savedCharUnderCursor = this.textBuffer[this.cursorY * TEXT_COLS + this.cursorX];
+    } else {
+      this.savedCharUnderCursor = 0x20;
+    }
+    // Debug: log character write commands with response info
+    if (fnc === 0x92 || fnc === 0x98) {
+      const ch = data[0] ?? -1;
+      const chStr = ch >= 0x20 && ch < 0x7F ? `'${String.fromCharCode(ch)}'` : `0x${ch.toString(16).padStart(2, '0')}`;
+      console.log(`[EPSP] FNC 0x${fnc.toString(16)}: write ${chStr} at (${this.cursorX},${this.cursorY}), old='${String.fromCharCode(this.savedCharUnderCursor)}' (0x${this.savedCharUnderCursor.toString(16).padStart(2, '0')})`);
+    }
     switch (fnc) {
       case 0x84: this.cmdDeviceSelect(data); break;
       case 0x85: this.cmdCrtInit(); break;
@@ -524,15 +563,16 @@ export class EPSPDisplay {
       case 0x88: this.cmdSetLineWidth(data); break;
       case 0x89: this.cmdGetScreenSize(); break;
       case 0x8C: this.cmdSetScrollMode(data); break;
-      case 0x91: this.cmdClearToEndOfLine(); break;
+      case 0x91: this.cmdClearToEndOfLine(data); break;
       case 0x92: this.cmdWriteCharacter(data); break;
       case 0x93: this.cmdSetDisplayMode(data); break;
-      case 0x97: this.cmdDefineWindow(data); break;
+      case 0x97: this.cmdReadScreenLine(data); break;
       case 0x98: this.cmdWriteCharacter(data); break;  // echo input character (same as 0x92)
       case 0xC0: this.cmdSetPhysicalPointer(data); break;
       case 0xC2: this.cmdSetCursorPosition(data); break;
       case 0xC5: this.cmdSetAttribute(data); break;
       case 0xC6: this.cmdSetCharAttribute(data); break;
+      case 0x8F: this.cmdReadPixel(data); break;
       case 0xC7: this.cmdSetPixel(data); break;
       case 0xC8: this.cmdDrawLine(data); break;
       case 0xC9: this.cmdSetScrollRegion(data); break;
@@ -560,14 +600,26 @@ export class EPSPDisplay {
     this.cursorX = 0;
     this.cursorY = 0;
     this.displayMode = 0;
+    this.rowOrigin = 0;
+    this.originDetected = false;
+    this.hasWrittenChars = false;
     this.dirty = true;
   }
 
-  // 0x87: Set virtual screen size
+  // 0x87: Set virtual screen size and origin
+  // Data: [cols-1, rows-1, origin_hi, origin_lo]
+  // The origin is a 16-bit address from the LCD's VRAM perspective.
+  // The low byte ($08EB = line_buf_ptr+2 low) is used by the ROM as the
+  // virtual row in FNC 0xC2, so we use it directly as rowOrigin.
   private cmdSetVirtualScreen(data: number[]): void {
     if (data.length >= 2) {
       this.virtualCols = data[0] || TEXT_COLS;
       this.virtualRows = data[1] || TEXT_ROWS;
+    }
+    if (data.length >= 4) {
+      this.rowOrigin = data[3];
+      this.originDetected = true;
+      console.log(`[EPSP] FNC 0x87: virtual screen ${data[0]+1}x${data[1]+1}, origin=0x${((data[2]<<8)|data[3]).toString(16).padStart(4,'0')}, rowOrigin=${this.rowOrigin}`);
     }
   }
 
@@ -578,6 +630,7 @@ export class EPSPDisplay {
 
   // 0x92/0x98: Write character at cursor, advance cursor
   private cmdWriteCharacter(data: number[]): void {
+    this.hasWrittenChars = true;
     for (const ch of data) {
       if (ch === 0x0D) {
         // Carriage return
@@ -590,17 +643,41 @@ export class EPSPDisplay {
           this.cursorY = TEXT_ROWS - 1;
         }
       } else if (ch === 0x08) {
-        // Backspace
+        // Backspace — move left and erase character
+        if (this.cursorX > 0) {
+          this.cursorX--;
+          this.textBuffer[this.cursorY * TEXT_COLS + this.cursorX] = 0x20;
+        }
+      } else if (ch === 0x1D) {
+        // Cursor left — move without erasing
         if (this.cursorX > 0) this.cursorX--;
+      } else if (ch === 0x1C) {
+        // Cursor right
+        if (this.cursorX < TEXT_COLS - 1) this.cursorX++;
+      } else if (ch === 0x0B || ch === 0x1E) {
+        // Cursor up
+        if (this.cursorY > 0) this.cursorY--;
+      } else if (ch === 0x1F) {
+        // Cursor down
+        if (this.cursorY < TEXT_ROWS - 1) this.cursorY++;
       } else if (ch === 0x0C) {
         // Form feed — clear screen
         this.textBuffer.fill(0x20);
         this.cursorX = 0;
         this.cursorY = 0;
+      } else if (ch === 0x01 || ch === 0x16 || ch === 0x17) {
+        // 0x01: cursor home/mode, 0x16: show cursor, 0x17: hide cursor
+        // These are display control codes — no text buffer effect
       } else if (ch < 0x20) {
-        // Other control characters — ignore (0x1D, 0x16, etc.)
+        // Other control characters — log for debugging
+        console.log(`[EPSP] WriteChar: unhandled ctrl 0x${ch.toString(16).padStart(2, '0')} at (${this.cursorX},${this.cursorY})`);
+      } else if (ch === 0x7F) {
+        // DEL — erase character at cursor (write space, don't advance)
+        if (this.cursorX < TEXT_COLS && this.cursorY < TEXT_ROWS) {
+          this.textBuffer[this.cursorY * TEXT_COLS + this.cursorX] = 0x20;
+        }
       } else {
-        // Printable character (0x20-0xFF)
+        // Printable character (0x20-0x7E, 0x80-0xFF)
         if (this.cursorX < TEXT_COLS && this.cursorY < TEXT_ROWS) {
           this.textBuffer[this.cursorY * TEXT_COLS + this.cursorX] = ch;
         }
@@ -622,6 +699,10 @@ export class EPSPDisplay {
   private cmdSetDisplayMode(data: number[]): void {
     if (data.length >= 1) {
       this.displayMode = data[0];
+      // Reset origin tracking on mode switch — new SCREEN command starts fresh
+      this.rowOrigin = 0;
+      this.originDetected = false;
+      this.hasWrittenChars = false;
       this.dirty = true;
     }
   }
@@ -635,13 +716,51 @@ export class EPSPDisplay {
     }
   }
 
-  // 0xC2: Set cursor position
+  // 0xC2: Set cursor position (virtual coordinates)
+  // The ROM always sends row = $08EB (a constant from boot) to mean "go to current
+  // prompt line." On the LCD, circular VRAM + scrolling origin makes this work
+  // automatically. On the CRT, we keep the cursor on its current row (the prompt row)
+  // when we see the "home" row value, and apply static origin mapping otherwise.
   private cmdSetCursorPosition(data: number[]): void {
     if (data.length >= 2) {
       this.cursorX = data[0];
-      this.cursorY = data[1];
+
+      // Auto-detect origin: the first FNC 0xC2 with row > 0 after characters
+      // have been written reveals the ROM's $08EB value
+      if (!this.originDetected && this.hasWrittenChars && data[1] > 0) {
+        this.rowOrigin = data[1];
+        this.originDetected = true;
+        console.log(`[EPSP] FNC 0xC2: auto-detected rowOrigin=${this.rowOrigin}`);
+      }
+
+      if (this.originDetected && data[1] === this.rowOrigin) {
+        // "Go home" — keep cursor on current row, just update column.
+        // The ROM follows this with CR+LF to advance to the output line.
+      } else if (this.originDetected) {
+        // Non-home positioning — apply static origin mapping
+        this.cursorY = (data[1] - this.rowOrigin + TEXT_ROWS) % TEXT_ROWS;
+      } else {
+        // Origin not yet detected — use raw value
+        this.cursorY = data[1];
+      }
+
       if (this.cursorX >= TEXT_COLS) this.cursorX = TEXT_COLS - 1;
       if (this.cursorY >= TEXT_ROWS) this.cursorY = TEXT_ROWS - 1;
+    }
+  }
+
+  // 0x8F: Read pixel at position (POINT function)
+  // Data: [X_hi, X_lo, Y_hi, Y_lo] — 4 bytes, 16-bit big-endian coords
+  // Response: pixel color at that position
+  private cmdReadPixel(data: number[]): void {
+    if (data.length >= 4) {
+      const x = (data[0] << 8) | data[1];
+      const y = (data[2] << 8) | data[3];
+      if (x < GFX_WIDTH && y < GFX_HEIGHT) {
+        this.savedPixelColor = this.graphicsBuffer[y * GFX_WIDTH + x] & 0x03;
+      } else {
+        this.savedPixelColor = 0;
+      }
     }
   }
 
@@ -706,19 +825,35 @@ export class EPSPDisplay {
     // data[0] = mode flags — accept silently
   }
 
-  // 0x91: Clear to end of line
-  private cmdClearToEndOfLine(): void {
+  // 0x91: Clear from cursor to end of line with fill character
+  // Response: character that was at cursor before clearing
+  private cmdClearToEndOfLine(data: number[]): void {
+    const fill = data.length > 0 ? data[0] : 0x20;
     if (this.cursorY < TEXT_ROWS) {
       for (let x = this.cursorX; x < TEXT_COLS; x++) {
-        this.textBuffer[this.cursorY * TEXT_COLS + x] = 0x20;
+        this.textBuffer[this.cursorY * TEXT_COLS + x] = fill;
       }
       this.dirty = true;
     }
   }
 
-  // 0x97: Define window/scroll region
-  private cmdDefineWindow(_data: number[]): void {
-    // data = [top_row, bottom_row, flags] — accept silently
+  // 0x97: Read screen line (line read-back for BASIC input)
+  // data[2] = byte count; response = text buffer contents starting from cursor row
+  private cmdReadScreenLine(data: number[]): void {
+    const byteCount = data.length >= 3 ? data[2] + 1 : TEXT_COLS;
+    // Read from the beginning of the cursor's row
+    const startPos = this.cursorY * TEXT_COLS;
+    const result: number[] = [];
+    for (let i = 0; i < byteCount; i++) {
+      const pos = startPos + i;
+      if (pos < this.textBuffer.length) {
+        result.push(this.textBuffer[pos]);
+      } else {
+        result.push(0x20);  // pad with spaces beyond buffer
+      }
+    }
+    console.log(`[EPSP] FNC 0x97: read ${byteCount} bytes from row ${this.cursorY}, first 40: [${result.slice(0, 40).map(b => b >= 0x20 && b < 0x7F ? String.fromCharCode(b) : '.').join('')}]`);
+    this.savedScreenLine = result;
   }
 
   // 0xC5: Set display attribute / line parameter
@@ -879,6 +1014,8 @@ export class EPSPDisplay {
       cursorY: this.cursorY,
       cursorVisible: this.cursorVisible,
       displayMode: this.displayMode,
+      rowOrigin: this.rowOrigin,
+      originDetected: this.originDetected,
     };
   }
 
@@ -893,6 +1030,9 @@ export class EPSPDisplay {
     this.cursorY = s.cursorY || 0;
     this.cursorVisible = s.cursorVisible !== undefined ? s.cursorVisible : true;
     this.displayMode = s.displayMode || 0;
+    this.rowOrigin = s.rowOrigin || 0;
+    this.originDetected = s.originDetected || false;
+    this.hasWrittenChars = true;  // assume chars were written before save
     this.dirty = true;
     // Reset protocol state on load
     this.state = EPSPState.IDLE;

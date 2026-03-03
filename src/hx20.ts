@@ -384,8 +384,12 @@ export class HX20 {
       if (this.sciDebug) {
         console.log(`[SCI] S→M: 0x${data.toString(16).padStart(2,'0')} sPC=${this.slaveCPU.PC.toString(16)} writePC=${this.slaveCPU.sciTxWritePC.toString(16)}`);
       }
-      // Slave CPU TX → Main CPU RX (always)
-      this.mainCPU.serialRecv(data);
+      // Slave CPU TX → Main CPU RX (only when P22=1, i.e., SCI routed to slave)
+      // When P22=0 (slaveSio=0), the SCI MUX routes main CPU RX to the external
+      // SIO bus (EPSP display), so slave bytes don't reach the main CPU.
+      if (this.slaveSio) {
+        this.mainCPU.serialRecv(data);
+      }
     };
 
     // Debug: log when master reads RDR (clears RDRF)
