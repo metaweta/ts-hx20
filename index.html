@@ -46,6 +46,7 @@
       <button id="btn-cas0-toggle">CAS0:</button>
       <button id="btn-cas1-toggle">CAS1:</button>
       <button id="btn-crt-toggle">CRT</button>
+      <button id="btn-printer-toggle">PRINTER</button>
       <button id="btn-debug-toggle">Show Debug</button>
     </div>
 
@@ -71,6 +72,16 @@
         <button id="btn-cas1-rewind">Rewind</button>
         <button id="btn-cas1-import">Import</button>
         <input type="file" id="cas1-file-input" accept=".json" style="display:none">
+      </div>
+    </div>
+
+    <div id="printer-panel" class="hidden">
+      <h3>Printer</h3>
+      <pre id="printer-paper"></pre>
+      <div class="printer-controls">
+        <button id="btn-printer-feed">Feed</button>
+        <button id="btn-printer-tear">Tear Off</button>
+        <button id="btn-printer-copy">Copy</button>
       </div>
     </div>
 

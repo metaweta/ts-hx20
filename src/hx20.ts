@@ -8,6 +8,7 @@ import { MC146818 } from './rtc';
 import { Cassette } from './cassette';
 import { MicrocassetteDrive } from './microcassette-drive';
 import { EPSPDisplay } from './epsp-display';
+import { Printer } from './printer';
 import { loadIntelHexIntoBuffer, loadBinaryIntoBuffer } from './rom-loader';
 
 export class HX20 {
@@ -19,6 +20,7 @@ export class HX20 {
   cas0: Cassette;  // Internal microcassette (CAS0:)
   cas1: Cassette;  // External cassette (CAS1:)
   epspDisplay: EPSPDisplay;
+  printer: Printer;
 
   // Main CPU memory
   mainRAM = new Uint8Array(0x4000);    // 16KB base at 0x0100-0x3FFF
@@ -82,6 +84,7 @@ export class HX20 {
     this.cas0.invertPlayback = true;  // Cassette mechanism inverts signal between P21 write and P20 read
     this.cas1 = new Cassette('hx20-tapes-cas1', 'CAS1');
     this.epspDisplay = new EPSPDisplay();
+    this.printer = new Printer();
 
     // Wire microcassette drive callbacks to CAS0 cassette
     this.drive.onMotorChange = (on, rec) => {
@@ -498,6 +501,7 @@ export class HX20 {
     this.keyboard.reset();
     this.rtc.reset();
     this.epspDisplay.reset();
+    this.printer.reset();
     this.mainCPU.reset();
     if (this.slaveROM) {
       this.slaveCPU.reset();
@@ -555,6 +559,15 @@ export class HX20 {
           console.log(`[MASTER] E7D4: Enable ETOI — counter=$${counter.toString(16)} TCSR=$${(ss.tcsr as number).toString(16).padStart(2,'0')} (TOF=${((ss.tcsr as number)>>5)&1})`);
         }
       }
+
+      // Printer character capture: io_write_byte at A7C9 with error_mode = printer
+      if (this.mainCPU.PC === 0xA7C9) {
+        const errorMode = this.mainCPU.read(0xF4);
+        if (errorMode === 0x11) {
+          this.printer.printChar(this.mainCPU.A);
+        }
+      }
+
       const mc = this.mainCPU.step();
       mainCycles += mc;
 
@@ -858,9 +871,10 @@ export class HX20 {
     // Periodic RTC tick
     this.rtc.tick();
 
-    // Render LCD and CRT
+    // Render LCD, CRT, and printer
     this.lcd.render();
     this.epspDisplay.render();
+    this.printer.render();
   }
 
   start(): void {
@@ -932,6 +946,7 @@ export class HX20 {
       slaveSio: this.slaveSio,
       ksc: this.ksc,
       epspDisplay: this.epspDisplay.saveState(),
+      printer: this.printer.saveState(),
     };
     return JSON.stringify(state);
   }
@@ -1008,6 +1023,11 @@ export class HX20 {
       this.epspDisplay.loadState(s.epspDisplay);
     } else {
       this.epspDisplay.reset();
+    }
+
+    // Restore printer state (optional — absent in older states)
+    if (s.printer) {
+      this.printer.loadState(s.printer);
     }
 
     // Reset transient subsystems

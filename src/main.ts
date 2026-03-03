@@ -97,6 +97,38 @@ btnDebugToggle.addEventListener('click', () => {
   btnDebugToggle.textContent = debugPanel.classList.contains('hidden') ? 'Show Debug' : 'Hide Debug';
 });
 
+// Printer panel
+const btnPrinterToggle = document.getElementById('btn-printer-toggle')!;
+const printerPanel = document.getElementById('printer-panel')!;
+const printerPaper = document.getElementById('printer-paper') as HTMLPreElement;
+const btnPrinterFeed = document.getElementById('btn-printer-feed')!;
+const btnPrinterTear = document.getElementById('btn-printer-tear')!;
+const btnPrinterCopy = document.getElementById('btn-printer-copy')!;
+
+hx20.printer.attachElement(printerPaper);
+
+btnPrinterToggle.addEventListener('click', () => {
+  printerPanel.classList.toggle('hidden');
+});
+
+btnPrinterFeed.addEventListener('click', () => {
+  hx20.printer.feed();
+});
+
+btnPrinterTear.addEventListener('click', () => {
+  hx20.printer.clear();
+  statusText.textContent = 'Paper torn off';
+});
+
+btnPrinterCopy.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(hx20.printer.getText());
+    statusText.textContent = 'Printer output copied';
+  } catch {
+    statusText.textContent = 'Clipboard access denied';
+  }
+});
+
 // CRT toggle — opening the CRT panel enables DIP SW4 (TF-20 mode)
 btnCrtToggle.addEventListener('click', () => {
   const wasHidden = crtPanel.classList.contains('hidden');
