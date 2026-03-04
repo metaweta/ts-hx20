@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Epson HX-20 Emulator</title>
+  <script type="module" crossorigin src="/ts-hx20/assets/index-KkYJbQP5.js"></script>
+  <link rel="stylesheet" crossorigin href="/ts-hx20/assets/index-CeJoL2ug.css">
+</head>
+<body>
+  <div id="emulator">
+    <div id="header">
+      <h1>EPSON HX-20</h1>
+      <div id="controls">
+        <button id="btn-power" title="Power On/Off">POWER</button>
+        <button id="btn-reset" title="Reset">RESET</button>
+        <button id="btn-load-rom" title="Load ROM files">LOAD ROMs</button>
+        <input type="file" id="rom-file-input" multiple accept=".hex,.bin,.rom" style="display:none">
+        <label id="speed-label">Speed: <span id="speed-display">1x</span></label>
+        <input type="range" id="speed-slider" min="1" max="10" value="1">
+        <button id="btn-paste" title="Paste text from clipboard">PASTE</button>
+        <label id="ram-label">RAM:
+          <select id="ram-select" title="RAM expansion (requires reset)">
+            <option value="0">16KB</option>
+            <option value="1">32KB</option>
+            <option value="4">64KB</option>
+            <option value="8">128KB</option>
+          </select>
+        </label>
+        <button id="btn-save-state" title="Save machine state to file">SAVE STATE</button>
+        <button id="btn-load-state" title="Load machine state from file">LOAD STATE</button>
+        <input type="file" id="state-file-input" accept=".json" style="display:none">
+      </div>
+    </div>
+
+    <div id="screen-bezel">
+      <canvas id="lcd" width="480" height="128"></canvas>
+    </div>
+
+    <div id="keyboard-area">
+      <div id="keyboard"></div>
+    </div>
+
+    <div id="status-bar">
+      <span id="status-text">Load ROMs to begin</span>
+      <span id="cpu-info"></span>
+    </div>
+
+    <div id="bottom-buttons">
+      <button id="btn-cas0-toggle">CAS0:</button>
+      <button id="btn-cas1-toggle">CAS1:</button>
+      <button id="btn-crt-toggle">CRT</button>
+      <button id="btn-printer-toggle">PRINTER</button>
+      <button id="btn-debug-toggle">Show Debug</button>
+      <button id="btn-get-list" title="Download BASIC listing as text file">GET LIST</button>
+      <button id="btn-put-list" title="Upload BASIC listing text file">PUT LIST</button>
+      <input type="file" id="list-file-input" accept=".bas,.txt,.basic" style="display:none">
+    </div>
+
+    <div id="cas0-panel" class="cassette-panel hidden">
+      <h3>CAS0: Microcassette <span id="cas0-motor" class="cas-motor"></span></h3>
+      <div id="cas0-current" class="cas-current">No tape loaded</div>
+      <div id="cas0-tape-list" class="tape-list"></div>
+      <div class="cassette-controls">
+        <button id="btn-cas0-new">New Tape</button>
+        <button id="btn-cas0-eject">Eject</button>
+        <button id="btn-cas0-import">Import</button>
+        <input type="file" id="cas0-file-input" accept=".json" style="display:none">
+      </div>
+    </div>
+
+    <div id="cas1-panel" class="cassette-panel hidden">
+      <h3>CAS1: External Cassette <span id="cas1-motor" class="cas-motor"></span></h3>
+      <div id="cas1-current" class="cas-current">No tape loaded</div>
+      <div id="cas1-tape-list" class="tape-list"></div>
+      <div class="cassette-controls">
+        <button id="btn-cas1-new">New Tape</button>
+        <button id="btn-cas1-eject">Eject</button>
+        <button id="btn-cas1-rewind">Rewind</button>
+        <button id="btn-cas1-import">Import</button>
+        <input type="file" id="cas1-file-input" accept=".json" style="display:none">
+      </div>
+    </div>
+
+    <div id="printer-panel" class="hidden">
+      <h3>Printer</h3>
+      <div id="printer-paper">
+        <canvas id="printer-canvas"></canvas>
+      </div>
+      <div class="printer-controls">
+        <button id="btn-printer-feed">Feed</button>
+        <button id="btn-printer-tear">Tear Off</button>
+        <button id="btn-printer-copy">Copy</button>
+      </div>
+    </div>
+
+    <div id="crt-panel" class="hidden">
+      <h3>External CRT Display</h3>
+      <div id="crt-bezel">
+        <canvas id="crt-canvas" width="320" height="192"></canvas>
+      </div>
+    </div>
+
+    <div id="debug-panel" class="hidden">
+      <h3>Debug</h3>
+      <pre id="registers"></pre>
+      <div id="debug-controls">
+        <button id="btn-step">Step 1</button>
+        <button id="btn-run">Run</button>
+        <button id="btn-pause">Pause</button>
+        <span class="debug-group">
+          <button id="btn-step-n">Step N</button>
+          <input id="step-n-input" type="text" value="1000" size="6" title="Number of steps">
+        </span>
+        <span class="debug-group">
+          <button id="btn-run-to-bp">Run to BP</button>
+          <input id="bp-input" type="text" placeholder="e44b" size="6" title="Breakpoint address (hex)">
+        </span>
+      </div>
+      <pre id="disasm"></pre>
+    </div>
+  </div>
+
+</body>
+</html>
