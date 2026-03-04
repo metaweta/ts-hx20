@@ -1,3 +1,5 @@
+import { deflate, inflate } from 'pako';
+
 // Virtual cassette drive for HX-20
 // Records/plays FSK signal at the bit level
 //
@@ -355,10 +357,10 @@ export class Cassette {
         view.setUint32(off, delta, true); off += 4;
       }
     }
-    // Convert to base64
-    const bytes = new Uint8Array(buf, 0, off);
+    // Deflate then base64
+    const compressed = deflate(new Uint8Array(buf, 0, off));
     let bin = '';
-    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    for (let i = 0; i < compressed.length; i++) bin += String.fromCharCode(compressed[i]);
     return { initLevel, data: btoa(bin) };
   }
 
@@ -366,9 +368,10 @@ export class Cassette {
   private static unpackTransitions(initLevel: number, packed: string): number[] {
     if (!packed) return [];
     const bin = atob(packed);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    const view = new DataView(bytes.buffer);
+    const compressed = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) compressed[i] = bin.charCodeAt(i);
+    const bytes = inflate(compressed);
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     const result: number[] = [];
     let off = 0;
     let cycle = view.getUint32(off, true); off += 4;
