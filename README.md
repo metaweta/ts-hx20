@@ -197,5 +197,5 @@ While ts-hx20 is not a port of anyone else's emulator (it did a full annotated d
 * [The MAME project](https://www.mamedev.org/)
 * nerdprojects' [hxlink](https://github.com/nerdprojects/hxlink)
 
-It made heavy use of Arakula's [A09](https://github.com/Arakula/A09) assembler and [f9dasm](https://github.com/Arakula/f9dasm) disassembler when understanding the ROMs.
+It made heavy use of Benschop and Seib's [A09](https://github.com/Arakula/A09) assembler and Salmi, Seib, Bourassa, and Buchty's [f9dasm](https://github.com/Arakula/f9dasm) disassembler when understanding the ROMs.
 
