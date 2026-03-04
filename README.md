@@ -144,16 +144,16 @@ window.hx20.sciDebug = true    // Enable SCI/EPSP protocol tracing
 ## Architecture
 
 ```
-┌─────────────────┐     SCI 38400     ┌─────────────────┐
-│   Main CPU      │◄────────────────►│   Slave CPU     │
-│   HD6303R       │   (slaveSio=1)    │   HD6301V1      │
+┌─────────────────┐     SCI 38400     ┌──────────────────┐
+│   Main CPU      │<─────────────────>│   Slave CPU      │
+│   HD6303R       │   (slaveSio=1)    │   HD6301V1       │
 │   32KB ROM      │                   │   4KB ROM        │
 │   16KB+ RAM     │   SIO bus         │                  │
-│                 ├──────────────────►│   Keyboard       │
+│                 ├──────────────────>│   Keyboard       │
 │                 │   (LCD data)      │   Cassettes      │
 └────────┬────────┘                   │   RTC            │
          │ SCI (slaveSio=0)           └──────────────────┘
-         ▼
+         V
 ┌─────────────────┐
 │  EPSP Display   │
 │  40x24 / 128x96 │
