@@ -66,6 +66,3 @@ Group 4 (0x4_): F8C9
 
 ### ROM Disassembly
 - `docs/main-rom-disasm.s` — fully commented main ROM disassembly
-
-### TF-20 Floppy Drive (Not Implemented)
-The TF-20 external floppy drive connects via EPSP (DID=0x31). Implementation was attempted but shelved: the TF-20 must first send a boot loader and BASIC extension program to the HX-20 at startup (see Tips & Tricks section 18.4.1). Without this boot loader, BASIC has no disk commands. This makes TF-20 emulation significantly more complex than just handling BDOS function codes.
