@@ -757,7 +757,7 @@ export class EPSPDisplay {
       const x = (data[0] << 8) | data[1];
       const y = (data[2] << 8) | data[3];
       if (x < GFX_WIDTH && y < GFX_HEIGHT) {
-        this.savedPixelColor = this.graphicsBuffer[y * GFX_WIDTH + x] & 0x03;
+        this.savedPixelColor = this.graphicsBuffer[y * GFX_WIDTH + x] & 0x07;
       } else {
         this.savedPixelColor = 0;
       }
@@ -772,7 +772,7 @@ export class EPSPDisplay {
       const y = (data[2] << 8) | data[3];
       const color = data[4];
       if (x < GFX_WIDTH && y < GFX_HEIGHT) {
-        this.graphicsBuffer[y * GFX_WIDTH + x] = color & 0x03;
+        this.graphicsBuffer[y * GFX_WIDTH + x] = color & 0x07;
         this.dirty = true;
       }
     }
@@ -786,7 +786,7 @@ export class EPSPDisplay {
       let y0 = (data[2] << 8) | data[3];
       const x1 = (data[4] << 8) | data[5];
       const y1 = (data[6] << 8) | data[7];
-      const color = data[8] & 0x03;
+      const color = data[8] & 0x07;
       // Bresenham
       const dx = Math.abs(x1 - x0);
       const dy = -Math.abs(y1 - y0);
@@ -960,18 +960,23 @@ export class EPSPDisplay {
   private overlayGraphics(pixels: Uint8ClampedArray): void {
     // Overlay non-zero graphics pixels on top of the text layer.
     // Scale: GFX_WIDTH=128 → CANVAS_W=320 (2.5x), GFX_HEIGHT=96 → CANVAS_H=192 (2x)
-    const palette = [
-      null,                    // 0 = transparent (don't overlay)
-      [0x33, 0xFF, 0x33],     // 1 = green
-      [0xFF, 0xFF, 0x33],     // 2 = yellow
-      [0xFF, 0xFF, 0xFF],     // 3 = white
+    // 3-bit RGB palette: R=bit2, G=bit1, B=bit0
+    const palette: ([number, number, number] | null)[] = [
+      null,                    // 0 = black (transparent, don't overlay)
+      [0x33, 0x33, 0xFF],     // 1 = blue
+      [0x33, 0xFF, 0x33],     // 2 = green
+      [0x33, 0xFF, 0xFF],     // 3 = cyan
+      [0xFF, 0x33, 0x33],     // 4 = red
+      [0xFF, 0x33, 0xFF],     // 5 = magenta
+      [0xFF, 0xFF, 0x33],     // 6 = yellow
+      [0xFF, 0xFF, 0xFF],     // 7 = white
     ];
 
     for (let cy = 0; cy < CANVAS_H; cy++) {
       const gy = Math.floor(cy * GFX_HEIGHT / CANVAS_H);
       for (let cx = 0; cx < CANVAS_W; cx++) {
         const gx = Math.floor(cx * GFX_WIDTH / CANVAS_W);
-        const colorIdx = this.graphicsBuffer[gy * GFX_WIDTH + gx] & 0x03;
+        const colorIdx = this.graphicsBuffer[gy * GFX_WIDTH + gx] & 0x07;
         if (colorIdx !== 0) {
           const [r, g, b] = palette[colorIdx]!;
           const p = (cy * CANVAS_W + cx) * 4;
@@ -982,12 +987,16 @@ export class EPSPDisplay {
   }
 
   private renderGraphics(pixels: Uint8ClampedArray): void {
-    // Graphics colors: 0=black, 1=green, 2=yellow, 3=white
-    const palette = [
-      [0x00, 0x11, 0x00],  // black (dark bg)
-      [0x33, 0xFF, 0x33],  // green
-      [0xFF, 0xFF, 0x33],  // yellow
-      [0xFF, 0xFF, 0xFF],  // white
+    // 3-bit RGB palette: R=bit2, G=bit1, B=bit0
+    const palette: [number, number, number][] = [
+      [0x00, 0x11, 0x00],  // 0 = black (dark bg)
+      [0x33, 0x33, 0xFF],  // 1 = blue
+      [0x33, 0xFF, 0x33],  // 2 = green
+      [0x33, 0xFF, 0xFF],  // 3 = cyan
+      [0xFF, 0x33, 0x33],  // 4 = red
+      [0xFF, 0x33, 0xFF],  // 5 = magenta
+      [0xFF, 0xFF, 0x33],  // 6 = yellow
+      [0xFF, 0xFF, 0xFF],  // 7 = white
     ];
 
     // Scale graphics buffer to canvas
@@ -997,7 +1006,7 @@ export class EPSPDisplay {
       const gy = Math.floor(cy * GFX_HEIGHT / CANVAS_H);
       for (let cx = 0; cx < CANVAS_W; cx++) {
         const gx = Math.floor(cx * GFX_WIDTH / CANVAS_W);
-        const colorIdx = this.graphicsBuffer[gy * GFX_WIDTH + gx] & 0x03;
+        const colorIdx = this.graphicsBuffer[gy * GFX_WIDTH + gx] & 0x07;
         const [r, g, b] = palette[colorIdx];
         const p = (cy * CANVAS_W + cx) * 4;
         pixels[p] = r; pixels[p + 1] = g; pixels[p + 2] = b; pixels[p + 3] = 0xFF;
