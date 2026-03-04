@@ -1,6 +1,6 @@
 # Epson HX-20 Emulator
 
-A browser-based emulator of the [Epson HX-20](https://en.wikipedia.org/wiki/Epson_HX-20), the world's first laptop computer (1981). Emulates the full dual-CPU system including LCD display, keyboard, cassette storage, real-time clock, and external CRT display.
+A browser-based emulator of the [Epson HX-20](https://en.wikipedia.org/wiki/Epson_HX-20), the world's first laptop computer (1981). Emulates the full dual-CPU system including LCD display, keyboard, cassette storage, real-time clock, and external CRT display.  Written by Claude, but see the Acknowledgements section below.
 
 ## Features
 
