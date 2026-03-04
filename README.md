@@ -184,3 +184,16 @@ window.hx20.sciDebug = true    // Enable SCI/EPSP protocol tracing
 - **Vite 6** — dev server with HMR and production bundling
 - **Canvas API** — LCD and CRT pixel rendering
 - **localStorage** — tape library and machine state persistence
+
+## Acknowledgements
+
+While ts-hx20 is not a port of anyone else's emulator (it did a full annotated disassembly of the ROMs provided by Electrickery and worked from there; see the docs folder), Claude did refer to any existing emulators and documentation it could find, particularly
+
+* Electrickery's [HX-20 documentation](https://electrickery.nl/comp/hx20/index.html) and [ROMs](https://electrickery.nl/comp/hx20/ROMdump.html)
+* Frigolit's [HXEmu](https://frigolit.net/projects/hxemu/)
+* Martin Hepperle's [MH-20](https://www.mh-aerotools.de/hp/hx-20/)
+* [The MAME project](https://www.mamedev.org/)
+* Norbert Kehrer's [flashx20](https://norbertkehrer.github.io/flashx20.html)
+* Kobolt's [hex20](https://github.com/kobolt/hex20)
+* nerdprojects' [hxlink](https://github.com/nerdprojects/hxlink)
+
