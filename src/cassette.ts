@@ -333,17 +333,76 @@ export class Cassette {
     this.onLibraryChange();
   }
 
+  /** Pack transition data: delta-encode cycles, drop alternating levels, base64 */
+  private static packTransitions(data: number[]): { initLevel: number; data: string } {
+    if (data.length < 2) return { initLevel: 1, data: '' };
+    const initLevel = data[1];
+    // Collect cycle values (every other element starting at 0)
+    const cycles: number[] = [];
+    for (let i = 0; i < data.length; i += 2) cycles.push(data[i]);
+    // Delta-encode: first value stored as-is (4 bytes), then deltas
+    // Delta encoding: <2 bytes Uint16 LE> if < 0xFF00, else <0xFF 0xFF> + <4 bytes Uint32 LE>
+    const buf = new ArrayBuffer(4 + cycles.length * 6); // max possible size
+    const view = new DataView(buf);
+    let off = 0;
+    view.setUint32(off, cycles[0], true); off += 4;
+    for (let i = 1; i < cycles.length; i++) {
+      const delta = cycles[i] - cycles[i - 1];
+      if (delta < 0xFF00) {
+        view.setUint16(off, delta, true); off += 2;
+      } else {
+        view.setUint16(off, 0xFFFF, true); off += 2;
+        view.setUint32(off, delta, true); off += 4;
+      }
+    }
+    // Convert to base64
+    const bytes = new Uint8Array(buf, 0, off);
+    let bin = '';
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return { initLevel, data: btoa(bin) };
+  }
+
+  /** Unpack base64 delta-encoded transition data back to interleaved [cycle, level, ...] */
+  private static unpackTransitions(initLevel: number, packed: string): number[] {
+    if (!packed) return [];
+    const bin = atob(packed);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const view = new DataView(bytes.buffer);
+    const result: number[] = [];
+    let off = 0;
+    let cycle = view.getUint32(off, true); off += 4;
+    let level = initLevel;
+    result.push(cycle, level);
+    while (off < bytes.length) {
+      const d = view.getUint16(off, true); off += 2;
+      let delta: number;
+      if (d === 0xFFFF) {
+        delta = view.getUint32(off, true); off += 4;
+      } else {
+        delta = d;
+      }
+      cycle += delta;
+      level = level ? 0 : 1;
+      result.push(cycle, level);
+    }
+    return result;
+  }
+
   exportTape(name: string): string | null {
     const data = this.library.get(name);
     if (!data) return null;
-    return JSON.stringify({ name, transitions: data });
+    const p = Cassette.packTransitions(data);
+    return JSON.stringify({ name, v: 2, initLevel: p.initLevel, data: p.data });
   }
 
   importTape(json: string): string | null {
     try {
       const obj = JSON.parse(json);
-      if (!obj.name || !Array.isArray(obj.transitions)) return null;
-      this.library.set(obj.name as string, obj.transitions as number[]);
+      if (!obj.name) return null;
+      if (obj.v !== 2 || typeof obj.data !== 'string') return null;
+      const data = Cassette.unpackTransitions(obj.initLevel ?? 1, obj.data);
+      this.library.set(obj.name as string, data);
       this.saveToStorage();
       this.onLibraryChange();
       return obj.name as string;
@@ -356,10 +415,13 @@ export class Cassette {
 
   saveToStorage(): void {
     try {
-      const data: Record<string, number[]> = {};
-      for (const [k, v] of this.library) data[k] = v;
+      const tapes: Record<string, { initLevel: number; data: string }> = {};
+      for (const [k, v] of this.library) {
+        tapes[k] = Cassette.packTransitions(v);
+      }
       localStorage.setItem(this.storageKey, JSON.stringify({
-        tapes: data,
+        v: 2,
+        tapes,
         currentTape: this.currentTape,
         counter: this.tapeCounter,
       }));
@@ -375,8 +437,8 @@ export class Cassette {
       const s = JSON.parse(json);
       this.library.clear();
       if (s.tapes) {
-        for (const [k, v] of Object.entries(s.tapes)) {
-          this.library.set(k, v as number[]);
+        for (const [k, v] of Object.entries(s.tapes) as [string, any][]) {
+          this.library.set(k, Cassette.unpackTransitions(v.initLevel ?? 1, v.data ?? ''));
         }
       }
       this.currentTape = s.currentTape || null;
