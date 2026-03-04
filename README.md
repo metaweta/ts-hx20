@@ -69,20 +69,64 @@ npm run preview   # Preview the production build
 | **PUT LIST** | Upload a `.bas` text file (clears program first, then types it in) |
 | **Show Debug** | Register dump, disassembly, step/breakpoint controls |
 
-### Cassette Storage
+### Getting Data In and Out
 
-Each cassette interface has a tape library panel where you can create blank tapes, load/eject tapes, and import/export tape images as JSON files. CAS1 includes a rewind button. Tapes persist in localStorage.
+There are several ways to transfer programs and data between the emulator and your host computer, each with different trade-offs.
+
+#### BASIC Listing Transfer (GET LIST / PUT LIST)
+
+The simplest way to work with BASIC programs.
+
+- **GET LIST** reads the tokenized program directly from RAM, detokenizes it using the keyword table in ROM, and downloads the result as a `.bas` text file. Instantaneous — doesn't require the emulator to be running.
+- **PUT LIST** uploads a `.bas` file, issues `NEW`, then types each line through the keyboard matrix so BASIC tokenizes it normally. Requires the emulator to be running at the BASIC prompt. Speed depends on the emulation speed setting.
+
+*Pros:* Human-readable format, easy to edit in any text editor, works with programs from other sources (books, websites).
+*Cons:* PUT LIST is slow (simulates typing). Only transfers BASIC program text — not variables, machine code, or binary data.
+
+#### Machine State (SAVE STATE / LOAD STATE)
+
+A complete snapshot of the entire machine: both CPUs, all RAM (including expansion banks), ROM, LCD, RTC, and peripheral state.
+
+- **SAVE STATE** downloads a JSON file. **LOAD STATE** restores from one.
+- The emulator also auto-saves to localStorage every 5 seconds and resumes on page reload.
+
+*Pros:* Captures everything — program, variables, machine code, screen contents, mid-execution state. Instant save and restore.
+*Cons:* Large files (~100KB+). Opaque binary format — not human-editable. Tied to the emulator's internal state layout.
+
+#### Cassette Tapes (CAS0: / CAS1:)
+
+The authentic HX-20 storage mechanism. Programs are saved and loaded using BASIC's built-in cassette commands.
 
 ```basic
-SAVE "CAS1:HELLO"
-LOAD "CAS1:HELLO"
+SAVE "CAS1:HELLO"       ' save current program to tape
+LOAD "CAS1:HELLO"       ' load program from tape
 ```
 
-### BASIC Listing Transfer
+Each cassette panel provides a tape library where you can create blank tapes, insert/eject tapes, and import/export tape images as JSON files. CAS1 also has a rewind button. Tapes persist in localStorage between sessions.
 
-**GET LIST** reads the tokenized BASIC program directly from RAM, detokenizes it using the keyword table in ROM, and downloads the result as `program.bas`.
+Tape images use a compact binary format (delta-encoded FSK transitions, deflate-compressed, base64-encoded) so exported JSON files are small despite storing the full analog waveform.
 
-**PUT LIST** uploads a `.bas` text file, issues `NEW` to clear the current program, then types each line through the keyboard matrix so BASIC tokenizes it normally. The emulator must be running at the BASIC prompt.
+*Pros:* Authentic to the real hardware. Handles any data the real cassette could store (BASIC programs, machine code via `SAVEM`/`LOADM`, sequential data files). Tape images are portable and small.
+*Cons:* Slow — runs at real cassette speed (~1300 bps). Requires the emulator to be running. CAS0 (internal microcassette) has known reliability issues; CAS1 (external) is more reliable.
+
+#### Clipboard Paste (PASTE / Cmd+V)
+
+Pastes text from the clipboard into the keyboard matrix, as if typing. Useful for entering short programs or commands without a file.
+
+*Pros:* No file management needed, works with any text source.
+*Cons:* Same speed limitation as PUT LIST. No way to extract data (one-way).
+
+#### Printer Output (LLIST / LPRINT)
+
+The built-in printer captures output from `LLIST` (list program to printer) and `LPRINT` (print to printer). The printer panel has a **Copy** button that copies the output as an image to the clipboard.
+
+```basic
+LLIST                    ' print program listing to printer
+LPRINT "HELLO"           ' print text to printer
+```
+
+*Pros:* Produces a visual copy of output, including GRPH characters and graphics. Copy button makes it easy to paste into documents.
+*Cons:* Image only — not editable text. One-way (output only). Graphics screen dumps via CTRL+PF2 are also supported.
 
 ### External CRT Display
 
