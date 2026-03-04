@@ -6,7 +6,7 @@ A browser-based emulator of the [Epson HX-20](https://en.wikipedia.org/wiki/Epso
 
 - **Dual HD6301/HD6303 CPUs** — main (32KB ROM, 16KB RAM) and slave (4KB internal ROM) running in lockstep with cycle-accurate SCI serial communication at 38400 baud
 - **120x32 LCD** — 6 UPD7227 controllers arranged in a 3x2 grid, rendered to canvas with 4x upscaling
-- **External CRT display** — 40x24 text / 128x96 graphics via EPSP protocol (`SCREEN 1`)
+- **External CRT display** — 40x24 text / 128x96 graphics via EPSP protocol (`SCREEN 1`), 8-color (3-bit RGB) palette
 - **Full keyboard** — on-screen clickable keyboard with physical keyboard mapping, GRPH character support, and clipboard paste (Cmd+V)
 - **Two cassette interfaces**
   - CAS0: internal microcassette with bit-bang controller protocol
