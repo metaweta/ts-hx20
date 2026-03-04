@@ -100,12 +100,13 @@ btnDebugToggle.addEventListener('click', () => {
 // Printer panel
 const btnPrinterToggle = document.getElementById('btn-printer-toggle')!;
 const printerPanel = document.getElementById('printer-panel')!;
-const printerPaper = document.getElementById('printer-paper') as HTMLPreElement;
+const printerPaper = document.getElementById('printer-paper')!;
+const printerCanvas = document.getElementById('printer-canvas') as HTMLCanvasElement;
 const btnPrinterFeed = document.getElementById('btn-printer-feed')!;
 const btnPrinterTear = document.getElementById('btn-printer-tear')!;
 const btnPrinterCopy = document.getElementById('btn-printer-copy')!;
 
-hx20.printer.attachElement(printerPaper);
+hx20.printer.attachCanvas(printerCanvas, printerPaper);
 
 btnPrinterToggle.addEventListener('click', () => {
   printerPanel.classList.toggle('hidden');
@@ -122,8 +123,8 @@ btnPrinterTear.addEventListener('click', () => {
 
 btnPrinterCopy.addEventListener('click', async () => {
   try {
-    await navigator.clipboard.writeText(hx20.printer.getText());
-    statusText.textContent = 'Printer output copied';
+    await hx20.printer.copyAsImage();
+    statusText.textContent = 'Printer image copied';
   } catch {
     statusText.textContent = 'Clipboard access denied';
   }

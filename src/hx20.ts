@@ -929,25 +929,18 @@ export class HX20 {
     this.onRegistersUpdate(this.mainCPU.dumpRegisters());
   }
 
-  // CTRL+PF2 screen dump: read the 20×4 LCD display buffer and print it
-  // The display buffer at $0220 stores the 4×20 character grid shown on the LCD.
+  // CTRL+PF2 screen dump: capture LCD pixel buffer and print as bitmap
   // lcd_read_all ($E332) normally reads LCD controller VRAM pixels and sends
-  // them to the slave for thermal printing; we intercept and print text instead.
+  // them to the slave for thermal printing; we capture the pixel data directly.
   private printerScreenDump(): void {
-    const DISPLAY_BUFFER = 0x0220;
-    const COLS = 20;
-    const ROWS = 4;
-
-    for (let row = 0; row < ROWS; row++) {
-      for (let col = 0; col < COLS; col++) {
-        let ch = this.mainCPU.read(DISPLAY_BUFFER + row * COLS + col);
-        // Clamp non-printable to space
-        if (ch < 0x20 || ch > 0x7E) ch = 0x20;
-        this.printer.printChar(ch);
-      }
-      this.printer.printChar(0x0D);
-      this.printer.printChar(0x0A);
+    // Force-update LCD pixel buffer from controller RAM
+    this.lcd.pixels.fill(0);
+    for (const ctrl of this.lcd.controllers) {
+      ctrl.render(this.lcd.pixels, 120);
     }
+
+    // Send 120×32 LCD pixel buffer to printer as bitmap
+    this.printer.printBitmap(120, 32, new Uint8Array(this.lcd.pixels));
   }
 
   // Snapshot the entire machine state for persistence
