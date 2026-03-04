@@ -562,11 +562,11 @@ romFileInput.addEventListener('change', async () => {
 // Load binary ROMs from local public/roms/ directory
 async function loadLocalROMs(): Promise<void> {
   const [rom0, rom1, rom2, rom3, slave] = await Promise.all([
-    fetchBinaryROM('/roms/rom0.bin'),
-    fetchBinaryROM('/roms/rom1.bin'),
-    fetchBinaryROM('/roms/rom2.bin'),
-    fetchBinaryROM('/roms/rom3.bin'),
-    fetchBinaryROM('/roms/secondary.bin'),
+    fetchBinaryROM(import.meta.env.BASE_URL + 'roms/rom0.bin'),
+    fetchBinaryROM(import.meta.env.BASE_URL + 'roms/rom1.bin'),
+    fetchBinaryROM(import.meta.env.BASE_URL + 'roms/rom2.bin'),
+    fetchBinaryROM(import.meta.env.BASE_URL + 'roms/rom3.bin'),
+    fetchBinaryROM(import.meta.env.BASE_URL + 'roms/secondary.bin'),
   ]);
 
   // ROM layout in mainROM buffer (0x8000 bytes for addresses 0x8000-0xFFFF):
