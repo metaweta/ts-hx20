@@ -107,7 +107,7 @@ Each cassette panel provides a tape library where you can create blank tapes, in
 Tape images use a compact binary format (delta-encoded FSK transitions, deflate-compressed, base64-encoded) so exported JSON files are small despite storing the full analog waveform.
 
 *Pros:* Authentic to the real hardware. Handles any data the real cassette could store (BASIC programs, machine code via `SAVEM`/`LOADM`, sequential data files). Tape images are portable and small.
-*Cons:* Slow — runs at real cassette speed (~1300 bps). Requires the emulator to be running. CAS0 (internal microcassette) has known reliability issues; CAS1 (external) is more reliable.
+*Cons:* Slow — runs at real cassette speed (~1300 bps). Requires the emulator to be running.
 
 #### Clipboard Paste (PASTE / Cmd+V)
 
