@@ -943,6 +943,125 @@ export class HX20 {
     this.printer.printBitmap(120, 32, new Uint8Array(this.lcd.pixels));
   }
 
+  // Parse keyword table from ROM at offset 0x00B1 (address 0x80B1)
+  // Returns array: indices 0-126 = tokens 0x80-0xFE, 127+ = 0xFF-prefixed function tokens
+  private parseKeywordTable(): string[] {
+    const keywords: string[] = [];
+    let pos = 0x00B1; // ROM offset for address 0x80B1
+    while (this.mainROM[pos] !== 0x00 && pos < this.mainROM.length) {
+      let kw = '';
+      while (pos < this.mainROM.length) {
+        const b = this.mainROM[pos++];
+        if (b & 0x80) {
+          kw += String.fromCharCode(b & 0x7F);
+          break;
+        }
+        kw += String.fromCharCode(b);
+      }
+      keywords.push(kw);
+    }
+    return keywords;
+  }
+
+  // Extract BASIC program from RAM and detokenize to ASCII listing
+  getBasicListing(): string {
+    const keywords = this.parseKeywordTable();
+
+    // HeadPointer at 0x009C-0x009D (CPU internal RAM, big-endian)
+    const headPtr = (this.mainCPU.read(0x009C) << 8) | this.mainCPU.read(0x009D);
+    if (headPtr === 0) return '';
+
+    const lines: string[] = [];
+    let addr = headPtr;
+    const seen = new Set<number>(); // guard against infinite loops
+
+    while (addr !== 0 && !seen.has(addr)) {
+      seen.add(addr);
+      const nextPtr = (this.mainCPU.read(addr) << 8) | this.mainCPU.read(addr + 1);
+      const lineNum = (this.mainCPU.read(addr + 2) << 8) | this.mainCPU.read(addr + 3);
+
+      if (nextPtr === 0) break;
+
+      let text = `${lineNum} `;
+      let i = addr + 4;
+      let inQuote = false;
+      let isRem = false;
+
+      while (true) {
+        const b = this.mainCPU.read(i);
+        if (b === 0) break;
+
+        if (isRem) {
+          text += String.fromCharCode(b);
+          i++;
+          continue;
+        }
+
+        if (b === 0x22) { // double quote
+          inQuote = !inQuote;
+          text += '"';
+          i++;
+          continue;
+        }
+
+        if (inQuote) {
+          text += String.fromCharCode(b);
+          i++;
+          continue;
+        }
+
+        if (b < 0x80) {
+          // Literal ASCII — check for colon before ' or ELSE tokens
+          if (b === 0x3A) {
+            const next = this.mainCPU.read(i + 1);
+            if (next === 0x8D) {
+              // ' (REM shorthand) — suppress the colon, output '
+              text += keywords[0x8D - 0x80] || "'";
+              isRem = true;
+              i += 2;
+              continue;
+            }
+            if (next === 0x8F) {
+              // ELSE — suppress the colon
+              text += keywords[0x8F - 0x80] || "ELSE";
+              i += 2;
+              continue;
+            }
+          }
+          text += String.fromCharCode(b);
+          i++;
+          continue;
+        }
+
+        if (b === 0xFF) {
+          // Function token prefix
+          i++;
+          const sub = this.mainCPU.read(i);
+          const idx = 127 + (sub - 0x80);
+          text += keywords[idx] || `?FF${sub.toString(16)}?`;
+          i++;
+          continue;
+        }
+
+        // Single-byte token 0x80-0xFE
+        const idx = b - 0x80;
+        text += keywords[idx] || `?${b.toString(16)}?`;
+
+        // After REM (0x8C) or ' (0x8D), rest of line is literal
+        if (b === 0x8C || b === 0x8D) {
+          isRem = true;
+        }
+
+        i++;
+      }
+
+      lines.push(text);
+      addr = nextPtr;
+    }
+
+    return lines.join('\n') + '\n';
+  }
+
   // Snapshot the entire machine state for persistence
   saveState(): string {
     const lcdControllers = this.lcd.controllers.map(c => ({

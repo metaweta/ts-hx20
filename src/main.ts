@@ -237,11 +237,82 @@ function stopAutoSave(): void {
   }
 }
 
+// --- Save/Load state to file ---
+const btnSaveState = document.getElementById('btn-save-state')!;
+const btnLoadState = document.getElementById('btn-load-state')!;
+const stateFileInput = document.getElementById('state-file-input') as HTMLInputElement;
+
+btnSaveState.addEventListener('click', () => {
+  const json = hx20.saveState();
+  const blob = new Blob([json], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `hx20-state-${new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-')}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  statusText.textContent = 'State saved to file';
+});
+
+btnLoadState.addEventListener('click', () => stateFileInput.click());
+stateFileInput.addEventListener('change', async () => {
+  const file = stateFileInput.files?.[0];
+  if (!file) return;
+  try {
+    const json = await file.text();
+    hx20.stop();
+    hx20.loadState(json);
+    hx20.lcd.render();
+    hx20.start();
+    startAutoSave();
+    statusText.textContent = `State loaded: ${file.name}`;
+    btnPower.classList.add('active');
+  } catch (e) {
+    statusText.textContent = `Failed to load state: ${e}`;
+  }
+  stateFileInput.value = '';
+});
+
 // Speed control
 speedSlider.addEventListener('input', () => {
   const val = parseInt(speedSlider.value);
   hx20.speedMultiplier = val;
   speedDisplay.textContent = `${val}x`;
+});
+
+// --- GET LIST / PUT LIST ---
+const btnGetList = document.getElementById('btn-get-list')!;
+const btnPutList = document.getElementById('btn-put-list')!;
+const listFileInput = document.getElementById('list-file-input') as HTMLInputElement;
+
+btnGetList.addEventListener('click', () => {
+  const listing = hx20.getBasicListing();
+  if (!listing) {
+    statusText.textContent = 'No BASIC program in memory';
+    return;
+  }
+  const blob = new Blob([listing], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'program.bas';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  statusText.textContent = `Downloaded listing (${listing.split('\n').length - 1} lines)`;
+});
+
+btnPutList.addEventListener('click', () => listFileInput.click());
+listFileInput.addEventListener('change', async () => {
+  const file = listFileInput.files?.[0];
+  if (!file) return;
+  const text = await file.text();
+  if (!text.trim()) {
+    statusText.textContent = 'Empty file';
+    listFileInput.value = '';
+    return;
+  }
+  hx20.keyboard.typeText('NEW\n' + text);
+  statusText.textContent = `Loading ${file.name} (${text.length} chars)...`;
+  hx20.keyboard.onPasteFinish = () => { statusText.textContent = `${file.name} loaded`; };
+  listFileInput.value = '';
 });
 
 // --- Paste button ---

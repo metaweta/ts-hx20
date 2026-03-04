@@ -26,6 +26,9 @@
             <option value="8">128KB</option>
           </select>
         </label>
+        <button id="btn-save-state" title="Save machine state to file">SAVE STATE</button>
+        <button id="btn-load-state" title="Load machine state from file">LOAD STATE</button>
+        <input type="file" id="state-file-input" accept=".json" style="display:none">
       </div>
     </div>
 
@@ -48,6 +51,9 @@
       <button id="btn-crt-toggle">CRT</button>
       <button id="btn-printer-toggle">PRINTER</button>
       <button id="btn-debug-toggle">Show Debug</button>
+      <button id="btn-get-list" title="Download BASIC listing as text file">GET LIST</button>
+      <button id="btn-put-list" title="Upload BASIC listing text file">PUT LIST</button>
+      <input type="file" id="list-file-input" accept=".bas,.txt,.basic" style="display:none">
     </div>
 
     <div id="cas0-panel" class="cassette-panel hidden">
