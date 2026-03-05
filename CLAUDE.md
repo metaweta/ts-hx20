@@ -65,4 +65,16 @@ Group 4 (0x4_): F8C9
 - Diagnostic breakpoints fire automatically when sciDebug=true
 
 ### ROM Disassembly
-- `docs/main-rom-disasm.s` — fully commented main ROM disassembly
+- `disassemblies/main-rom-disasm.s` — fully commented main ROM disassembly
+- `disassemblies/tf20-rom-disasm.s` — TF-20 EPSP controller ROM (HD6303R, 8KB)
+- `disassemblies/boot80-disasm.s` — BOOT80.SYS disk boot loader (256B, runs on HX-20)
+- `disassemblies/dbasic-disasm.s` — DBASIC.SYS Disk BASIC V-1.0 extension (4.7KB)
+
+## TODO
+
+1. Finish debugging TF-20 execution.
+2. ~~Full commented disassembly of the TF-20 ROMs in the same style as the one in docs/.  Use ../../a09-build and ../../f9dasm to make it.  Rename docs subdirectory to disassemblies.~~ Done — TF-20 ROM, BOOT80.SYS, and DBASIC.SYS disassembled with info files. Comments need continued refinement.
+3. Fix bug where messages intended for the LCD screen when loading and saving end up copied to the printer.
+4. Fix the bugs preventing use of the MONITOR program.
+
+

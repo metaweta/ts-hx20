@@ -1,0 +1,71 @@
+* f9dasm info file for DBASIC.SYS — Disk BASIC V-1.0 extension
+* 4737 bytes, loaded at $6000 on 32KB HX-20 (mem_size=$7281)
+* Runs on HD6303R main CPU — adds disk file I/O commands to BASIC
+* Embedded in tf20.ts as DBASIC_B64 (header stripped)
+*
+* Copyright 1982 by Microsoft & EPSON
+*
+* Adds keywords: FILES, KILL, NAME, OPEN, CLOSE, FIELD,
+*   LSET, RSET, PUT, GET, PRINT#, INPUT#, LINE INPUT#,
+*   DSKO$, DSKI$, LOF, LOC, MKI$, MKS$, MKD$,
+*   CVI, CVS, CVD
+
+OPTION 6301
+
+* ============================================================
+* HX-20 Direct Page Variables Referenced
+* ============================================================
+label 0085 var_type
+label 008F fp_work
+label 009C head_ptr
+label 009E bas_string_pool_size
+label 00A4 bas_fre_result
+label 00A6 bas_tmp1
+label 00AA bas_tmp2
+label 00C4 bas_code_ptr
+label 00D9 bas_data_ptr
+
+* ============================================================
+* HX-20 Workspace Addresses
+* ============================================================
+label 04B2 mem_size
+label 05A2 bas_ext_base
+label 05A4 bas_ext_end
+label 05AE bas_ext_fn_table
+label 05B3 bas_ext_fn_dispatch_ptr
+label 05B8 bas_ext_stmt_dispatch_ptr
+label 05E5 bas_ext_hooks
+
+* ============================================================
+* Code Regions
+* ============================================================
+code 6000-7280
+
+* ============================================================
+* Key Labels (init, keyword table, dispatch)
+* ============================================================
+label 6000 dbasic_init
+
+* Keyword table: MSB-terminated strings, tokens $80+
+* KILL, NAME, FIELD, LSET, RSET, RESET, SYSGEN, FRMAT,
+* FILNUM, DSKO$, CVI, CVS, CVD, MKI$, MKS$, MKD$, LOC, DSKF, DSKI$
+CHAR 6B70-6BC8
+
+* Statement dispatch table (word pointers)
+WORD 6B50-6B6F
+
+* Function dispatch table (word pointers)
+WORD 6BC9-6BEB
+
+* Error message strings (via BASIC error handler)
+label 6438 err_directory_full
+label 644D err_too_many_open
+label 6464 err_disk_full
+label 6505 err_file_exists
+label 6538 err_field_overflow
+label 6565 err_bad_record_num
+label 659E err_disk_write_prot
+label 65D4 str_read
+label 65EB str_write
+
+END

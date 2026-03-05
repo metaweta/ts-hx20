@@ -1,0 +1,314 @@
+* f9dasm info file for TF-20 EPSP controller ROM (k3pf1.bin, HD6303R)
+* 8KB ROM loaded at $E000-$FFFF
+* Handles EPSP serial protocol between HX-20 and TF-20 floppy subsystem
+
+OPTION 6301
+
+* ============================================================
+* HD6303R Internal I/O Registers (00-14)
+* ============================================================
+label 00 P1DDR
+label 01 P2DDR
+label 02 PORT1
+label 03 PORT2
+label 04 P3DDR
+label 05 P4DDR
+label 06 PORT3
+label 07 PORT4
+label 08 TCSR
+label 09 FRC_H
+label 0A FRC_L
+label 0B OCR_H
+label 0C OCR_L
+label 0D ICR_H
+label 0E ICR_L
+label 0F P3CSR
+label 10 RMCR
+label 11 TRCSR
+label 12 RDR
+label 13 TDR
+label 14 RAMCR
+
+* ============================================================
+* TF-20 External I/O (directly decoded on bus)
+* ============================================================
+label 15 EXT_PORT5
+label 16 FDC_CFG_LO
+label 17 FDC_CFG_HI
+label 1B EXT_CFG
+label 1C BAUD_CFG
+label 1D EXT_CFG2
+
+* ============================================================
+* HD6303R Internal RAM — Variables ($40-$7F)
+* ============================================================
+label 40 drv_num
+label 41 trk_num
+label 42 sec_num
+label 43 sec_div8
+label 44 prev_drv
+label 45 prev_trk
+label 46 prev_sec
+label 47 disk_open_flag
+label 48 writeback_pending
+label 49 sector_buf_ptr
+label 4B drv_select
+label 4C fdc_track
+label 4D fdc_sector
+label 4E side_select
+label 4F cached_drv
+label 50 cached_trk
+label 51 cached_sec
+label 52 retry_counter
+label 53 alloc_track
+label 54 sector_count
+label 55 side_byte
+label 56 seek_track
+label 57 motor0_flag
+label 58 motor1_flag
+label 59 write_dir
+label 5A flush_flag
+label 5B write_mode
+label 5C rw_mode
+label 5D error_code
+label 5E error_info1
+label 5F error_info2
+label 60 abort_flag
+label 61 retry_limit_cnt
+label 62 timeout_counter
+label 64 device_id
+label 65 fdc_status_temp
+label 66 stepper_phase
+label 67 floppy_detect
+label 68 spt_config
+label 69 max_spt
+label 6A gap_fill
+label 6B disk_retry_limit
+label 6C src_ptr
+label 6E temp_ptr
+label 70 dest_ptr
+label 72 dma_read_buf
+label 74 dma_write_buf
+label 76 operation_type
+label 77 xfer_direction
+label 78 xor_mask_trk
+label 79 xor_mask_side
+label 7A xor_mask_sec
+
+* ============================================================
+* External RAM ($0800-$0AFF)
+* ============================================================
+label 0AFF stack_top
+
+* ============================================================
+* EPSP Packet Buffer ($0B00-$0B8F)
+* ============================================================
+label 0B00 epsp_fmt
+label 0B01 epsp_did
+label 0B02 epsp_sid
+label 0B03 epsp_fnc
+label 0B04 epsp_siz
+label 0B05 epsp_data
+label 0B06 epsp_data1
+label 0B07 epsp_data2
+label 0B08 epsp_data3
+label 0B09 epsp_data4
+label 0B0A epsp_data5
+label 0B0B epsp_data6
+label 0B0C epsp_data7
+label 0B85 epsp_err_ret
+label 0B89 fdc_result_buf
+label 0B8C fdc_cmd_buf
+label 0B8D fdc_cmd_buf1
+label 0B8E fdc_cmd_buf2
+label 0B8F fdc_cmd_buf3
+
+* ============================================================
+* Sector Buffers and FDC Interface
+* ============================================================
+label 0BBA sci_timeout
+label 0C00 sector_buf_0
+label 0E00 sector_buf_1
+label 0999 step_timeout
+label 039A step_delay
+label 03B8 init_delay_short
+label 0771 init_delay_long
+label 04CE stepper_delay
+
+* FDC hardware registers (active accent through bus)
+label 1000 FDC_STATUS
+label 1001 FDC_DATA
+label 1331 fdc_poll_delay
+label 1800 FDC_SELECT
+
+* FDC DMA areas
+label 4000 fdc_dma_read
+label 5200 fdc_dma_write
+
+* ============================================================
+* Code Regions
+* ============================================================
+code E000-EEA3
+
+* ============================================================
+* Data Regions
+* ============================================================
+* Dispatch table — function code to handler address
+WORD E0E4-E10D
+
+* Init data copied to $7B+ (12 bytes)
+DATA EA7A-EA85
+
+* Init data copied to $99+ (14 bytes)
+DATA EA86-EA93
+
+* Unused ROM area
+UNUSED EEA4-FFE9
+
+* Additional interrupt vectors (pre-standard)
+WORD FFEA-FFEF
+
+* Standard HD6303R interrupt vectors
+WORD FFF0-FFFF
+
+* ============================================================
+* Subroutine Labels
+* ============================================================
+
+* --- Reset and Main Loop ---
+label E000 reset_init
+label E038 read_dip_sw1
+label E04B read_dip_sw2
+label E061 init_serial
+label E082 copy_init_data1
+label E09D copy_init_data2
+label E0B8 main_cmd_loop
+label E0DE send_response_and_loop
+label E0E4 dispatch_table
+
+* --- BDOS Function Handlers ---
+* Table index computed from function code
+label E114 fn_random_read
+label E181 do_sector_read
+label E229 fn_random_write
+label E2F7 fn_close_file
+label E347 fn_find_first
+label E433 fn_disk_reset_select
+label E502 fn_compute_fs
+label E511 fn_find_next_err
+label E516 fn_find_first_ext
+label E54E fn_find_next_ext1
+label E55C fn_find_next_ext2
+label E660 fn_read_sector
+label E665 fn_write_sector
+label E6B4 fn_set_retry
+label E6BD fn_format_track
+label E756 fn_get_version
+label E10E fn_unimplemented
+label E111 fn_unimplemented2
+
+* --- Response Builders ---
+label E4A1 return_error_80
+label E4AB return_result_00
+label E4B4 return_result_02
+label E4BE return_result_03
+label E4C5 return_result_store
+label E4D3 return_result_pair
+label E4E0 return_result_01
+label E4E5 finalize_response
+label E4EB build_epsp_response
+
+* --- Disk I/O Helpers ---
+label E45E check_disk_ready
+label E478 delay_long
+label E487 delay_medium
+label E491 delay_short
+label E49B delay_tiny
+
+* --- Sector Read/Write with Retry ---
+label E761 flush_sector_cache
+label E77B fdc_read_sector
+label E7A2 setup_prev_sector
+label E7BD set_read_error
+label E7C7 fdc_writeback_sector
+label E804 fdc_write_sector
+label E82B fdc_seek_track
+label E859 fdc_recalibrate
+
+* --- EPSP Protocol: Receive ---
+label E920 epsp_recv_byte_slp
+label E948 sci_recv_byte_poll
+label E95C sci_recv_with_timeout
+label E96B epsp_recv_header
+label E97F epsp_recv_data
+label E999 epsp_send_response
+
+* --- EPSP Protocol: Send ---
+label E9F1 sci_send_with_checksum
+label E9F5 sci_send_byte_wait
+label EA00 epsp_send_ack
+label EA04 epsp_send_nak
+label EA08 epsp_send_eot
+label EA0C epsp_send_soh_header
+label EA21 epsp_send_header_checksum
+label EA26 epsp_send_stx_data
+label EA41 epsp_send_etx
+label EA45 epsp_send_data_checksum
+
+* --- Motor Control ---
+label EA4A motor0_on
+label EA62 motor_spinup_delay
+label EA6A motor0_off
+label EA94 motor1_on
+label EAB3 motor1_off
+label EABD stepper_clr_bit3
+label EAC4 stepper_set_bit3
+
+* --- FDC Command Interface ---
+label EACB fdc_cmd_force_interrupt
+label EADF fdc_cmd_seek
+label EAF6 fdc_cmd_restore
+label EB03 fdc_wait_seek_complete
+label EB7B fdc_set_track
+label EB9B fdc_read_cmd
+label EC02 fdc_write_cmd
+label EC8C fdc_format_cmd
+label ED46 fdc_write_reg
+label ED55 fdc_read_reg
+label ED63 stepper_step_in
+label ED74 stepper_step_out
+label ED87 stepper_update_port
+label ED91 fdc_send_sector_params
+
+* --- Init Data Tables ---
+label EA7A init_data_7B
+label EA86 init_data_99
+
+* --- Interrupt Handlers ---
+label EDFB hdlr_sci
+label EE0F hdlr_timer_ovf
+label EE36 hdlr_irq1
+label EE3C hdlr_default
+label EE55 hdlr_nmi_loop
+label EE66 hdlr_ocf
+label EE7E hdlr_icf
+
+* ============================================================
+* Interrupt Vector Labels
+* ============================================================
+* Pre-standard vectors at FFEA
+label FFEA vec_icf_ext
+label FFEC vec_default1
+label FFEE vec_default2
+
+* Standard HD6303R vectors at FFF0
+label FFF0 vec_sci
+label FFF2 vec_tof
+label FFF4 vec_ocf
+label FFF6 vec_icf
+label FFF8 vec_irq1
+label FFFA vec_swi
+label FFFC vec_nmi
+label FFFE vec_reset
+
+END

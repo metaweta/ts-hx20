@@ -1,0 +1,75 @@
+* f9dasm info file for BOOT80.SYS — TF-20 disk boot loader
+* 256 bytes loaded at $0400 by HX-20 main CPU during disk boot
+* Runs on HD6303R main CPU — loads DBASIC.SYS from TF-20
+
+OPTION 6301
+
+* ============================================================
+* HX-20 System Variables Referenced
+* ============================================================
+label 008F fp_work
+label 009E bas_string_pool_size
+label 00C4 bas_code_ptr
+label 00C6 bas_var_base
+label 00C8 bas_array_base
+label 00CA bas_free_mem
+label 00D5 bas_load_flag
+label 00D9 bas_data_ptr
+
+* ============================================================
+* HX-20 Workspace Addresses
+* ============================================================
+label 04B2 mem_size
+label 04FE bas_ext_size
+label 05A2 bas_ext_base
+label 0921 tf20_ctrl_block
+label 0926 tf20_status
+label 0927 tf20_saved_ptr
+label 0928 tf20_data_buf
+label 0932 saved_mem_size
+label 09A8 tf20_data_end
+
+* ============================================================
+* HX-20 ROM Subroutines Called
+* ============================================================
+label 917E bas_print_error_msg
+label B383 bas_warm_start
+label B3A4 tf20_setup_load_request
+label B74F bas_clear_variables
+label BCB1 bas_adjust_memory
+label FF70 api_tf20_io
+
+* ============================================================
+* Code/Data Regions
+* ============================================================
+code 0400-04B6
+
+* Filename FCB: "DBASIC  SYS" + config
+DATA 04B7-04EB
+
+* Boot parameter table (pointers/config)
+DATA 04EC-04FF
+
+* ============================================================
+* Labels
+* ============================================================
+label 0400 boot_entry
+label 041E load_file_sub
+label 042A check_mem_error
+label 0435 filename_data
+label 044A str_out_of_mem_id
+label 0446 load_block_cfg
+label 044F request_next_block
+label 045F copy_block_loop
+label 0459 str_cannot_load_id
+label 047B load_error
+label 0497 mem_error
+label 049A print_error
+label 049D exit_to_basic
+label 04A0 tf20_load_request
+label 04B7 boot_config_data
+label 04BC str_dbasic_sys
+label 04CD str_out_of_memory
+label 04DC str_cannot_load
+
+END
