@@ -64,17 +64,24 @@ Group 4 (0x4_): F8C9
 - `window.hx20` exposed for console access
 - Diagnostic breakpoints fire automatically when sciDebug=true
 
-### ROM Disassembly
+### ROM Disassemblies
 - `disassemblies/main-rom-disasm.s` — fully commented main ROM disassembly
-- `disassemblies/tf20-rom-disasm.s` — TF-20 EPSP controller ROM (HD6303R, 8KB)
+- `disassemblies/slave-rom-disasm.s` — slave CPU ROM (4KB)
+- `disassemblies/tf20-rom-disasm.s` — TF-20 EPSP controller ROM (Z80, 8KB)
 - `disassemblies/boot80-disasm.s` — BOOT80.SYS disk boot loader (256B, runs on HX-20)
-- `disassemblies/dbasic-disasm.s` — DBASIC.SYS Disk BASIC V-1.0 extension (4.7KB)
+- `disassemblies/dbasic-disasm.s` — DBASIC.SYS Disk BASIC V-1.0 extension (4.7KB PRL)
+
+### TF-20 Floppy Disk
+- EPSP protocol: DID $31-$34, broadcast serial to both EPSPDisplay and TF20
+- BOOT80.SYS (256B) sent via FN_DISK_BOOT ($80), then DBASIC.SYS via FN_LOAD_OPEN/FN_READ_BLOCK
+- DBASIC.SYS uses CP/M PRL format: 4158 bytes code (base page $60) + 520 bytes relocation bitmap
+- Relocation: reads MEMTOP from $04B2, computes target page, applies bitmap-guided delta to high address bytes
+- Two independent drives (A: and B:) as separate in-memory CP/M filesystems
+- ROM bug fix: DBASIC $6878 ORAA #$37 ($8A) → ADDA #$37 ($8B) so A: ($0A+$37=$41) and B: ($0B+$37=$42) produce distinct drive codes
 
 ## TODO
 
-1. Finish debugging TF-20 execution.
-2. ~~Full commented disassembly of the TF-20 ROMs in the same style as the one in docs/.  Use ../../a09-build and ../../f9dasm to make it.  Rename docs subdirectory to disassemblies.~~ Done — TF-20 ROM, BOOT80.SYS, and DBASIC.SYS disassembled with info files. Comments need continued refinement.
+1. ~~Finish debugging TF-20 execution.~~ Done — TF-20 boots, SAVE/LOAD/FILES/KILL all work, both drives independent.
+2. ~~Full commented disassembly of the TF-20 ROMs.~~ Done — TF-20 ROM, BOOT80.SYS, and DBASIC.SYS disassembled with info files.
 3. Fix bug where messages intended for the LCD screen when loading and saving end up copied to the printer.
-4. Fix the bugs preventing use of the MONITOR program.
-
-
+4. ~~Fix the bugs preventing use of the MONITOR program.~~ Done — implemented TRAP instruction (opcode $00).
