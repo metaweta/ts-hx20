@@ -70,6 +70,7 @@ Group 4 (0x4_): F8C9
 - `disassemblies/tf20-rom-disasm.s` — TF-20 EPSP controller ROM (Z80, 8KB)
 - `disassemblies/boot80-disasm.s` — BOOT80.SYS disk boot loader (256B, runs on HX-20)
 - `disassemblies/dbasic-disasm.s` — DBASIC.SYS Disk BASIC V-1.0 extension (4.7KB PRL)
+- `disassemblies/forth-rom-disasm.s` — HCCS Forth option ROM (8KB FIG-Forth, $6000-$7FFF)
 
 ### TF-20 Floppy Disk
 - EPSP protocol: DID $31-$34, broadcast serial to both EPSPDisplay and TF20
