@@ -80,10 +80,10 @@ There are several ways to transfer programs and data between the emulator and yo
 The simplest way to work with BASIC programs.
 
 - **GET LIST** reads the tokenized program directly from RAM, detokenizes it using the keyword table in ROM, and downloads the result as a `.bas` text file. Instantaneous — doesn't require the emulator to be running.
-- **PUT LIST** uploads a `.bas` file, issues `NEW`, then types each line through the keyboard matrix so BASIC tokenizes it normally. Requires the emulator to be running at the BASIC prompt. Speed depends on the emulation speed setting.
+- **PUT LIST** uploads a `.bas` file, issues `NEW`, then injects each line into the keyboard FIFO so BASIC tokenizes it normally. Requires the emulator to be running at the BASIC prompt.
 
 *Pros:* Human-readable format, easy to edit in any text editor, works with programs from other sources (books, websites).
-*Cons:* PUT LIST is slow (simulates typing). Only transfers BASIC program text — not variables, machine code, or binary data.
+*Cons:* Only transfers BASIC program text — not variables, machine code, or binary data.
 
 #### Machine State (SAVE STATE / LOAD STATE)
 
@@ -113,10 +113,10 @@ Tape images use a compact binary format (delta-encoded FSK transitions, deflate-
 
 #### Clipboard Paste (PASTE / Cmd+V)
 
-Pastes text from the clipboard into the keyboard matrix, as if typing. Useful for entering short programs or commands without a file.
+Pastes text from the clipboard directly into the keyboard FIFO. Useful for entering short programs or commands without a file.
 
 *Pros:* No file management needed, works with any text source.
-*Cons:* Same speed limitation as PUT LIST. No way to extract data (one-way).
+*Cons:* One-way (no way to extract data).
 
 #### Printer Output (LLIST / LPRINT)
 

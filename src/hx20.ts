@@ -104,6 +104,18 @@ export class HX20 {
     this.wireSerial();
     this.wireSIO();
 
+    // Give keyboard module direct FIFO injection for paste.
+    // This bypasses the matrix → IRQ1 → scan → debounce pipeline entirely,
+    // injecting ASCII characters straight into the firmware's keyboard FIFO.
+    this.keyboard.injectToFifo = (code: number): boolean => {
+      const count = this.mainRAM[0x68]; // kbd_buf_count at $0168
+      const max = this.mainRAM[0x40];   // kbd_buf_max at $0140
+      if (count >= max) return false;
+      this.mainRAM[0x81 + count] = code; // kbd_fifo at $0181
+      this.mainRAM[0x68] = count + 1;    // kbd_buf_count++
+      return true;
+    };
+
     // EPSP display response → main CPU SCI RX
     this.epspDisplay.onSendByte = (data: number) => {
       this.mainCPU.serialRecv(data);
@@ -145,13 +157,15 @@ export class HX20 {
         case 0x0020: return this.ksc; // KSC (write-only, but reads return last written)
         case 0x0022: {
           const val = this.keyboard.readKRTN07(this.ksc);
-          this.updateMainIRQ(); // KRTN read clears keyboard IRQ latch
+          this.keyboard.clearIrqLatch();
+          this.updateMainIRQ();
           return val;
         }
         case 0x0026: return 0xFF;
         case 0x0028: {
           const val = this.keyboard.readKRTN89(this.ksc);
-          this.updateMainIRQ(); // KRTN read clears keyboard IRQ latch
+          this.keyboard.clearIrqLatch();
+          this.updateMainIRQ();
           return val;
         }
         case 0x002A:
@@ -536,6 +550,11 @@ export class HX20 {
   // Run one frame's worth of CPU cycles — both CPUs interleaved
   runFrame(): void {
     const targetCycles = HX20.CYCLES_PER_FRAME * this.speedMultiplier;
+
+    // Drive paste state machine (before IRQ update so pressed keys take effect immediately)
+    if (this.keyboard.isPasting) {
+      this.keyboard.pasteUpdate();
+    }
 
     // Transfer any pending key events to the IRQ latch
     if (this.keyboard.hasKeyRequest()) {

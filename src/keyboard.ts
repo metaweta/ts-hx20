@@ -256,8 +256,7 @@ export class Keyboard {
         result &= this.matrix[col];
       }
     }
-    // Reading keyboard matrix acknowledges the interrupt
-    this.irqLatch = false;
+    // irqLatch clearing is handled by the caller (hx20.ts) based on CPU context
     return result;
   }
 
@@ -278,9 +277,12 @@ export class Keyboard {
     result &= 0x3F;
     result |= 0x80; // not busy
     result |= 0x40; // PWSW = 1 (power switch ON)
-    // Reading keyboard matrix acknowledges the interrupt
-    this.irqLatch = false;
+    // irqLatch clearing is handled by the caller (hx20.ts) based on CPU context
     return result;
+  }
+
+  clearIrqLatch(): void {
+    this.irqLatch = false;
   }
 
   private getRow89(col: number): number {
@@ -502,95 +504,91 @@ export class Keyboard {
     }
   }
 
-  // --- Paste / type-in support ---
+  // --- Paste / type-in support (direct FIFO injection) ---
+  // Instead of pressing keys in the matrix and relying on the firmware's
+  // IRQ1 → scan → debounce pipeline (which has many timing pitfalls),
+  // paste injects ASCII characters directly into the keyboard FIFO in RAM.
   private pasteQueue: string[] = [];
   private pasteActive = false;
+  private pasteWaitFrames = 0;
   onPasteFinish: (() => void) | null = null;
 
-  /** Feed a string into the keyboard matrix one character at a time. */
+  // Callback set by hx20.ts to write directly to kbd_fifo in main RAM.
+  // Returns true if the character was injected, false if FIFO is full.
+  injectToFifo: ((code: number) => boolean) | null = null;
+
+  /** Feed a string into the keyboard FIFO one character at a time. */
   typeText(text: string): void {
     const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     this.pasteQueue.push(...normalized);
-    if (!this.pasteActive) this.feedNextChar();
+    if (!this.pasteActive) {
+      this.pasteActive = true;
+      this.pasteWaitFrames = 0;
+    }
   }
 
   cancelPaste(): void {
     this.pasteQueue.length = 0;
     this.pasteActive = false;
+    this.pasteWaitFrames = 0;
   }
 
   get isPasting(): boolean {
     return this.pasteActive;
   }
 
-  private feedNextChar(): void {
-    if (this.pasteQueue.length === 0) {
-      this.pasteActive = false;
-      this.onPasteFinish?.();
+  /** Called each frame from runFrame(). Injects next character into FIFO. */
+  pasteUpdate(): void {
+    if (!this.pasteActive || !this.injectToFifo) return;
+
+    // Wait after Enter for line processing
+    if (this.pasteWaitFrames > 0) {
+      this.pasteWaitFrames--;
       return;
     }
-    this.pasteActive = true;
-    const ch = this.pasteQueue.shift()!;
-    const code = ch.charCodeAt(0);
 
-    // GRPH characters (0x80-0x9F): press GRPH + key simultaneously
-    const grphMapping = (code >= 0x80 && code <= 0x9F) ? GRPH_MAP[code] : undefined;
-    if (grphMapping) {
-      this.matrix[6] &= ~(1 << 6); // GRPH down
-      this.matrix[grphMapping.col] &= ~(1 << grphMapping.row);
-      this.kbrequest = true;
+    // Skip unmappable characters, inject next valid one
+    while (this.pasteQueue.length > 0) {
+      const ch = this.pasteQueue.shift()!;
+      const code = ch.charCodeAt(0);
+
+      // Map character to HX-20 FIFO byte
+      let fifoCode: number | null = null;
+      if (ch === '\n') {
+        fifoCode = 0x0D; // Enter/CR
+      } else if (code >= 0x20 && code <= 0x7E) {
+        fifoCode = code; // Printable ASCII
+      } else if (code >= 0x80 && code <= 0x9F) {
+        fifoCode = code; // GRPH characters
+      } else if (code === 0x09) {
+        fifoCode = 0x09; // Tab
+      }
+
+      if (fifoCode === null) continue; // skip unmappable
+
+      if (!this.injectToFifo(fifoCode)) {
+        // FIFO full — put character back and retry next frame
+        this.pasteQueue.unshift(ch);
+        return;
+      }
+
+      // Wake the CPU from SLP/WAI — BASIC's input routine sleeps
+      // waiting for a keyboard interrupt when the FIFO is empty.
       this.irqLatch = true;
-      setTimeout(() => {
-        this.matrix[grphMapping.col] |= (1 << grphMapping.row);
-        this.matrix[6] |= (1 << 6); // GRPH up
-        setTimeout(() => this.feedNextChar(), 30);
-      }, 50);
+
+      // After Enter, wait for BASIC to process the line
+      if (fifoCode === 0x0D) {
+        this.pasteWaitFrames = 12;
+        return;
+      }
+
+      // One character per frame to let the firmware echo and process
       return;
     }
 
-    let mapping: KeyMapping | null = null;
-    let isEnter = false;
-
-    if (ch === '\n') {
-      mapping = CODE_MAP['Enter'];
-      isEnter = true;
-    } else if (ch === '\t') {
-      mapping = CODE_MAP['Tab'];
-    } else {
-      mapping = CHAR_MAP[ch] || null;
-    }
-
-    if (!mapping || mapping.row >= 8) {
-      // Skip unmappable characters (control chars, emoji, etc.)
-      setTimeout(() => this.feedNextChar(), 0);
-      return;
-    }
-
-    // Determine effective shift state.
-    // In CAPS mode the HX-20 inverts shift for letters (unshifted=upper, shifted=lower),
-    // so we must invert our shift override for letters to produce the correct case.
-    let effectiveShift = mapping.shift;
-    const isLetter = ch.toLowerCase() !== ch.toUpperCase();
-    if (this.capsLockOn && isLetter) {
-      effectiveShift = (ch === ch.toLowerCase()); // lowercase needs shift, uppercase doesn't
-    }
-
-    const savedShift = this.isShiftPressed;
-    if (effectiveShift === true) this.isShiftPressed = true;
-    else if (effectiveShift === false) this.isShiftPressed = false;
-
-    // Press key into matrix
-    this.matrix[mapping.col] &= ~(1 << mapping.row);
-    this.kbrequest = true;
-    this.irqLatch = true;
-
-    // Hold 50ms, then release; longer gap after Enter for BASIC line processing
-    setTimeout(() => {
-      this.matrix[mapping!.col] |= (1 << mapping!.row);
-      this.isShiftPressed = savedShift;
-      const gap = isEnter ? 200 : 30;
-      setTimeout(() => this.feedNextChar(), gap);
-    }, 50);
+    // Queue empty — paste complete
+    this.pasteActive = false;
+    this.onPasteFinish?.();
   }
 
   // Build the on-screen keyboard
