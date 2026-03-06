@@ -704,6 +704,11 @@ export class HD6301 {
 
     switch (opcode) {
       // --- Row 0x0_: Inherent ---
+      case 0x00: // TRAP (HD6301/HD6303 only)
+        this.pushAll();
+        this.CC |= FLAG_I;
+        this.PC = this.readWord(0xFFEE);
+        cycles = 12; break;
       case 0x01: cycles = 1; break; // NOP
       case 0x04: { // LSRD
         const d = this.D;
