@@ -46,8 +46,7 @@ hx20.epspDisplay.attachCanvas(crtCanvas);
 // Build on-screen keyboard
 hx20.keyboard.buildUI(keyboardEl);
 
-// Set DIP switches: USA/English (country=0), no TF-20
-hx20.keyboard.setDipSwitches(0, false);
+// DIP switches are set by the panel restore block (updateDipSW4) below
 
 // Status callbacks
 hx20.onStatusUpdate = (text: string) => {
@@ -130,19 +129,52 @@ btnPrinterCopy.addEventListener('click', async () => {
   }
 });
 
+// DISK panel elements (declared early so updateDipSW4 can reference them)
+const btnDiskToggle = document.getElementById('btn-disk-toggle')!;
+const diskPanel = document.getElementById('disk-panel')!;
+const diskFileListA = document.getElementById('disk-file-list-a')!;
+const diskFileListB = document.getElementById('disk-file-list-b')!;
+const diskFileInputA = document.getElementById('disk-file-input-a') as HTMLInputElement;
+const diskFileInputB = document.getElementById('disk-file-input-b') as HTMLInputElement;
+
+// DIP SW4 management — both CRT and DISK need it enabled
+// Persist panel state so DIP switches survive page reload
+const PANELS_STORAGE_KEY = 'hx20-panels';
+function updateDipSW4(): void {
+  const crtOpen = !crtPanel.classList.contains('hidden');
+  const diskOpen = !diskPanel.classList.contains('hidden');
+  hx20.keyboard.setDipSwitches(0, crtOpen || diskOpen);
+  localStorage.setItem(PANELS_STORAGE_KEY, JSON.stringify({ crt: crtOpen, disk: diskOpen }));
+}
+
+// Restore panel state from localStorage (before any boot/reset)
+try {
+  const panels = JSON.parse(localStorage.getItem(PANELS_STORAGE_KEY) || '{}');
+  if (panels.crt) crtPanel.classList.remove('hidden');
+  if (panels.disk) diskPanel.classList.remove('hidden');
+} catch { /* ignore */ }
+updateDipSW4();
+
 // CRT toggle — opening the CRT panel enables DIP SW4 (TF-20 mode)
 btnCrtToggle.addEventListener('click', () => {
   const wasHidden = crtPanel.classList.contains('hidden');
   crtPanel.classList.toggle('hidden');
+  updateDipSW4();
+  if (wasHidden && hx20.isROMLoaded()) {
+    statusText.textContent = 'CRT enabled — reset required for SCREEN 1';
+  }
+});
+
+// DISK toggle
+btnDiskToggle.addEventListener('click', () => {
+  const wasHidden = diskPanel.classList.contains('hidden');
+  diskPanel.classList.toggle('hidden');
+  updateDipSW4();
   if (wasHidden) {
-    // Enable TF-20 DIP switch (SW4) so ROM initializes EPSP
-    hx20.keyboard.setDipSwitches(0, true);
+    renderDiskFileList();
     if (hx20.isROMLoaded()) {
-      statusText.textContent = 'CRT enabled — reset required for SCREEN 1';
+      statusText.textContent = 'TF-20 enabled — reset required for Disk BASIC';
     }
-  } else {
-    // Disable TF-20 DIP switch
-    hx20.keyboard.setDipSwitches(0, false);
   }
 });
 
@@ -350,6 +382,7 @@ ramSelect.addEventListener('change', () => {
   applyRAMConfig();
   if (hx20.isROMLoaded()) {
     hx20.stop();
+    updateDipSW4();
     hx20.reset();
     hx20.start();
     startAutoSave();
@@ -467,6 +500,87 @@ wireCassettePanel(hx20.cas1, {
   btnRewind: 'btn-cas1-rewind',
 });
 
+// --- TF-20 Disk Panel ---
+
+function renderDriveFileList(drive: string, listEl: HTMLElement): void {
+  const files = hx20.tf20.getFileList().filter(f => f.drive === drive);
+  listEl.innerHTML = '';
+  if (files.length === 0) {
+    listEl.innerHTML = '<div class="tape-entry">No files</div>';
+    return;
+  }
+  for (const file of files) {
+    const entry = document.createElement('div');
+    entry.className = 'tape-entry';
+    const info = document.createElement('span');
+    info.className = 'tape-info';
+    info.textContent = `${file.name} (${file.size} bytes)`;
+    const actions = document.createElement('span');
+    actions.className = 'tape-actions';
+    const btnDl = document.createElement('button');
+    btnDl.textContent = 'Download';
+    btnDl.addEventListener('click', () => {
+      const data = hx20.tf20.exportFile(file.name, drive);
+      if (data) {
+        const blob = new Blob([data.buffer as ArrayBuffer], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    });
+    const btnDel = document.createElement('button');
+    btnDel.textContent = 'Delete';
+    btnDel.addEventListener('click', () => {
+      hx20.tf20.deleteFileByName(file.name, drive);
+      renderDiskFileList();
+    });
+    actions.append(btnDl, btnDel);
+    entry.append(info, actions);
+    listEl.appendChild(entry);
+  }
+}
+
+function renderDiskFileList(): void {
+  renderDriveFileList('A', diskFileListA);
+  renderDriveFileList('B', diskFileListB);
+}
+
+// Auto-refresh disk file list when files change
+hx20.tf20.onFileChange = () => {
+  if (!diskPanel.classList.contains('hidden')) {
+    renderDiskFileList();
+  }
+};
+
+// Wire import/format for each drive
+function wireDiskDrive(drive: string, btnImportId: string, btnFormatId: string, fileInput: HTMLInputElement): void {
+  document.getElementById(btnImportId)!.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => {
+    const files = fileInput.files;
+    if (!files) return;
+    for (const file of Array.from(files)) {
+      file.arrayBuffer().then(buf => {
+        hx20.tf20.importFile(file.name, new Uint8Array(buf), drive);
+        renderDiskFileList();
+      });
+    }
+    fileInput.value = '';
+  });
+  document.getElementById(btnFormatId)!.addEventListener('click', () => {
+    if (confirm(`Erase all files on drive ${drive}:?`)) {
+      hx20.tf20.formatDisk(drive);
+      renderDiskFileList();
+      statusText.textContent = `Drive ${drive}: formatted`;
+    }
+  });
+}
+
+wireDiskDrive('A', 'btn-disk-import-a', 'btn-disk-format-a', diskFileInputA);
+wireDiskDrive('B', 'btn-disk-import-b', 'btn-disk-format-b', diskFileInputB);
+
 // Debug: expose hx20 for console access
 (window as any).hx20 = hx20;
 
@@ -477,6 +591,7 @@ btnPower.addEventListener('click', () => {
     return;
   }
   hx20.stop();
+  updateDipSW4(); // ensure DIP switches reflect panel state before boot
   hx20.reset();
   hx20.start();
   startAutoSave();
@@ -488,6 +603,7 @@ btnPower.addEventListener('click', () => {
 btnReset.addEventListener('click', () => {
   if (!hx20.isROMLoaded()) return;
   hx20.stop();
+  updateDipSW4(); // ensure DIP switches reflect panel state before boot
   hx20.reset();
   hx20.start();
   statusText.textContent = 'Reset - Running';
@@ -616,6 +732,7 @@ function updateDebugDisplay(): void {
 function freshBoot(): void {
   statusText.textContent = 'Loading ROMs...';
   loadLocalROMs().then(() => {
+    updateDipSW4(); // ensure DIP switches reflect panel state before boot
     hx20.reset();
     hx20.start();
     startAutoSave();

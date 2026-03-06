@@ -48,6 +48,7 @@
     <div id="bottom-buttons">
       <button id="btn-cas0-toggle">CAS0:</button>
       <button id="btn-cas1-toggle">CAS1:</button>
+      <button id="btn-disk-toggle">DISK</button>
       <button id="btn-crt-toggle">CRT</button>
       <button id="btn-printer-toggle">PRINTER</button>
       <button id="btn-debug-toggle">Show Debug</button>
@@ -97,6 +98,24 @@
       <h3>External CRT Display</h3>
       <div id="crt-bezel">
         <canvas id="crt-canvas" width="320" height="192"></canvas>
+      </div>
+    </div>
+
+    <div id="disk-panel" class="cassette-panel hidden">
+      <h3>TF-20 Floppy Disk</h3>
+      <h4>Drive A:</h4>
+      <div id="disk-file-list-a" class="tape-list"></div>
+      <div class="cassette-controls">
+        <button id="btn-disk-import-a">Import</button>
+        <button id="btn-disk-format-a">Format A:</button>
+        <input type="file" id="disk-file-input-a" multiple style="display:none">
+      </div>
+      <h4>Drive B:</h4>
+      <div id="disk-file-list-b" class="tape-list"></div>
+      <div class="cassette-controls">
+        <button id="btn-disk-import-b">Import</button>
+        <button id="btn-disk-format-b">Format B:</button>
+        <input type="file" id="disk-file-input-b" multiple style="display:none">
       </div>
     </div>
 

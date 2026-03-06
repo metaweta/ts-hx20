@@ -8,6 +8,7 @@ import { MC146818 } from './rtc';
 import { Cassette } from './cassette';
 import { MicrocassetteDrive } from './microcassette-drive';
 import { EPSPDisplay } from './epsp-display';
+import { TF20 } from './tf20';
 import { Printer } from './printer';
 import { loadIntelHexIntoBuffer, loadBinaryIntoBuffer } from './rom-loader';
 
@@ -20,6 +21,7 @@ export class HX20 {
   cas0: Cassette;  // Internal microcassette (CAS0:)
   cas1: Cassette;  // External cassette (CAS1:)
   epspDisplay: EPSPDisplay;
+  tf20: TF20;
   printer: Printer;
 
   // Main CPU memory
@@ -84,6 +86,7 @@ export class HX20 {
     this.cas0.invertPlayback = true;  // Cassette mechanism inverts signal between P21 write and P20 read
     this.cas1 = new Cassette('hx20-tapes-cas1', 'CAS1');
     this.epspDisplay = new EPSPDisplay();
+    this.tf20 = new TF20();
     this.printer = new Printer();
 
     // Wire microcassette drive callbacks to CAS0 cassette
@@ -104,6 +107,16 @@ export class HX20 {
     // EPSP display response → main CPU SCI RX
     this.epspDisplay.onSendByte = (data: number) => {
       this.mainCPU.serialRecv(data);
+    };
+
+    // TF-20 floppy response → main CPU SCI RX
+    this.tf20.onSendByte = (data: number) => {
+      this.mainCPU.serialRecv(data);
+    };
+
+    // TF-20 needs to read HX-20 memory (MEMTOP at $04B2) for DBASIC relocation
+    this.tf20.readMemory = (addr: number) => {
+      return this.mainCPU.read(addr);
     };
   }
 
@@ -160,6 +173,10 @@ export class HX20 {
     // External bus write
     cpu.onWrite = (addr: number, val: number): void => {
       if (addr >= 0x0100 && addr < 0x4000) {
+        // Boot diagnostic: log when kbd_row89_status is written (DIP switch scan result)
+        if (addr === 0x014E) {
+          console.log(`[BOOT] kbd_row89_status=$${val.toString(16).padStart(2,'0')} bit3(SW4)=${(val>>3)&1} mPC=${cpu.PC.toString(16)}`);
+        }
         this.mainRAM[addr - 0x0100] = val;
         return;
       }
@@ -223,7 +240,11 @@ export class HX20 {
         this.slaveRx = (val >> 4) & 1;
       }
       // Bit 2: serial select (0=SIO, 1=slave)
-      this.slaveSio = (val >> 2) & 1;
+      const newSlaveSio = (val >> 2) & 1;
+      if (newSlaveSio !== this.slaveSio) {
+        console.log(`[BOOT] slaveSio ${this.slaveSio}->${newSlaveSio} (P22=${newSlaveSio}) mPC=${cpu.PC.toString(16)}`);
+      }
+      this.slaveSio = newSlaveSio;
       // Bit 1: RS-232 TXD
     };
 
@@ -378,8 +399,10 @@ export class HX20 {
         // Main CPU TX → Slave CPU RX
         this.slaveCPU.serialRecv(data);
       } else {
-        // External SIO bus → EPSP display controller
+        // External SIO bus → broadcast to all EPSP devices
+        console.log(`[EPSP TX] 0x${data.toString(16).padStart(2,'0')} mPC=${this.mainCPU.PC.toString(16)}`);
         this.epspDisplay.recvByte(data);
+        this.tf20.recvByte(data);
       }
     };
 
@@ -501,11 +524,13 @@ export class HX20 {
     this.keyboard.reset();
     this.rtc.reset();
     this.epspDisplay.reset();
+    this.tf20.reset();
     this.printer.reset();
     this.mainCPU.reset();
     if (this.slaveROM) {
       this.slaveCPU.reset();
     }
+    console.log(`[BOOT] reset() complete. dipSwitches=0x${this.keyboard.getDipSwitches().toString(16)} (SW4=${(this.keyboard.getDipSwitches() >> 3) & 1 ? 'OFF' : 'ON'}) slaveSio=${this.slaveSio}`);
   }
 
   // Run one frame's worth of CPU cycles — both CPUs interleaved
@@ -558,6 +583,23 @@ export class HX20 {
           const ss = this.mainCPU.saveState();
           console.log(`[MASTER] E7D4: Enable ETOI — counter=$${counter.toString(16)} TCSR=$${(ss.tcsr as number).toString(16).padStart(2,'0')} (TOF=${((ss.tcsr as number)>>5)&1})`);
         }
+      }
+
+      // Boot sequence diagnostics (always active, fire only during boot)
+      if (this.mainCPU.PC === 0xB35B) {
+        // TIM #$08,$09,X — DIP SW4 check. X=$0145, tests bit 3 of $014E
+        const x = this.mainCPU.X;
+        const addr = (x + 0x09) & 0xFFFF;
+        const val = this.mainCPU.read(addr);
+        console.log(`[BOOT] B35B: TIM #$08,$${addr.toString(16)} val=$${val.toString(16)} bit3=${(val>>3)&1} → ${(val & 0x08) ? 'DIP SW4 ON, BOOT PROCEEDS' : 'DIP SW4 OFF, SKIP BOOT'}`);
+      } else if (this.mainCPU.PC === 0xB360) {
+        console.log(`[BOOT] B360: JSR ZBA80 (sci_session_rie) — TF-20 boot initiated`);
+      } else if (this.mainCPU.PC === 0xB373) {
+        console.log(`[BOOT] B373: JSR api_tf20_send — sending boot request to TF-20`);
+      } else if (this.mainCPU.PC === 0xB383) {
+        console.log(`[BOOT] B383: tf20_init_failed — TF-20 boot FAILED`);
+      } else if (this.mainCPU.PC === 0xB38A) {
+        console.log(`[BOOT] B38A: bas_init_final — entering standard BASIC`);
       }
 
       // Printer character capture: io_write_byte at A7C9 with error_mode = printer
@@ -870,6 +912,7 @@ export class HX20 {
           this.cas1.advance(sc);
           this.drive.advance(sc);
           this.epspDisplay.advance(sc);
+          this.tf20.advance(sc);
         }
       }
     }
@@ -1085,6 +1128,7 @@ export class HX20 {
       slaveSio: this.slaveSio,
       ksc: this.ksc,
       epspDisplay: this.epspDisplay.saveState(),
+      tf20: this.tf20.saveState(),
       printer: this.printer.saveState(),
     };
     return JSON.stringify(state);
@@ -1162,6 +1206,13 @@ export class HX20 {
       this.epspDisplay.loadState(s.epspDisplay);
     } else {
       this.epspDisplay.reset();
+    }
+
+    // Restore TF-20 state (optional — absent in older states)
+    if (s.tf20) {
+      this.tf20.loadState(s.tf20);
+    } else {
+      this.tf20.reset();
     }
 
     // Restore printer state (optional — absent in older states)

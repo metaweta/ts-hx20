@@ -12,6 +12,7 @@ A browser-based emulator of the [Epson HX-20](https://en.wikipedia.org/wiki/Epso
   - CAS0: internal microcassette with bit-bang controller protocol
   - CAS1: external cassette with FSK recording/playback
   - Tape library with localStorage persistence, JSON import/export
+- **TF-20 floppy disk** — virtual dual floppy drive (A: and B:) with embedded Disk BASIC boot loader, PRL page relocation, in-memory CP/M filesystem, and localStorage persistence. Supports `SAVE`, `LOAD`, `FILES`, and `KILL` commands.
 - **RAM expansion** — bank-switched 16/32/64/128 KB
 - **MC146818 RTC** — real-time clock synced from browser
 - **Built-in printer** — thermal printer emulation with bitmap rendering, feed/tear/copy controls
@@ -63,6 +64,7 @@ npm run preview   # Preview the production build
 | **SAVE STATE** | Download full machine state as JSON file |
 | **LOAD STATE** | Restore machine state from a saved JSON file |
 | **CAS0:/CAS1:** | Open cassette tape management panels |
+| **DISK** | Toggle TF-20 floppy disk panel (enables DIP SW4) |
 | **CRT** | Toggle external CRT display (enables DIP SW4) |
 | **PRINTER** | Toggle printer output panel |
 | **GET LIST** | Download current BASIC program as a `.bas` text file |
@@ -128,6 +130,22 @@ LPRINT "HELLO"           ' print text to printer
 *Pros:* Produces a visual copy of output, including GRPH characters and graphics. Copy button makes it easy to paste into documents.
 *Cons:* Image only — not editable text. One-way (output only). Graphics screen dumps via CTRL+PF2 are also supported.
 
+### TF-20 Floppy Disk
+
+Click the **DISK** button to open the TF-20 floppy disk panel. This enables DIP switch 4 (external device mode). After a reset, the HX-20 boots Disk BASIC from the virtual TF-20, adding commands like `SAVE`, `LOAD`, `FILES`, and `KILL` for floppy disk storage.
+
+The virtual TF-20 emulates both drives (A: and B:) as independent in-memory filesystems. Files default to drive A: if no drive prefix is given.
+
+```basic
+SAVE "TEST"              ' save to A: (default)
+SAVE "B:TEST"            ' save to B:
+LOAD "A:TEST"            ' load from A:
+FILES                    ' list files on current drive
+KILL "TEST.BAS"          ' delete a file
+```
+
+The disk panel shows each drive's files separately with their sizes, and provides per-drive Import, Download, Delete, and Format controls. Files persist in localStorage between sessions.
+
 ### External CRT Display
 
 Click the **CRT** button to open the external display panel. This sets DIP switch 4 (TF-20 mode). After a reset, use `SCREEN 1` in BASIC to switch output to the CRT.
@@ -169,6 +187,7 @@ window.hx20.sciDebug = true    // Enable SCI/EPSP protocol tracing
 | `src/main.ts` | UI wiring — canvas, buttons, panels, ROM loading, state persistence |
 | `src/lcd.ts` | UPD7227 LCD controller emulation and canvas rendering |
 | `src/epsp-display.ts` | External CRT display — EPSP protocol state machine, text/graphics rendering |
+| `src/tf20.ts` | TF-20 floppy disk — EPSP protocol, boot loader, CP/M filesystem |
 | `src/keyboard.ts` | Keyboard matrix (8x10), key mapping, DIP switches, text paste |
 | `src/cassette.ts` | Virtual cassette — FSK recording/playback, tape library |
 | `src/microcassette-drive.ts` | CAS0 internal drive — bit-bang protocol, motor/transport control |
@@ -177,6 +196,28 @@ window.hx20.sciDebug = true    // Enable SCI/EPSP protocol tracing
 | `src/disasm.ts` | HD6301/HD6303 disassembler for the debug panel |
 | `src/rom-loader.ts` | Intel HEX parser and binary ROM loading |
 | `src/style.css` | UI styling |
+
+## ROM Disassemblies
+
+The `disassemblies/` directory contains fully annotated disassemblies of all the ROMs involved in the system, produced with [f9dasm](https://github.com/Arakula/f9dasm) and extensive manual annotation:
+
+| File | Description |
+|------|-------------|
+| `main-rom-disasm.s` | Main CPU ROM (32KB) — BASIC interpreter, I/O drivers, SCI protocol |
+| `slave-rom-disasm.s` | Slave CPU ROM (4KB) — keyboard scan, cassette I/O, RTC, LCD commands |
+| `tf20-rom-disasm.s` | TF-20 Z80 firmware — EPSP protocol handler, CP/M BDOS, floppy driver |
+| `dbasic-disasm.s` | DBASIC.SYS — Disk BASIC extension (PRL-format, page-relocatable) |
+| `boot80-disasm.s` | BOOT80.SYS — HD6301 boot loader sent by TF-20 on startup |
+
+Each disassembly has a companion `.info` file (f9dasm label/comment definitions).
+
+### DBASIC.SYS ROM Patch
+
+The emulator applies a one-byte patch to DBASIC.SYS to fix a bug in the original Epson firmware that prevents drive B: from working independently of drive A:.
+
+At address `$6878`, the instruction `ORAA #$37` (opcode `$8A`) is changed to `ADDA #$37` (opcode `$8B`). The original OR operation converts both device codes `$0A` (A:) and `$0B` (B:) to the same value `$3F`, because `$0A | $37 = $0B | $37 = $3F` — the OR merges the single-bit difference between the two codes. With ADDA, they correctly produce `$41` and `$42`, which downstream code at `$6DFC` subtracts `$40` from to yield drive codes 1 (A:) and 2 (B:).
+
+Without this patch, `SAVE "A:TEST"` and `SAVE "B:TEST"` both write to the same drive. It is likely that this bug was never caught on real hardware because few users had a second floppy drive connected to their TF-20.
 
 ## Tech Stack
 
@@ -189,13 +230,15 @@ window.hx20.sciDebug = true    // Enable SCI/EPSP protocol tracing
 
 While ts-hx20 is not a port of anyone else's emulator (it did a full annotated disassembly of the ROMs provided by Electrickery and worked from there; see the docs folder), Claude did refer to any existing emulators and documentation it could find, particularly
 
-* Electrickery's [HX-20 documentation](https://electrickery.nl/comp/hx20/index.html) and [ROMs](https://electrickery.nl/comp/hx20/ROMdump.html)
+* Electrickery's [HX-20 documentation](https://electrickery.nl/comp/hx20/index.html), [ROMs](https://electrickery.nl/comp/hx20/ROMdump.html), [TF-20 documentation](https://electrickery.nl/comp/tf20/doc/), and [pxdisk](https://github.com/electrickery/pxdisk_mega), with HX-20 support by R. Offner
 * Frigolit's [HXEmu](https://frigolit.net/projects/hxemu/)
 * Martin Hepperle's [MH-20](https://www.mh-aerotools.de/hp/hx-20/)
 * Norbert Kehrer's [flashx20](https://norbertkehrer.github.io/flashx20.html)
 * Kobolt's [hex20](https://github.com/kobolt/hex20)
 * [The MAME project](https://www.mamedev.org/)
 * nerdprojects' [hxlink](https://github.com/nerdprojects/hxlink)
+* The [CP/M PRL file format documentation](https://www.seasip.info/Cpm/prl.html) at seasip.info, which was essential for understanding DBASIC.SYS page relocation
+* The [PFBDK EPSP Floppy Drive Emulator](https://hackaday.io/project/193978-pfbdk-epsp-floppy-drive-emulator) project on Hackaday
 
 It made heavy use of Benschop and Seib's [A09](https://github.com/Arakula/A09) assembler and Salmi, Seib, Bourassa, and Buchty's [f9dasm](https://github.com/Arakula/f9dasm) disassembler when understanding the ROMs.
 

@@ -417,6 +417,9 @@ export class Keyboard {
     }
   }
 
+  // Get raw DIP switch state (for diagnostics)
+  getDipSwitches(): number { return this.dipSwitches; }
+
   // Set DIP switch country code (0-7) and TF-20 flag
   setDipSwitches(country: number, tf20: boolean): void {
     // Switches are active low: closed (ON) = 0 in the keyboard matrix

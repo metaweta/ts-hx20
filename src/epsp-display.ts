@@ -341,7 +341,7 @@ export class EPSPDisplay {
           // enquiryBuf = [P1, DID, SID, ENQ]
           const did = this.enquiryBuf[1];
           const enq = this.enquiryBuf[3];
-          if ((did === DID_CRT || did === DID_TF20_1 || did === DID_TF20_2) && enq === ENQ) {
+          if (did === DID_CRT && enq === ENQ) {
             console.log(`[EPSP] Enquiry OK: P1=0x${this.enquiryBuf[0].toString(16)} DID=0x${did.toString(16)} SID=0x${this.enquiryBuf[2].toString(16)} → ACK`);
             this.queueByte(ACK);
             this.state = EPSPState.WAIT_SOH;
