@@ -137,6 +137,7 @@ body {
   align-items: center;
   justify-content: center;
   line-height: 1.1;
+  white-space: pre-line;
 }
 
 .key:hover {
@@ -192,6 +193,26 @@ body {
 
 .key.spacebar {
   width: 60%;
+}
+
+.kbd-led-spacer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 2px;
+}
+
+.kbd-led {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid #222;
+  background: #1a1a1a;
+}
+
+.kbd-led.on {
+  background: #33cc33;
+  box-shadow: 0 0 3px #33cc33;
 }
 
 #status-bar {

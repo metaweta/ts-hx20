@@ -285,6 +285,18 @@ export class Keyboard {
     this.irqLatch = false;
   }
 
+  updateNumLock(on: boolean): void {
+    if (this.numLedEl) {
+      this.numLedEl.classList.toggle('on', on);
+    }
+  }
+
+  updateCapsLock(on: boolean): void {
+    if (this.capsLedEl) {
+      this.capsLedEl.classList.toggle('on', on);
+    }
+  }
+
   private getRow89(col: number): number {
     let bits = 0x03; // both rows not pressed
     switch (col) {
@@ -436,6 +448,8 @@ export class Keyboard {
   private stickyCtrlBtn: HTMLElement | null = null;
   private stickyShiftBtns: HTMLElement[] = [];
   private stickyGrphBtn: HTMLElement | null = null;
+  private numLedEl: HTMLElement | null = null;
+  private capsLedEl: HTMLElement | null = null;
 
   // --- Manual Microcassette Mode (MMCM) ---
   // Entered via CTRL+PF1. Swaps PF button labels to show transport functions:
@@ -606,11 +620,11 @@ export class Keyboard {
         { label: 'PF3', code: 'HX_PF3', cls: 'key-light' },
         { label: 'PF4', code: 'HX_PF4', cls: 'key-light' },
         { label: 'PF5', code: 'HX_PF5', cls: 'key-light' },
-        null,
+        'NUM_LED',
         { label: 'NUM', code: 'HX_Num', cls: 'key-light' },
-        { label: 'HOME', code: 'Home', cls: 'key-light' },
+        { label: 'HOME\nCLR', code: 'Home', cls: 'key-light' },
         { label: 'SCRN', code: 'HX_Scrn', cls: 'key-light' },
-        { label: 'DEL', code: 'Backspace', cls: 'key-light' },
+        { label: 'INS\nDEL', code: 'Backspace', cls: 'key-light' },
       ],
       // Row 2: Number/symbol row
       [
@@ -667,6 +681,7 @@ export class Keyboard {
       ],
       // Row 6: Space row (centered)
       [
+        'CAPS_LED',
         { label: 'CAPS', code: 'CapsLock', cls: 'key-caps' },
         { label: 'SPACE', code: 'Space', cls: 'key-dark spacebar' },
       ],
@@ -681,6 +696,17 @@ export class Keyboard {
       for (const key of row) {
         if (!key) {
           const spacer = document.createElement('div');
+          rowDiv.appendChild(spacer);
+          continue;
+        }
+        if (typeof key === 'string') {
+          const spacer = document.createElement('div');
+          spacer.className = 'kbd-led-spacer';
+          const led = document.createElement('div');
+          led.className = 'kbd-led';
+          spacer.appendChild(led);
+          if (key === 'NUM_LED') this.numLedEl = led;
+          else if (key === 'CAPS_LED') this.capsLedEl = led;
           rowDiv.appendChild(spacer);
           continue;
         }

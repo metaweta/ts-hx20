@@ -955,6 +955,10 @@ export class HX20 {
     const frameLoop = () => {
       if (!this.running) return;
       this.runFrame();
+      // Update keyboard LEDs from firmware state (kbd_modifier_flags at $0169)
+      const modFlags = this.mainRAM[0x69];
+      this.keyboard.updateNumLock((modFlags & 0x02) !== 0);
+      this.keyboard.updateCapsLock((modFlags & 0x04) === 0);
       this.onStatusUpdate(
         `PC=${this.mainCPU.PC.toString(16).padStart(4, '0')} ` +
         `cyc=${this.mainCPU.totalCycles}`
