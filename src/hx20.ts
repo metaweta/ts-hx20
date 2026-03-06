@@ -606,7 +606,10 @@ export class HX20 {
       if (this.mainCPU.PC === 0xA7C9) {
         const errorMode = this.mainCPU.read(0xF4);
         if (errorMode === 0x11) {
-          this.printer.printChar(this.mainCPU.A);
+          const deviceStatus = this.mainCPU.read(0x0688);
+          if ((deviceStatus & 0x0F) === 0x06) {
+            this.printer.printChar(this.mainCPU.A);
+          }
         }
       }
 
