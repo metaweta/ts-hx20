@@ -171,7 +171,6 @@ export class TF20 {
           const enq = this.enquiryBuf[3];
           if (did >= DID_TF20_MIN && did <= DID_TF20_MAX && enq === ENQ) {
             this.myDid = did;
-            console.log(`[TF20] Enquiry ACK'd for DID=0x${did.toString(16)}`);
             this.queueByte(ACK);
             this.state = TF20State.WAIT_SOH;
           } else {
@@ -329,7 +328,6 @@ export class TF20 {
       case FN_LOAD_OPEN:    return this.fnLoadOpen(data);
       case FN_READ_BLOCK:   return this.fnReadBlock();
       default:
-        console.log(`[TF20] Unknown FNC: 0x${fnc.toString(16).padStart(2, '0')}`);
         return [0x00];
     }
   }
@@ -338,7 +336,6 @@ export class TF20 {
 
   private fnDiskBoot(): number[] {
     // Response: [return_code, boot80[0..254]] = 256 bytes, SIZ=0xFF
-    console.log('[TF20] DISK_BOOT: sending BOOT80.SYS');
     const resp = new Array(256);
     resp[0] = 0x00; // success
     for (let i = 0; i < 255; i++) {
@@ -361,7 +358,6 @@ export class TF20 {
       const loadAddr = (memtop - size) & 0xFF00;  // page-aligned down
       const targetPage = (loadAddr >> 8) & 0xFF;
       const delta = (targetPage - DBASIC_BASE_PAGE) & 0xFF;
-      console.log(`[TF20] LOAD_OPEN: DBASIC.SYS ${size} bytes, MEMTOP=$${memtop.toString(16)}, load=$${loadAddr.toString(16)}, delta=$${delta.toString(16)}`);
 
       // Apply relocation: for each set bit in bitmap, add delta to the code byte
       for (let i = 0; i < this.dbasicBitmap.length; i++) {
@@ -377,7 +373,6 @@ export class TF20 {
         }
       }
     } else {
-      console.log(`[TF20] LOAD_OPEN: DBASIC.SYS ${size} bytes (no relocation - readMemory not wired)`);
     }
 
     this.block = 0;
@@ -399,7 +394,6 @@ export class TF20 {
     if (this.block >= this.blocks) {
       this.block = 0;
       this.blocks = 0;
-      console.log('[TF20] READ_BLOCK: DBASIC.SYS transfer complete');
     }
     return resp;
   }
@@ -423,7 +417,6 @@ export class TF20 {
     const drive = this.drives[this.currentDriveIdx];
     const name = this.parseFilenameFromFCB(data);
     this.currentFilename = name;
-    console.log(`[TF20] OPEN: ${this.driveLetter(this.currentDriveIdx)}:${name} → ${drive.has(name) ? 'found' : 'not found'}`);
     return [drive.has(name) ? 0x00 : 0xFF];
   }
 
@@ -436,7 +429,6 @@ export class TF20 {
       this.saveToStorage();
       if (this.onFileChange) this.onFileChange();
     }
-    console.log(`[TF20] CREATE: ${this.driveLetter(this.currentDriveIdx)}:${this.currentFilename}`);
     return [0x00];
   }
 
@@ -456,10 +448,8 @@ export class TF20 {
       for (const name of toDelete) drv.delete(name);
       this.saveToStorage();
       if (this.onFileChange) this.onFileChange();
-      console.log(`[TF20] DELETE: ${this.driveLetter(idx)}:${pattern} → deleted ${toDelete.join(', ')}`);
       return [0x00];
     }
-    console.log(`[TF20] DELETE: ${this.driveLetter(idx)}:${pattern} not found`);
     return [0xFF];
   }
 
@@ -474,14 +464,12 @@ export class TF20 {
       this.lastBlockBytes = size - fullBlocks * 128;
       if (this.lastBlockBytes === 0) this.lastBlockBytes = 128;
       this.block = 0;
-      console.log(`[TF20] COMPUTE_FS: ${this.currentFilename} = ${size} bytes, ${this.blocks} blocks`);
       return [0x00, 0x00, this.blocks & 0xFF, 0x00, 0x00, 0x00];
     }
     // New/empty file
     this.blocks = 0;
     this.block = 0;
     this.lastBlockBytes = 128;
-    console.log(`[TF20] COMPUTE_FS: ${this.currentFilename} (new file, 0 blocks)`);
     return [0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
   }
 
@@ -490,7 +478,6 @@ export class TF20 {
     const drive = this.drives[this.currentDriveIdx];
     const fileData = drive.get(this.currentFilename);
     if (!fileData) {
-      console.log(`[TF20] RANDOM_READ: ${this.currentFilename} not found`);
       return [0xFF]; // error — short response
     }
     const offset = this.block * 128;
@@ -560,7 +547,6 @@ export class TF20 {
       }
     }
     this.searchIndex = 0;
-    console.log(`[TF20] FIND_FIRST: ${this.driveLetter(this.driveIdx(unit))}:"${pattern}" → ${this.searchResults.length} matches`);
 
     return this.buildSearchResponse();
   }

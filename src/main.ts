@@ -696,9 +696,6 @@ async function loadLocalROMs(): Promise<void> {
   hx20.loadMainROMBinary(rom0, 0x6000);
   hx20.loadSlaveROM(slave);
 
-  console.log('Local ROMs loaded. Reset vector:',
-    hx20.mainROM[0x7FFE].toString(16).padStart(2, '0') +
-    hx20.mainROM[0x7FFF].toString(16).padStart(2, '0'));
 }
 
 // Load Intel HEX ROMs from electrickery website

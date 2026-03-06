@@ -330,8 +330,6 @@ export class EPSPDisplay {
         if (byte === EOT) {
           this.enquiryBuf = [];
           this.state = EPSPState.ENQUIRY;
-        } else {
-          console.log(`[EPSP] IDLE: ignored byte 0x${byte.toString(16).padStart(2, '0')}`);
         }
         break;
 
@@ -342,11 +340,9 @@ export class EPSPDisplay {
           const did = this.enquiryBuf[1];
           const enq = this.enquiryBuf[3];
           if (did === DID_CRT && enq === ENQ) {
-            console.log(`[EPSP] Enquiry OK: P1=0x${this.enquiryBuf[0].toString(16)} DID=0x${did.toString(16)} SID=0x${this.enquiryBuf[2].toString(16)} → ACK`);
             this.queueByte(ACK);
             this.state = EPSPState.WAIT_SOH;
           } else {
-            console.log(`[EPSP] Enquiry rejected: DID=0x${did.toString(16)} ENQ=0x${enq.toString(16)}`);
             this.state = EPSPState.IDLE;
           }
         }
@@ -373,7 +369,6 @@ export class EPSPDisplay {
             // Checksum valid
             this.fnc = this.headerBuf[4];
             this.siz = this.headerBuf[5];
-            console.log(`[EPSP] Header OK: FNC=0x${this.fnc.toString(16).padStart(2, '0')} SIZ=${this.siz} → ACK`);
             this.queueByte(ACK);
             // Host always sends a data block (SIZ+1 bytes), even for SIZ=0
             this.dataBuf = [];
@@ -417,7 +412,6 @@ export class EPSPDisplay {
 
       case EPSPState.DATA_CKS:
         if (((this.dataChecksum + byte) & 0xFF) === 0) {
-          console.log(`[EPSP] Data OK: ${this.dataBuf.length} bytes → ACK → execute FNC=0x${this.fnc.toString(16).padStart(2, '0')}`);
           this.queueByte(ACK);
           this.executeCommand(this.fnc, this.dataBuf);
           // Commands with bit 6 clear (0x80-0xBF) require a response packet
@@ -438,7 +432,6 @@ export class EPSPDisplay {
       case EPSPState.RESPONSE_PENDING:
         // Host sends EOT after command exchange, then waits for our response
         if (byte === EOT) {
-          console.log(`[EPSP] Response: sending header for FNC=0x${this.responseFnc.toString(16).padStart(2, '0')}`);
           this.queueResponseHeader();
           this.state = EPSPState.RESPONSE_WAIT_HEADER_ACK;
         }
@@ -446,7 +439,6 @@ export class EPSPDisplay {
 
       case EPSPState.RESPONSE_WAIT_HEADER_ACK:
         if (byte === ACK) {
-          console.log(`[EPSP] Response: header ACK'd, sending data [${this.responseData.map(b => '0x' + b.toString(16).padStart(2, '0')).join(',')}]`);
           this.queueResponseDataBlock();
           this.state = EPSPState.RESPONSE_WAIT_DATA_ACK;
         } else if (byte === NAK) {
@@ -457,7 +449,6 @@ export class EPSPDisplay {
 
       case EPSPState.RESPONSE_WAIT_DATA_ACK:
         if (byte === ACK) {
-          console.log(`[EPSP] Response: data ACK'd, done`);
           // Send a status byte so the host's tf20_close_session receives it
           // immediately instead of timing out (~840K cycles = 1.37s per command).
           // Must NOT be EOT (0x04) — host would echo it back, corrupting state.
@@ -550,12 +541,6 @@ export class EPSPDisplay {
     } else {
       this.savedCharUnderCursor = 0x20;
     }
-    // Debug: log character write commands with response info
-    if (fnc === 0x92 || fnc === 0x98) {
-      const ch = data[0] ?? -1;
-      const chStr = ch >= 0x20 && ch < 0x7F ? `'${String.fromCharCode(ch)}'` : `0x${ch.toString(16).padStart(2, '0')}`;
-      console.log(`[EPSP] FNC 0x${fnc.toString(16)}: write ${chStr} at (${this.cursorX},${this.cursorY}), old='${String.fromCharCode(this.savedCharUnderCursor)}' (0x${this.savedCharUnderCursor.toString(16).padStart(2, '0')})`);
-    }
     switch (fnc) {
       case 0x84: this.cmdDeviceSelect(data); break;
       case 0x85: this.cmdCrtInit(); break;
@@ -580,7 +565,6 @@ export class EPSPDisplay {
       case 0xD0: this.cmdSetCursorMode(data); break;
       case 0xD4: this.cmdSetDisplayAttribute(data); break;
       default:
-        console.log(`[EPSP] Unimplemented FNC: 0x${fnc.toString(16).padStart(2, '0')} data=[${data.map(b => '0x' + b.toString(16).padStart(2, '0')).join(',')}]`);
         break;
     }
   }
@@ -619,7 +603,6 @@ export class EPSPDisplay {
     if (data.length >= 4) {
       this.rowOrigin = data[3];
       this.originDetected = true;
-      console.log(`[EPSP] FNC 0x87: virtual screen ${data[0]+1}x${data[1]+1}, origin=0x${((data[2]<<8)|data[3]).toString(16).padStart(4,'0')}, rowOrigin=${this.rowOrigin}`);
     }
   }
 
@@ -669,8 +652,7 @@ export class EPSPDisplay {
         // 0x01: cursor home/mode, 0x16: show cursor, 0x17: hide cursor
         // These are display control codes — no text buffer effect
       } else if (ch < 0x20) {
-        // Other control characters — log for debugging
-        console.log(`[EPSP] WriteChar: unhandled ctrl 0x${ch.toString(16).padStart(2, '0')} at (${this.cursorX},${this.cursorY})`);
+        // Other control characters — ignore
       } else if (ch === 0x7F) {
         // DEL — erase character at cursor (write space, don't advance)
         if (this.cursorX < TEXT_COLS && this.cursorY < TEXT_ROWS) {
@@ -730,7 +712,6 @@ export class EPSPDisplay {
       if (!this.originDetected && this.hasWrittenChars && data[1] > 0) {
         this.rowOrigin = data[1];
         this.originDetected = true;
-        console.log(`[EPSP] FNC 0xC2: auto-detected rowOrigin=${this.rowOrigin}`);
       }
 
       if (this.originDetected && data[1] === this.rowOrigin) {
@@ -852,7 +833,6 @@ export class EPSPDisplay {
         result.push(0x20);  // pad with spaces beyond buffer
       }
     }
-    console.log(`[EPSP] FNC 0x97: read ${byteCount} bytes from row ${this.cursorY}, first 40: [${result.slice(0, 40).map(b => b >= 0x20 && b < 0x7F ? String.fromCharCode(b) : '.').join('')}]`);
     this.savedScreenLine = result;
   }
 
