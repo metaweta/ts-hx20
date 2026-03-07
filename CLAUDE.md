@@ -95,6 +95,14 @@ Group 4 (0x4_): F8C9
 - Two independent drives (A: and B:) as separate in-memory CP/M filesystems
 - ROM bug fix: DBASIC $6878 ORAA #$37 ($8A) → ADDA #$37 ($8B) so A: ($0A+$37=$41) and B: ($0B+$37=$42) produce distinct drive codes
 
+### Deployment
+- Hosted on GitHub Pages at https://metaweta.github.io/ts-hx20/
+- Source: `gh-pages` branch, built from `dist/`
+- Build: `npx vite build --base=/ts-hx20/`
+- Deploy: `npx gh-pages -d dist` (pushes dist/ to gh-pages branch)
+- Do NOT use wrangler/Cloudflare — there is no API token configured
+
 ## TODO
 
-1. Automated testing
+1. Automated testing.
+2. Fix "The CJS build of Vite's Node API is deprecated" warning from `npx vite`.
