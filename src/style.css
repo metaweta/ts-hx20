@@ -325,6 +325,10 @@ body {
   background: #555;
 }
 
+#bottom-buttons button.muted {
+  color: #666;
+}
+
 /* Printer panel */
 
 #printer-panel {

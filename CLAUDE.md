@@ -97,5 +97,4 @@ Group 4 (0x4_): F8C9
 
 ## TODO
 
-1. Sound
-2. Automated testing
+1. Automated testing

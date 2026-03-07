@@ -10,6 +10,7 @@ import { MicrocassetteDrive } from './microcassette-drive';
 import { EPSPDisplay } from './epsp-display';
 import { TF20 } from './tf20';
 import { Printer } from './printer';
+import { Speaker } from './speaker';
 import { loadIntelHexIntoBuffer, loadBinaryIntoBuffer } from './rom-loader';
 
 export class HX20 {
@@ -23,6 +24,7 @@ export class HX20 {
   epspDisplay: EPSPDisplay;
   tf20: TF20;
   printer: Printer;
+  speaker: Speaker;
 
   // Main CPU memory
   mainRAM = new Uint8Array(0x4000);    // 16KB base at 0x0100-0x3FFF
@@ -89,6 +91,7 @@ export class HX20 {
     this.epspDisplay = new EPSPDisplay();
     this.tf20 = new TF20();
     this.printer = new Printer();
+    this.speaker = new Speaker();
 
     // Wire microcassette drive callbacks to CAS0 cassette
     this.drive.onMotorChange = (on, rec) => {
@@ -276,8 +279,9 @@ export class HX20 {
 
     // Port 1: printer control + speaker
     cpu.onReadPort1 = () => 0xC0; // timing + reset pulses high
-    cpu.onWritePort1 = (_val: number): void => {
+    cpu.onWritePort1 = (val: number): void => {
       // Bit 5: speaker
+      this.speaker.updatePort1(val, cpu.totalCycles);
       // Bits 0-4: printer head/motor control
     };
 
@@ -939,6 +943,9 @@ export class HX20 {
 
     // Periodic RTC tick
     this.rtc.tick();
+
+    // Speaker silence detection
+    this.speaker.endFrame();
 
     // Render LCD, CRT, and printer
     this.lcd.render();

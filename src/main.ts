@@ -98,6 +98,13 @@ btnDebugToggle.addEventListener('click', () => {
   btnDebugToggle.textContent = debugPanel.classList.contains('hidden') ? 'Show Debug' : 'Hide Debug';
 });
 
+// Sound toggle
+const btnSoundToggle = document.getElementById('btn-sound-toggle')!;
+btnSoundToggle.addEventListener('click', () => {
+  const muted = hx20.speaker.toggleMute();
+  btnSoundToggle.classList.toggle('muted', muted);
+});
+
 // Printer panel
 const btnPrinterToggle = document.getElementById('btn-printer-toggle')!;
 const printerPanel = document.getElementById('printer-panel')!;
@@ -620,6 +627,7 @@ let powerOn = false;
 function powerOff(): void {
   powerOn = false;
   hx20.stop();
+  hx20.speaker.stop();
   stopAutoSave();
   // Clear the LCD canvas directly (controllers still hold VRAM for power-on resume)
   const lcdCtx = canvas.getContext('2d')!;
