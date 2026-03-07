@@ -132,31 +132,28 @@ btnPrinterCopy.addEventListener('click', async () => {
 });
 
 // DISK panel elements (declared early so updateDipSW4 can reference them)
-const btnDiskToggle = document.getElementById('btn-disk-toggle')!;
 const diskPanel = document.getElementById('disk-panel')!;
 const diskFileListA = document.getElementById('disk-file-list-a')!;
 const diskFileListB = document.getElementById('disk-file-list-b')!;
 const diskFileInputA = document.getElementById('disk-file-input-a') as HTMLInputElement;
 const diskFileInputB = document.getElementById('disk-file-input-b') as HTMLInputElement;
 
-// DIP SW4 management — both CRT and DISK need it enabled
-// Persist panel state so DIP switches survive page reload
+// DIP SW4 management
+// Persist CRT panel state so DIP switches survive page reload
 const PANELS_STORAGE_KEY = 'hx20-panels';
 function updateDipSW4(): void {
   const crtOpen = !crtPanel.classList.contains('hidden');
-  const diskOpen = !diskPanel.classList.contains('hidden');
   const expansion = expansionSelect.value;
-  // FORTH ROM doesn't use EPSP bus — SW4 must be OFF to prevent TF-20 boot
-  const sw4 = expansion !== 'forth' && (crtOpen || (diskOpen && expansion === 'tf20'));
+  // SW4 ON when TF-20 selected or CRT open, OFF for FORTH (no EPSP bus)
+  const sw4 = expansion !== 'forth' && (expansion === 'tf20' || crtOpen);
   hx20.keyboard.setDipSwitches(0, sw4);
-  localStorage.setItem(PANELS_STORAGE_KEY, JSON.stringify({ crt: crtOpen, disk: diskOpen }));
+  localStorage.setItem(PANELS_STORAGE_KEY, JSON.stringify({ crt: crtOpen }));
 }
 
-// Restore panel state from localStorage (before any boot/reset)
+// Restore CRT panel state from localStorage (before any boot/reset)
 try {
   const panels = JSON.parse(localStorage.getItem(PANELS_STORAGE_KEY) || '{}');
   if (panels.crt) crtPanel.classList.remove('hidden');
-  if (panels.disk) diskPanel.classList.remove('hidden');
 } catch { /* ignore */ }
 updateDipSW4();
 
@@ -167,19 +164,6 @@ btnCrtToggle.addEventListener('click', () => {
   updateDipSW4();
   if (wasHidden && hx20.isROMLoaded()) {
     statusText.textContent = 'CRT enabled — reset required for SCREEN 1';
-  }
-});
-
-// DISK toggle
-btnDiskToggle.addEventListener('click', () => {
-  const wasHidden = diskPanel.classList.contains('hidden');
-  diskPanel.classList.toggle('hidden');
-  updateDipSW4();
-  if (wasHidden) {
-    renderDiskFileList();
-    if (hx20.isROMLoaded()) {
-      statusText.textContent = 'TF-20 enabled — reset required for Disk BASIC';
-    }
   }
 });
 
@@ -370,14 +354,21 @@ if (savedBanks && ramSelect.querySelector(`option[value="${savedBanks}"]`)) {
 applyRAMConfig();
 
 ramSelect.addEventListener('change', () => {
+  if (hx20.isROMLoaded() && !confirm('Are you sure? This will clear all RAM.')) {
+    const prev = localStorage.getItem(RAM_STORAGE_KEY) || '0';
+    ramSelect.value = prev;
+    return;
+  }
   localStorage.setItem(RAM_STORAGE_KEY, ramSelect.value);
   applyRAMConfig();
   if (hx20.isROMLoaded()) {
     hx20.stop();
     updateDipSW4();
     hx20.coldStart();
+    powerOn = true;
     hx20.start();
     startAutoSave();
+    btnPower.classList.add('active');
     statusText.textContent = `RAM: ${ramSelect.options[ramSelect.selectedIndex].text} — Reset`;
   }
 });
@@ -388,19 +379,15 @@ const EXPANSION_STORAGE_KEY = 'hx20-expansion';
 function applyExpansionConfig(): void {
   const expansion = expansionSelect.value;
   if (expansion === 'forth') {
-    // Forth needs expansion RAM for bank-switched ROM detection
-    if (ramSelect.value === '0') {
-      ramSelect.value = '8';
-      localStorage.setItem(RAM_STORAGE_KEY, '8');
-      applyRAMConfig();
-    }
     if (forthROMData) hx20.loadOptionROM(forthROMData);
   } else {
     hx20.clearOptionROM();
   }
-  // DISK button only visible when TF-20 selected
-  btnDiskToggle.style.display = expansion === 'tf20' ? '' : 'none';
-  if (expansion !== 'tf20' && !diskPanel.classList.contains('hidden')) {
+  // Show disk panel when TF-20 selected, hide otherwise
+  if (expansion === 'tf20') {
+    diskPanel.classList.remove('hidden');
+    renderDiskFileList();
+  } else {
     diskPanel.classList.add('hidden');
   }
   updateDipSW4();
@@ -414,13 +401,21 @@ if (savedExpansion && expansionSelect.querySelector(`option[value="${savedExpans
 applyExpansionConfig();
 
 expansionSelect.addEventListener('change', () => {
+  if (hx20.isROMLoaded() && !confirm('Are you sure? This will clear all RAM.')) {
+    // Revert to saved value
+    const prev = localStorage.getItem(EXPANSION_STORAGE_KEY) || 'none';
+    expansionSelect.value = prev;
+    return;
+  }
   localStorage.setItem(EXPANSION_STORAGE_KEY, expansionSelect.value);
   applyExpansionConfig();
   if (hx20.isROMLoaded()) {
     hx20.stop();
     hx20.coldStart();
+    powerOn = true;
     hx20.start();
     startAutoSave();
+    btnPower.classList.add('active');
     statusText.textContent = `Expansion: ${expansionSelect.options[expansionSelect.selectedIndex].text} — Reset`;
   }
 });
