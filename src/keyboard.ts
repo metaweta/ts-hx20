@@ -285,9 +285,20 @@ export class Keyboard {
     this.irqLatch = false;
   }
 
+  private static readonly NUM_LABELS: [string, string, string][] = [
+    // [code, normal, numlock]
+    ['KeyU', 'U', '4'], ['KeyI', 'I', '5'], ['KeyO', 'O', '6'],
+    ['KeyJ', 'J', '1'], ['KeyK', 'K', '2'], ['KeyL', 'L', '3'],
+    ['KeyM', 'M', '0'],
+  ];
+
   updateNumLock(on: boolean): void {
     if (this.numLedEl) {
       this.numLedEl.classList.toggle('on', on);
+    }
+    for (const [code, normal, num] of Keyboard.NUM_LABELS) {
+      const el = this.keyElements.get(code);
+      if (el) el.textContent = on ? num : normal;
     }
   }
 
@@ -450,6 +461,7 @@ export class Keyboard {
   private stickyGrphBtn: HTMLElement | null = null;
   private numLedEl: HTMLElement | null = null;
   private capsLedEl: HTMLElement | null = null;
+  private keyElements = new Map<string, HTMLElement>();
 
   // --- Manual Microcassette Mode (MMCM) ---
   // Entered via CTRL+PF1. Swaps PF button labels to show transport functions:
@@ -714,6 +726,7 @@ export class Keyboard {
         btn.className = 'key' + (key.cls ? ' ' + key.cls : '');
         btn.textContent = key.label;
         btn.dataset.code = key.code;
+        this.keyElements.set(key.code, btn);
 
         const isModifier = key.code === 'ControlLeft' || key.code === 'ControlRight' ||
                            key.code === 'ShiftLeft' || key.code === 'ShiftRight';
