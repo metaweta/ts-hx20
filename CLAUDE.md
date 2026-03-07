@@ -82,7 +82,4 @@ Group 4 (0x4_): F8C9
 
 ## TODO
 
-1. ~~Finish debugging TF-20 execution.~~ Done — TF-20 boots, SAVE/LOAD/FILES/KILL all work, both drives independent.
-2. ~~Full commented disassembly of the TF-20 ROMs.~~ Done — TF-20 ROM, BOOT80.SYS, and DBASIC.SYS disassembled with info files.
-3. ~~Fix bug where messages intended for the LCD screen when loading and saving end up copied to the printer.~~ Done — printer capture now checks io_device_status ($0688) lower nibble for device $06.
-4. ~~Fix the bugs preventing use of the MONITOR program.~~ Done — implemented TRAP instruction (opcode $00).
+1. Sound

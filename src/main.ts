@@ -1,8 +1,10 @@
 import './style.css';
 import { HX20 } from './hx20';
 import { Cassette } from './cassette';
-import { fetchROM, fetchBinaryROM, ROM_FILES } from './rom-loader';
+import { fetchBinaryROM } from './rom-loader';
 import { disassemble, formatDisasmLine } from './disasm';
+// FORTH ROM loaded from public/roms/forth.bin
+let forthROMData: Uint8Array | null = null;
 
 const hx20 = new HX20();
 
@@ -24,11 +26,11 @@ const btnPause = document.getElementById('btn-pause')!;
 // Control elements
 const btnPower = document.getElementById('btn-power')!;
 const btnReset = document.getElementById('btn-reset')!;
-const btnLoadRom = document.getElementById('btn-load-rom')!;
 const romFileInput = document.getElementById('rom-file-input') as HTMLInputElement;
 const speedSlider = document.getElementById('speed-slider') as HTMLInputElement;
 const speedDisplay = document.getElementById('speed-display')!;
 const ramSelect = document.getElementById('ram-select') as HTMLSelectElement;
+const expansionSelect = document.getElementById('expansion-select') as HTMLSelectElement;
 
 // CRT display panel
 const btnCrtToggle = document.getElementById('btn-crt-toggle')!;
@@ -143,7 +145,10 @@ const PANELS_STORAGE_KEY = 'hx20-panels';
 function updateDipSW4(): void {
   const crtOpen = !crtPanel.classList.contains('hidden');
   const diskOpen = !diskPanel.classList.contains('hidden');
-  hx20.keyboard.setDipSwitches(0, crtOpen || diskOpen);
+  const expansion = expansionSelect.value;
+  // FORTH ROM doesn't use EPSP bus — SW4 must be OFF to prevent TF-20 boot
+  const sw4 = expansion !== 'forth' && (crtOpen || (diskOpen && expansion === 'tf20'));
+  hx20.keyboard.setDipSwitches(0, sw4);
   localStorage.setItem(PANELS_STORAGE_KEY, JSON.stringify({ crt: crtOpen, disk: diskOpen }));
 }
 
@@ -233,6 +238,7 @@ btnRun.addEventListener('click', () => {
     statusText.textContent = 'Load ROMs first!';
     return;
   }
+  powerOn = true;
   hx20.start();
   startAutoSave();
   statusText.textContent = 'Running';
@@ -294,6 +300,7 @@ stateFileInput.addEventListener('change', async () => {
     hx20.stop();
     hx20.loadState(json);
     hx20.lcd.render();
+    powerOn = true;
     hx20.start();
     startAutoSave();
     statusText.textContent = `State loaded: ${file.name}`;
@@ -347,21 +354,6 @@ listFileInput.addEventListener('change', async () => {
   listFileInput.value = '';
 });
 
-// --- Paste button ---
-const btnPaste = document.getElementById('btn-paste')!;
-btnPaste.addEventListener('click', async () => {
-  try {
-    const text = await navigator.clipboard.readText();
-    if (text) {
-      hx20.keyboard.typeText(text);
-      statusText.textContent = `Pasting ${text.length} chars...`;
-      hx20.keyboard.onPasteFinish = () => { statusText.textContent = 'Paste complete'; };
-    }
-  } catch {
-    statusText.textContent = 'Clipboard access denied — use Cmd+V instead';
-  }
-});
-
 // --- RAM expansion ---
 const RAM_STORAGE_KEY = 'hx20-ram-banks';
 
@@ -383,10 +375,53 @@ ramSelect.addEventListener('change', () => {
   if (hx20.isROMLoaded()) {
     hx20.stop();
     updateDipSW4();
-    hx20.reset();
+    hx20.coldStart();
     hx20.start();
     startAutoSave();
     statusText.textContent = `RAM: ${ramSelect.options[ramSelect.selectedIndex].text} — Reset`;
+  }
+});
+
+// --- Expansion device ---
+const EXPANSION_STORAGE_KEY = 'hx20-expansion';
+
+function applyExpansionConfig(): void {
+  const expansion = expansionSelect.value;
+  if (expansion === 'forth') {
+    // Forth needs expansion RAM for bank-switched ROM detection
+    if (ramSelect.value === '0') {
+      ramSelect.value = '8';
+      localStorage.setItem(RAM_STORAGE_KEY, '8');
+      applyRAMConfig();
+    }
+    if (forthROMData) hx20.loadOptionROM(forthROMData);
+  } else {
+    hx20.clearOptionROM();
+  }
+  // DISK button only visible when TF-20 selected
+  btnDiskToggle.style.display = expansion === 'tf20' ? '' : 'none';
+  if (expansion !== 'tf20' && !diskPanel.classList.contains('hidden')) {
+    diskPanel.classList.add('hidden');
+  }
+  updateDipSW4();
+}
+
+// Restore saved expansion config
+const savedExpansion = localStorage.getItem(EXPANSION_STORAGE_KEY);
+if (savedExpansion && expansionSelect.querySelector(`option[value="${savedExpansion}"]`)) {
+  expansionSelect.value = savedExpansion;
+}
+applyExpansionConfig();
+
+expansionSelect.addEventListener('change', () => {
+  localStorage.setItem(EXPANSION_STORAGE_KEY, expansionSelect.value);
+  applyExpansionConfig();
+  if (hx20.isROMLoaded()) {
+    hx20.stop();
+    hx20.coldStart();
+    hx20.start();
+    startAutoSave();
+    statusText.textContent = `Expansion: ${expansionSelect.options[expansionSelect.selectedIndex].text} — Reset`;
   }
 });
 
@@ -584,48 +619,52 @@ wireDiskDrive('B', 'btn-disk-import-b', 'btn-disk-format-b', diskFileInputB);
 // Debug: expose hx20 for console access
 (window as any).hx20 = hx20;
 
-// Power button — always cold boots (fresh start)
-btnPower.addEventListener('click', () => {
+// Power switch — toggle on/off, preserves RAM (like real battery-backed CMOS hardware)
+let powerOn = false;
+
+function powerOff(): void {
+  powerOn = false;
+  hx20.stop();
+  stopAutoSave();
+  // Clear the LCD canvas directly (controllers still hold VRAM for power-on resume)
+  const lcdCtx = canvas.getContext('2d')!;
+  lcdCtx.fillStyle = '#a5ada5';
+  lcdCtx.fillRect(0, 0, canvas.width, canvas.height);
+  btnPower.classList.remove('active');
+  statusText.textContent = 'Power off';
+}
+
+function powerOnAction(): void {
   if (!hx20.isROMLoaded()) {
     statusText.textContent = 'Load ROMs first!';
     return;
   }
-  hx20.stop();
-  updateDipSW4(); // ensure DIP switches reflect panel state before boot
+  powerOn = true;
+  applyExpansionConfig(); // load/clear option ROM + update DIP switches
   hx20.reset();
   hx20.start();
   startAutoSave();
-  statusText.textContent = 'Running';
   btnPower.classList.add('active');
+  statusText.textContent = 'Running';
+}
+
+btnPower.addEventListener('click', () => {
+  if (powerOn) {
+    powerOff();
+  } else {
+    powerOnAction();
+  }
 });
 
-// Reset button
+// Reset button — clears RAM (cold start, restores initial state)
 btnReset.addEventListener('click', () => {
   if (!hx20.isROMLoaded()) return;
+  if (!confirm('Are you sure? This will clear all RAM.')) return;
   hx20.stop();
-  updateDipSW4(); // ensure DIP switches reflect panel state before boot
-  hx20.reset();
+  applyExpansionConfig(); // load/clear option ROM + update DIP switches
+  hx20.coldStart();
   hx20.start();
   statusText.textContent = 'Reset - Running';
-});
-
-// Load ROM button
-btnLoadRom.addEventListener('click', async () => {
-  statusText.textContent = 'Loading ROMs...';
-  try {
-    await loadLocalROMs();
-    statusText.textContent = 'ROMs loaded! Press POWER to start';
-  } catch (e) {
-    console.warn('Local ROMs not found, trying web fetch...', e);
-    try {
-      await loadROMsFromWeb();
-      statusText.textContent = 'ROMs loaded from web! Press POWER to start';
-    } catch (e2) {
-      console.error('All ROM loading failed:', e2);
-      statusText.textContent = 'Auto-load failed - select ROM files manually';
-      romFileInput.click();
-    }
-  }
 });
 
 // File input for manual ROM loading
@@ -677,12 +716,16 @@ romFileInput.addEventListener('change', async () => {
 
 // Load binary ROMs from local public/roms/ directory
 async function loadLocalROMs(): Promise<void> {
-  const [rom0, rom1, rom2, rom3, slave] = await Promise.all([
-    fetchBinaryROM(import.meta.env.BASE_URL + 'roms/rom0.bin'),
-    fetchBinaryROM(import.meta.env.BASE_URL + 'roms/rom1.bin'),
-    fetchBinaryROM(import.meta.env.BASE_URL + 'roms/rom2.bin'),
-    fetchBinaryROM(import.meta.env.BASE_URL + 'roms/rom3.bin'),
-    fetchBinaryROM(import.meta.env.BASE_URL + 'roms/secondary.bin'),
+  const base = import.meta.env.BASE_URL + 'roms/';
+  const [rom0, rom1, rom2, rom3, slave, boot80, dbasic, forth] = await Promise.all([
+    fetchBinaryROM(base + 'rom0.bin'),
+    fetchBinaryROM(base + 'rom1.bin'),
+    fetchBinaryROM(base + 'rom2.bin'),
+    fetchBinaryROM(base + 'rom3.bin'),
+    fetchBinaryROM(base + 'secondary.bin'),
+    fetchBinaryROM(base + 'boot80.bin'),
+    fetchBinaryROM(base + 'dbasic.bin'),
+    fetchBinaryROM(base + 'forth.bin'),
   ]);
 
   // ROM layout in mainROM buffer (0x8000 bytes for addresses 0x8000-0xFFFF):
@@ -695,22 +738,10 @@ async function loadLocalROMs(): Promise<void> {
   hx20.loadMainROMBinary(rom1, 0x4000);
   hx20.loadMainROMBinary(rom0, 0x6000);
   hx20.loadSlaveROM(slave);
-
+  hx20.tf20.loadBootROMs(boot80, dbasic);
+  forthROMData = forth;
 }
 
-// Load Intel HEX ROMs from electrickery website
-async function loadROMsFromWeb(): Promise<void> {
-  const entries = Object.entries(ROM_FILES) as [string, { url: string; address: number; size: number }][];
-  const results = await Promise.all(
-    entries.map(async ([_name, info]) => {
-      const hex = await fetchROM(info.url);
-      return { hex, address: info.address };
-    })
-  );
-  for (const { hex, address } of results) {
-    hx20.loadROMHex(hex, address);
-  }
-}
 
 function updateDebugDisplay(): void {
   registersEl.textContent = hx20.mainCPU.dumpRegisters();
@@ -725,37 +756,25 @@ function updateDebugDisplay(): void {
   ).join('\n');
 }
 
-// Fresh boot: load ROMs and cold start
-function freshBoot(): void {
-  statusText.textContent = 'Loading ROMs...';
-  loadLocalROMs().then(() => {
-    updateDipSW4(); // ensure DIP switches reflect panel state before boot
-    hx20.reset();
-    hx20.start();
-    startAutoSave();
-    statusText.textContent = 'Running';
-    btnPower.classList.add('active');
-  }).catch(() => {
-    statusText.textContent = 'Click LOAD ROMs to fetch, or select ROM files manually';
-  });
-}
-
-// Startup: restore saved state if available, otherwise cold boot
-const savedState = localStorage.getItem(STATE_STORAGE_KEY);
-if (savedState) {
-  // Resume from snapshot — no ROM loading or boot needed
-  try {
-    hx20.loadState(savedState);
-    hx20.lcd.render();
-    hx20.start();
-    startAutoSave();
-    statusText.textContent = 'Resumed';
-    btnPower.classList.add('active');
-  } catch (e) {
-    console.warn('State incompatible or corrupted, fresh boot:', e);
-    localStorage.removeItem(STATE_STORAGE_KEY);
-    freshBoot();
+// Startup: load ROMs and restore state, but stay powered off
+statusText.textContent = 'Loading ROMs...';
+loadLocalROMs().then(() => {
+  const savedState = localStorage.getItem(STATE_STORAGE_KEY);
+  if (savedState) {
+    try {
+      hx20.loadState(savedState);
+      applyExpansionConfig();
+    } catch (e) {
+      console.warn('State incompatible or corrupted:', e);
+      localStorage.removeItem(STATE_STORAGE_KEY);
+      applyExpansionConfig();
+      hx20.coldStart();
+    }
+  } else {
+    applyExpansionConfig();
+    hx20.coldStart();
   }
-} else {
-  freshBoot();
-}
+  statusText.textContent = 'Power off — press POWER to start';
+}).catch(() => {
+  statusText.textContent = 'ROM files not found — place rom0-3.bin + secondary.bin in public/roms/';
+});

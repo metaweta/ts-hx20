@@ -10,12 +10,20 @@ export class MC146818 {
   }
 
   reset(): void {
-    this.regs.fill(0);
+    // Only clear control/status registers (0x00-0x0D), preserve NVRAM (0x0E-0x3F)
+    // which the ROM uses for system variables (ext_rom_flags, system_mode, etc.)
+    for (let i = 0; i <= 0x0D; i++) this.regs[i] = 0;
     // Set reasonable defaults
     this.regs[0x0A] = 0x26; // DV=010 (32.768kHz), RS=0110 (1024Hz)
     this.regs[0x0B] = 0x02; // 24-hour mode, BCD
     this.regs[0x0D] = 0x80; // VRT = 1 (valid RAM and time)
     this.updateTime();
+  }
+
+  /** Full clear including NVRAM — used by cold start */
+  coldReset(): void {
+    this.regs.fill(0);
+    this.reset();
   }
 
   read(addr: number): number {

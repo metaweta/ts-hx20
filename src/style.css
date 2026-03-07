@@ -63,6 +63,19 @@ body {
   border-color: #5a9c5a;
 }
 
+#reset-spacer {
+  flex: 1;
+}
+
+#btn-reset {
+  background: #6a3333 !important;
+  border-color: #884444 !important;
+}
+
+#btn-reset:hover {
+  background: #7a4444 !important;
+}
+
 #speed-label {
   font-size: 11px;
   color: #999;

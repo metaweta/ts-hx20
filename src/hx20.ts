@@ -33,6 +33,7 @@ export class HX20 {
   // RAM expansion (bank-switched at 0x4000-0x7FFF)
   expansionBanks: Uint8Array[] = [];   // Each bank is 16KB
   private bankRegister = 0;            // Selected bank (written via 0x0030)
+  private optionROMVisible = true;     // BANK2 ($32) selects option ROM; BANK0 ($30) selects RAM
 
   // Slave CPU memory (internal 4KB ROM loaded separately)
   slaveROM: Uint8Array | null = null;
@@ -70,7 +71,7 @@ export class HX20 {
   static readonly CYCLES_PER_FRAME = Math.floor(HX20.E_CLOCK / HX20.FRAME_RATE);
 
   // State format version (increment when save format changes)
-  static readonly STATE_VERSION = 3;
+  static readonly STATE_VERSION = 4;
 
   onStatusUpdate: (text: string) => void = () => {};
   onRegistersUpdate: (text: string) => void = () => {};
@@ -139,7 +140,7 @@ export class HX20 {
     cpu.onRead = (addr: number): number => {
       if (addr >= 0x8000) return this.mainROM[addr - 0x8000];
       if (addr >= 0x6000 && addr < 0x8000) {
-        if (this.hasOptionROM) return this.optionROM[addr - 0x6000];
+        if (this.hasOptionROM && this.optionROMVisible) return this.optionROM[addr - 0x6000];
         if (this.expansionBanks.length > 0) {
           return this.expansionBanks[this.bankRegister % this.expansionBanks.length][addr - 0x4000];
         }
@@ -191,7 +192,7 @@ export class HX20 {
         return;
       }
       if (addr >= 0x4000 && addr < 0x8000 && this.expansionBanks.length > 0) {
-        if (addr >= 0x6000 && this.hasOptionROM) return; // can't write to ROM
+        if (addr >= 0x6000 && this.hasOptionROM && this.optionROMVisible) return; // can't write to ROM
         this.expansionBanks[this.bankRegister % this.expansionBanks.length][addr - 0x4000] = val;
         return;
       }
@@ -211,8 +212,12 @@ export class HX20 {
         case 0x002C: break; // interrupt mask sleep mode
         case 0x0030:
           if (this.expansionBanks.length > 0) this.bankRegister = val;
+          this.optionROMVisible = false; // BANK0: show expansion RAM at $6000-$7FFF
           break;
-        case 0x0031: case 0x0032: case 0x0033:
+        case 0x0032:
+          this.optionROMVisible = true;  // BANK2: show option ROM at $6000-$7FFF
+          break;
+        case 0x0031: case 0x0033:
           break; // bank switching (reserved)
       }
     };
@@ -488,16 +493,27 @@ export class HX20 {
     }
   }
 
+  loadOptionROM(data: Uint8Array): void {
+    this.optionROM.set(data);
+    this.hasOptionROM = true;
+  }
+
+  clearOptionROM(): void {
+    this.hasOptionROM = false;
+  }
+
   isROMLoaded(): boolean {
     // Check if reset vector is valid (not 0xFFFF)
     const resetVec = (this.mainROM[0x7FFE] << 8) | this.mainROM[0x7FFF];
     return resetVec !== 0xFFFF && resetVec !== 0x0000;
   }
 
-  reset(): void {
+  /** Cold start: clear all RAM (including RTC NVRAM and CPU internal RAM), then reset. */
+  coldStart(): void {
     this.mainRAM.fill(0);
     for (const bank of this.expansionBanks) bank.fill(0);
-    this.bankRegister = 0;
+    this.mainCPU.ram.fill(0);
+    this.rtc.coldReset();
 
     // Pre-initialize battery-backed RAM values that the ROM expects.
     // With expansion RAM, BASIC sees flat memory up to 0x6000 (or 0x8000 if no option ROM).
@@ -509,6 +525,14 @@ export class HX20 {
     this.mainRAM[0x0135 - 0x0100] = ramEnd & 0xFF;
     this.mainRAM[0x012C - 0x0100] = (ramEnd >> 8) & 0xFF;
     this.mainRAM[0x012D - 0x0100] = ramEnd & 0xFF;
+
+    this.reset();
+  }
+
+  /** Reset: restart CPUs and peripherals, preserving RAM (like real hardware). */
+  reset(): void {
+    this.bankRegister = 0;
+    this.optionROMVisible = true;
 
     this.slaveTx = 1;
     this.slaveRx = 1;
@@ -1119,6 +1143,8 @@ export class HX20 {
       expansionBanks: this.expansionBanks.map(b => btoa(String.fromCharCode(...b))),
       bankRegister: this.bankRegister,
       mainROM: btoa(String.fromCharCode(...this.mainROM)),
+      optionROM: this.hasOptionROM ? btoa(String.fromCharCode(...this.optionROM)) : null,
+      hasOptionROM: this.hasOptionROM,
       slaveROM: this.slaveROM ? btoa(String.fromCharCode(...this.slaveROM)) : null,
       lcd: lcdControllers,
       rtc: this.rtc.saveState(),
@@ -1127,6 +1153,7 @@ export class HX20 {
       slaveFlag: this.slaveFlag,
       slaveSio: this.slaveSio,
       ksc: this.ksc,
+      optionROMVisible: this.optionROMVisible,
       epspDisplay: this.epspDisplay.saveState(),
       tf20: this.tf20.saveState(),
       printer: this.printer.saveState(),
@@ -1162,6 +1189,15 @@ export class HX20 {
       this.bankRegister = s.bankRegister || 0;
     }
 
+    // Restore option ROM (if present in state)
+    if (s.optionROM) {
+      const optStr = atob(s.optionROM);
+      for (let i = 0; i < optStr.length; i++) this.optionROM[i] = optStr.charCodeAt(i);
+      this.hasOptionROM = true;
+    } else {
+      this.hasOptionROM = !!s.hasOptionROM;
+    }
+
     // Restore slave ROM (must happen before slave CPU restore)
     if (s.slaveROM) {
       const slaveStr = atob(s.slaveROM);
@@ -1193,6 +1229,7 @@ export class HX20 {
     this.slaveFlag = s.slaveFlag;
     this.slaveSio = s.slaveSio;
     this.ksc = s.ksc;
+    this.optionROMVisible = s.optionROMVisible !== undefined ? s.optionROMVisible : true;
 
     // Restore RTC NVRAM (contains TITLE directory etc.), or reset if absent
     if (s.rtc) {

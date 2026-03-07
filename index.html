@@ -12,12 +12,9 @@
       <h1>EPSON HX-20</h1>
       <div id="controls">
         <button id="btn-power" title="Power On/Off">POWER</button>
-        <button id="btn-reset" title="Reset">RESET</button>
-        <button id="btn-load-rom" title="Load ROM files">LOAD ROMs</button>
         <input type="file" id="rom-file-input" multiple accept=".hex,.bin,.rom" style="display:none">
         <label id="speed-label">Speed: <span id="speed-display">1x</span></label>
         <input type="range" id="speed-slider" min="1" max="10" value="1">
-        <button id="btn-paste" title="Paste text from clipboard">PASTE</button>
         <label id="ram-label">RAM:
           <select id="ram-select" title="RAM expansion (requires reset)">
             <option value="0">16KB</option>
@@ -26,9 +23,18 @@
             <option value="8">128KB</option>
           </select>
         </label>
+        <label id="expansion-label">Expansion:
+          <select id="expansion-select" title="Expansion device (requires reset)">
+            <option value="none">Standard</option>
+            <option value="tf20">TF-20 Disk</option>
+            <option value="forth">FORTH ROM</option>
+          </select>
+        </label>
         <button id="btn-save-state" title="Save machine state to file">SAVE STATE</button>
         <button id="btn-load-state" title="Load machine state from file">LOAD STATE</button>
         <input type="file" id="state-file-input" accept=".json" style="display:none">
+        <span id="reset-spacer"></span>
+        <button id="btn-reset" title="Reset — clears all RAM">RESET</button>
       </div>
     </div>
 

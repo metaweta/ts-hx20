@@ -232,7 +232,7 @@ While ts-hx20 is not a port of anyone else's emulator (it did a full annotated d
 
 * Electrickery's [HX-20 documentation](https://electrickery.nl/comp/hx20/index.html), [ROMs](https://electrickery.nl/comp/hx20/ROMdump.html), [TF-20 documentation](https://electrickery.nl/comp/tf20/doc/), and [pxdisk](https://github.com/electrickery/pxdisk_mega), with HX-20 support by R. Offner
 * Frigolit's [HXEmu](https://frigolit.net/projects/hxemu/)
-* Martin Hepperle's [MH-20](https://www.mh-aerotools.de/hp/hx-20/)
+* Martin Hepperle's [MH-20](https://www.mh-aerotools.de/hp/hx-20/) and [modified FORTH ROM](https://github.com/MartinHepperle/Epson-HX-20/tree/main/Forth-ROM)
 * Norbert Kehrer's [flashx20](https://norbertkehrer.github.io/flashx20.html)
 * Kobolt's [hex20](https://github.com/kobolt/hex20)
 * [The MAME project](https://www.mamedev.org/)
