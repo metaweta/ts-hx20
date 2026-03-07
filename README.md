@@ -219,6 +219,17 @@ At address `$6878`, the instruction `ORAA #$37` (opcode `$8A`) is changed to `AD
 
 Without this patch, `SAVE "A:TEST"` and `SAVE "B:TEST"` both write to the same drive. It is likely that this bug was never caught on real hardware because few users had a second floppy drive connected to their TF-20.
 
+## Deployment
+
+The emulator is hosted on GitHub Pages at https://metaweta.github.io/ts-hx20/.
+
+```bash
+npx vite build --base=/ts-hx20/   # build with GitHub Pages base path
+npx gh-pages -d dist               # push dist/ to the gh-pages branch
+```
+
+GitHub Pages is configured to serve from the `gh-pages` branch root.
+
 ## Tech Stack
 
 - **TypeScript 5.7** — type-safe emulation core
