@@ -151,8 +151,8 @@ const PANELS_STORAGE_KEY = 'hx20-panels';
 function updateDipSW4(): void {
   const crtOpen = !crtPanel.classList.contains('hidden');
   const expansion = expansionSelect.value;
-  // SW4 ON when TF-20 selected or CRT open, OFF for FORTH (no EPSP bus)
-  const sw4 = expansion !== 'forth' && (expansion === 'tf20' || crtOpen);
+  // SW4 ON when TF-20 selected or CRT panel open (any expansion mode)
+  const sw4 = expansion === 'tf20' || crtOpen;
   hx20.keyboard.setDipSwitches(0, sw4);
   localStorage.setItem(PANELS_STORAGE_KEY, JSON.stringify({ crt: crtOpen }));
 }
