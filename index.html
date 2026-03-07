@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Epson HX-20 Emulator</title>
-  <script type="module" crossorigin src="/ts-hx20/assets/index-KkYJbQP5.js"></script>
-  <link rel="stylesheet" crossorigin href="/ts-hx20/assets/index-CeJoL2ug.css">
+  <script type="module" crossorigin src="/ts-hx20/assets/index-DnUwCnah.js"></script>
+  <link rel="stylesheet" crossorigin href="/ts-hx20/assets/index-Gr6yLnww.css">
 </head>
 <body>
   <div id="emulator">
@@ -13,12 +13,9 @@
       <h1>EPSON HX-20</h1>
       <div id="controls">
         <button id="btn-power" title="Power On/Off">POWER</button>
-        <button id="btn-reset" title="Reset">RESET</button>
-        <button id="btn-load-rom" title="Load ROM files">LOAD ROMs</button>
         <input type="file" id="rom-file-input" multiple accept=".hex,.bin,.rom" style="display:none">
         <label id="speed-label">Speed: <span id="speed-display">1x</span></label>
         <input type="range" id="speed-slider" min="1" max="10" value="1">
-        <button id="btn-paste" title="Paste text from clipboard">PASTE</button>
         <label id="ram-label">RAM:
           <select id="ram-select" title="RAM expansion (requires reset)">
             <option value="0">16KB</option>
@@ -27,9 +24,18 @@
             <option value="8">128KB</option>
           </select>
         </label>
+        <label id="expansion-label">Expansion:
+          <select id="expansion-select" title="Expansion device (requires reset)">
+            <option value="none">Standard</option>
+            <option value="tf20">TF-20 Disk</option>
+            <option value="forth">FORTH ROM</option>
+          </select>
+        </label>
         <button id="btn-save-state" title="Save machine state to file">SAVE STATE</button>
         <button id="btn-load-state" title="Load machine state from file">LOAD STATE</button>
         <input type="file" id="state-file-input" accept=".json" style="display:none">
+        <span id="reset-spacer"></span>
+        <button id="btn-reset" title="Reset — clears all RAM">RESET</button>
       </div>
     </div>
 
@@ -49,6 +55,7 @@
     <div id="bottom-buttons">
       <button id="btn-cas0-toggle">CAS0:</button>
       <button id="btn-cas1-toggle">CAS1:</button>
+      <button id="btn-disk-toggle">DISK</button>
       <button id="btn-crt-toggle">CRT</button>
       <button id="btn-printer-toggle">PRINTER</button>
       <button id="btn-debug-toggle">Show Debug</button>
@@ -98,6 +105,24 @@
       <h3>External CRT Display</h3>
       <div id="crt-bezel">
         <canvas id="crt-canvas" width="320" height="192"></canvas>
+      </div>
+    </div>
+
+    <div id="disk-panel" class="cassette-panel hidden">
+      <h3>TF-20 Floppy Disk</h3>
+      <h4>Drive A:</h4>
+      <div id="disk-file-list-a" class="tape-list"></div>
+      <div class="cassette-controls">
+        <button id="btn-disk-import-a">Import</button>
+        <button id="btn-disk-format-a">Format A:</button>
+        <input type="file" id="disk-file-input-a" multiple style="display:none">
+      </div>
+      <h4>Drive B:</h4>
+      <div id="disk-file-list-b" class="tape-list"></div>
+      <div class="cassette-controls">
+        <button id="btn-disk-import-b">Import</button>
+        <button id="btn-disk-format-b">Format B:</button>
+        <input type="file" id="disk-file-input-b" multiple style="display:none">
       </div>
     </div>
 
