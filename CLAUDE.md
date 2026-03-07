@@ -70,7 +70,22 @@ Group 4 (0x4_): F8C9
 - `disassemblies/tf20-rom-disasm.s` — TF-20 EPSP controller ROM (Z80, 8KB)
 - `disassemblies/boot80-disasm.s` — BOOT80.SYS disk boot loader (256B, runs on HX-20)
 - `disassemblies/dbasic-disasm.s` — DBASIC.SYS Disk BASIC V-1.0 extension (4.7KB PRL)
-- `disassemblies/forth-rom-disasm.s` — HCCS Forth option ROM (8KB FIG-Forth, $6000-$7FFF)
+
+### Expansion System
+- Expansion selector: Standard / TF-20 Disk / FORTH ROM
+- Option ROM at $6000-$7FFF: detected at boot, diverts to Forth instead of BASIC
+- FORTH ROM: Martin Hepperle's Japan V1.1 build (matches our Basic ROMs)
+- ROM version: Japan V1.1 (D760=43 D4, E2EF=E2 3F) — FORTH ROM must match
+- All expansion ROMs stored as binary files in `public/roms/` (boot80.bin, dbasic.bin, forth.bin)
+- TF20 boot ROMs loaded via `tf20.loadBootROMs()` at startup
+
+### Power / Reset Semantics
+- Power toggle: preserves all RAM (mainRAM, CPU internal RAM, RTC NVRAM) — like real battery-backed CMOS
+- Reset: clears all RAM (cold start) — gated behind confirmation dialog
+- RTC NVRAM ($004E-$007F): MC146818 registers $0E-$3F used by ROM for system variables (ext_rom_flags, system_mode, etc.)
+- `coldStart()`: clears mainRAM, expansion banks, CPU internal RAM, RTC NVRAM, then calls `reset()`
+- `reset()`: restarts CPUs and peripherals only, RAM untouched
+- Page loads in powered-off state; ROM and state restored silently
 
 ### TF-20 Floppy Disk
 - EPSP protocol: DID $31-$34, broadcast serial to both EPSPDisplay and TF20
