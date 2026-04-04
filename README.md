@@ -242,12 +242,13 @@ GitHub Pages is configured to serve from the `gh-pages` branch root.
 While ts-hx20 is not a port of anyone else's emulator (it did a full annotated disassembly of the ROMs provided by Electrickery and worked from there; see the docs folder), Claude did refer to any existing emulators and documentation it could find, particularly
 
 * Electrickery's [HX-20 documentation](https://electrickery.nl/comp/hx20/index.html), [ROMs](https://electrickery.nl/comp/hx20/ROMdump.html), [TF-20 documentation](https://electrickery.nl/comp/tf20/doc/), and [pxdisk](https://github.com/electrickery/pxdisk_mega), with HX-20 support by R. Offner
+* Fjkraan's [documentation](http://www.vintagecomputer.net/fjkraan/comp/hx20/doc/)
 * Frigolit's [HXEmu](https://frigolit.net/projects/hxemu/)
 * Martin Hepperle's [MH-20](https://www.mh-aerotools.de/hp/hx-20/) and [modified FORTH ROM](https://github.com/MartinHepperle/Epson-HX-20/tree/main/Forth-ROM)
 * Norbert Kehrer's [flashx20](https://norbertkehrer.github.io/flashx20.html)
 * Kobolt's [hex20](https://github.com/kobolt/hex20)
 * [The MAME project](https://www.mamedev.org/)
-* nerdprojects' [hxlink](https://github.com/nerdprojects/hxlink)
+* Nerdprojects' [hxlink](https://github.com/nerdprojects/hxlink)
 * The [CP/M PRL file format documentation](https://www.seasip.info/Cpm/prl.html) at seasip.info, which was essential for understanding DBASIC.SYS page relocation
 * The [PFBDK EPSP Floppy Drive Emulator](https://hackaday.io/project/193978-pfbdk-epsp-floppy-drive-emulator) project on Hackaday
 
