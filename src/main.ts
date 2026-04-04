@@ -465,7 +465,7 @@ function wireCassettePanel(cas: Cassette, ids: {
       const dlBtn = document.createElement('button');
       dlBtn.textContent = 'DL';
       dlBtn.className = 'tape-action';
-      dlBtn.title = 'Download tape';
+      dlBtn.title = 'Download tape (JSON)';
       dlBtn.addEventListener('click', () => {
         const json = cas.exportTape(name);
         if (!json) return;
@@ -477,6 +477,21 @@ function wireCassettePanel(cas: Cassette, ids: {
         URL.revokeObjectURL(a.href);
       });
 
+      const wavBtn = document.createElement('button');
+      wavBtn.textContent = 'WAV';
+      wavBtn.className = 'tape-action';
+      wavBtn.title = 'Download tape as audio WAV';
+      wavBtn.addEventListener('click', () => {
+        const blob = cas.exportWAV(name);
+        if (!blob) return;
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `${name}.wav`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+        statusText.textContent = `Exported ${name}.wav`;
+      });
+
       const delBtn = document.createElement('button');
       delBtn.textContent = '\u00D7';
       delBtn.className = 'tape-action tape-delete';
@@ -485,6 +500,7 @@ function wireCassettePanel(cas: Cassette, ids: {
 
       row.appendChild(btn);
       row.appendChild(dlBtn);
+      row.appendChild(wavBtn);
       row.appendChild(delBtn);
       tapeListEl.appendChild(row);
     }

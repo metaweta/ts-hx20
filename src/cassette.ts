@@ -345,6 +345,61 @@ export class Cassette {
     return JSON.stringify({ name, v: 2, initLevel: p.initLevel, data: p.data });
   }
 
+  /** Export tape as a WAV file (16-bit PCM square wave from FSK transitions) */
+  exportWAV(name: string, sampleRate = 44100): Blob | null {
+    const data = this.library.get(name);
+    if (!data || data.length < 4) return null;
+
+    const E_CLOCK = 614400; // slave CPU clock
+    const lastCycle = data[data.length - 2];
+    const duration = lastCycle / E_CLOCK;
+    const numSamples = Math.ceil(duration * sampleRate);
+    if (numSamples <= 0) return null;
+
+    const samples = new Int16Array(numSamples);
+    const amplitude = 24000; // ~73% of max to avoid clipping
+
+    // Walk transitions and fill samples
+    let transIdx = 0;
+    let level = data[1] !== 0; // initial level
+    for (let s = 0; s < numSamples; s++) {
+      const cycle = (s / sampleRate) * E_CLOCK;
+      // Advance past transitions that have occurred by this sample time
+      while (transIdx + 2 < data.length && data[transIdx + 2] <= cycle) {
+        transIdx += 2;
+        level = data[transIdx + 1] !== 0;
+      }
+      samples[s] = level ? amplitude : -amplitude;
+    }
+
+    // Build WAV file
+    const dataSize = numSamples * 2; // 16-bit = 2 bytes per sample
+    const buf = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(buf);
+
+    // RIFF header
+    writeString(view, 0, 'RIFF');
+    view.setUint32(4, 36 + dataSize, true);
+    writeString(view, 8, 'WAVE');
+    // fmt chunk
+    writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true);          // chunk size
+    view.setUint16(20, 1, true);           // PCM format
+    view.setUint16(22, 1, true);           // mono
+    view.setUint32(24, sampleRate, true);  // sample rate
+    view.setUint32(28, sampleRate * 2, true); // byte rate
+    view.setUint16(32, 2, true);           // block align
+    view.setUint16(34, 16, true);          // bits per sample
+    // data chunk
+    writeString(view, 36, 'data');
+    view.setUint32(40, dataSize, true);
+
+    const output = new Int16Array(buf, 44);
+    output.set(samples);
+
+    return new Blob([buf], { type: 'audio/wav' });
+  }
+
   importTape(json: string): string | null {
     try {
       const obj = JSON.parse(json);
@@ -395,5 +450,12 @@ export class Cassette {
     } catch (e) {
       console.warn('Cassette: failed to load library:', e);
     }
+  }
+}
+
+/** Write an ASCII string into a DataView at the given offset */
+function writeString(view: DataView, offset: number, str: string): void {
+  for (let i = 0; i < str.length; i++) {
+    view.setUint8(offset + i, str.charCodeAt(i));
   }
 }
