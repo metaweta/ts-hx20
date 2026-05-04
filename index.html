@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Epson HX-20 Emulator</title>
-  <script type="module" crossorigin src="/ts-hx20/assets/index-DYoiRbsO.js"></script>
-  <link rel="stylesheet" crossorigin href="/ts-hx20/assets/index-dlrxHFTP.css">
+  <script type="module" crossorigin src="/ts-hx20/assets/index-D-UF1wqT.js"></script>
+  <link rel="stylesheet" crossorigin href="/ts-hx20/assets/index-sJ5-82JG.css">
 </head>
 <body>
   <div id="emulator">
@@ -29,6 +29,7 @@
             <option value="none">Standard</option>
             <option value="tf20">TF-20 Disk</option>
             <option value="forth">FORTH ROM</option>
+            <option value="epson_link">Epson Link ROM</option>
           </select>
         </label>
         <button id="btn-save-state" title="Save machine state to file">SAVE STATE</button>
@@ -57,6 +58,7 @@
       <button id="btn-cas1-toggle">CAS1:</button>
       <button id="btn-crt-toggle">CRT</button>
       <button id="btn-printer-toggle">PRINTER</button>
+      <button id="btn-rs232-toggle">RS-232C</button>
       <button id="btn-sound-toggle">SOUND</button>
       <button id="btn-debug-toggle">Show Debug</button>
       <button id="btn-get-list" title="Download BASIC listing as text file">GET LIST</button>
@@ -123,6 +125,45 @@
         <button id="btn-disk-import-b">Import</button>
         <button id="btn-disk-format-b">Format B:</button>
         <input type="file" id="disk-file-input-b" multiple style="display:none">
+      </div>
+    </div>
+
+    <div id="rs232-panel" class="cassette-panel hidden">
+      <h3>RS-232C Serial</h3>
+      <div id="rs232-params" class="rs232-params">No parameters yet — boot the HX-20 and OPEN "COM0:..." to configure.</div>
+
+      <div class="rs232-handshake">
+        <label title="Peer asserts CTS (clear-to-send)"><input type="checkbox" id="rs232-cts"> CTS</label>
+        <label title="Peer asserts DSR (data-set-ready)"><input type="checkbox" id="rs232-dsr"> DSR</label>
+        <label title="Carrier detected"><input type="checkbox" id="rs232-cd"> CD</label>
+        <label title="Ring indicator"><input type="checkbox" id="rs232-ri"> RI</label>
+      </div>
+
+      <div class="rs232-section">
+        <div class="rs232-section-head">
+          <span>Host → Device (TX)</span>
+          <span class="rs232-mode-toggle">
+            <label><input type="radio" name="rs232-tx-mode" value="text" checked> text</label>
+            <label><input type="radio" name="rs232-tx-mode" value="hex"> hex</label>
+            <button id="btn-rs232-tx-clear" class="tape-action">Clear</button>
+          </span>
+        </div>
+        <pre id="rs232-tx-log" class="rs232-log"></pre>
+      </div>
+
+      <div class="rs232-section">
+        <div class="rs232-section-head">
+          <span>Device → Host (RX)</span>
+          <span class="rs232-mode-toggle">
+            <label><input type="radio" name="rs232-rx-mode" value="text" checked> text</label>
+            <label><input type="radio" name="rs232-rx-mode" value="hex"> hex</label>
+          </span>
+        </div>
+        <textarea id="rs232-rx-input" class="rs232-input" rows="3" placeholder="Type text, or hex bytes like &quot;48 65 6c 6c 6f&quot;"></textarea>
+        <div class="rs232-rx-controls">
+          <button id="btn-rs232-rx-send" class="tape-action">Send</button>
+          <label><input type="checkbox" id="rs232-rx-crlf"> append CR/LF</label>
+        </div>
       </div>
     </div>
 
