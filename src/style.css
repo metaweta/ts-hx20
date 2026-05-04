@@ -534,3 +534,89 @@ body {
   line-height: 1.4;
   white-space: pre;
 }
+
+/* RS-232C panel */
+.rs232-params {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 3px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  color: #8cf;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  white-space: pre-wrap;
+}
+
+.rs232-handshake {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-size: 11px;
+  color: #ccc;
+}
+
+.rs232-handshake label {
+  cursor: pointer;
+}
+
+.rs232-section {
+  margin-bottom: 10px;
+}
+
+.rs232-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: #aaa;
+  margin-bottom: 4px;
+}
+
+.rs232-mode-toggle {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 11px;
+}
+
+.rs232-mode-toggle label {
+  cursor: pointer;
+}
+
+.rs232-log {
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 3px;
+  padding: 6px 8px;
+  margin: 0;
+  height: 120px;
+  overflow-y: auto;
+  color: #cfc;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.rs232-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: #1a1a1a;
+  color: #cfc;
+  border: 1px solid #444;
+  border-radius: 3px;
+  padding: 4px 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  font-size: 11px;
+  resize: vertical;
+}
+
+.rs232-rx-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #ccc;
+}

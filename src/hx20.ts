@@ -11,6 +11,7 @@ import { EPSPDisplay } from './epsp-display';
 import { TF20 } from './tf20';
 import { Printer } from './printer';
 import { Speaker } from './speaker';
+import { RS232, BitBangDecoder } from './rs232';
 import { loadIntelHexIntoBuffer, loadBinaryIntoBuffer } from './rom-loader';
 
 export class HX20 {
@@ -25,6 +26,9 @@ export class HX20 {
   tf20: TF20;
   printer: Printer;
   speaker: Speaker;
+  rs232: RS232;
+  private rs232Decoder = new BitBangDecoder();
+  private rs232TxLevel = 1;  // last seen master Port 2 bit 1 (TXD) level
 
   // Main CPU memory
   mainRAM = new Uint8Array(0x4000);    // 16KB base at 0x0100-0x3FFF
@@ -92,6 +96,7 @@ export class HX20 {
     this.tf20 = new TF20();
     this.printer = new Printer();
     this.speaker = new Speaker();
+    this.rs232 = new RS232();
 
     // Wire microcassette drive callbacks to CAS0 cassette
     this.drive.onMotorChange = (on, rec) => {
@@ -237,8 +242,12 @@ export class HX20 {
       if (!this.keyboard.irqPending) val |= 0x20;
       // Bit 2: slave flag (slave P34 → master P12)
       if (this.slaveFlag) val |= 0x04;
-      // Bits 1,0: RS-232 CTS, DSR (both high = ready)
-      val |= 0x03;
+      // Bits 1,0: RS-232 CTS, DSR (driven by external peer state).
+      // After the level converter, an asserted handshake reads as 0 at the CPU pin
+      // (serial_write_byte $E5E5 transmits when (~params_hi[5:4] & PORT1 & 3) == 0).
+      // So we set the bit only when the peer is *not* asserting the line.
+      if (!this.rs232.cts) val |= 0x02;
+      if (!this.rs232.dsr) val |= 0x01;
       return val;
     };
 
@@ -260,7 +269,15 @@ export class HX20 {
       // Bit 2: serial select (0=SIO, 1=slave)
       const newSlaveSio = (val >> 2) & 1;
       this.slaveSio = newSlaveSio;
-      // Bit 1: RS-232 TXD
+      // Bit 1: RS-232 TXD — feed the bit-bang decoder
+      const txd = (val >> 1) & 1;
+      if (txd !== this.rs232TxLevel) {
+        this.rs232TxLevel = txd;
+        const period = this.getSciBaudPeriod();
+        const dataBits = this.getRS232DataBits();
+        const parity = this.getRS232ParityEnabled();
+        this.rs232Decoder.setLevel(txd, this.mainCPU.totalCycles, period, dataBits, parity);
+      }
     };
 
     cpu.onReadPort3 = () => 0xFF;
@@ -415,10 +432,16 @@ export class HX20 {
         // Main CPU TX → Slave CPU RX
         this.slaveCPU.serialRecv(data);
       } else {
-        // External SIO bus → broadcast to all EPSP devices
+        // External SIO bus → broadcast to all EPSP devices + the RS-232C peer
         this.epspDisplay.recvByte(data);
         this.tf20.recvByte(data);
+        this.rs232.recvFromSCI(data, this.mainCPU.totalCycles);
       }
+    };
+
+    // RS-232C peer → main CPU SCI RX (only when SCI is routed to the SIO bus)
+    this.rs232.onRx = (data: number) => {
+      if (!this.slaveSio) this.mainCPU.serialRecv(data);
     };
 
     this.slaveCPU.onSerialSend = (data: number) => {
@@ -504,6 +527,70 @@ export class HX20 {
 
   clearOptionROM(): void {
     this.hasOptionROM = false;
+  }
+
+  // --- RS-232C parameter readout ---
+  // The firmware stores the active SCI/RS-232C config in working RAM:
+  //   $01AF (16-bit, big-endian)  sci_baud_period — E-clock cycles per bit
+  //   $01B5                       sci_params_lo  — low nibble = data format,
+  //                                                high nibble = baud table index
+  //   $01B6                       sci_params_hi  — flow-control mask + parity bits
+  //   $007A                       sci_xfer_flags — TIE/RIE/parity-enable/etc.
+  // sci_params_hi bit layout (proven against ROM):
+  //   bits 1..0  stop bits — `serial_bitbang_send` at $E670+ does
+  //              `ANDB #$03 / BNE +1 / INCB` so the value 0 maps to 1; final
+  //              count (1..3) is multiplied by sci_baud_period and used as the
+  //              MARK time held after the parity bit. No 1.5-stop-bit support.
+  //   bits 3..2  unused by serial_bitbang_send (set by 5th OPEN "COM:" digit).
+  //   bits 5..4  flow-control mask. serial_write_byte ($E5E5) does
+  //              `LDAB params_hi / ASR x4 (sign-extending) / COMB / ANDB PORT1
+  //               / ANDB #$03 / BEQ send`. So a 0 bit at position 4/5 means
+  //              "require PORT1 bit 0/1 (DSR/CTS) to be 0 before transmitting";
+  //              a 1 bit disables that check. Real RS-232C lines are inverted
+  //              by the level converter, so PORT1 bit 0/1 == 0 == handshake
+  //              asserted at the connector.
+  //   bit 6      parity sense — 0 = even, 1 = odd (set by io_parse_device_params
+  //              at $B14A: 'E' → 0, 'O' → $40, 'N' → $C0).
+  //   bit 7      parity disable — 1 = no parity bit. serial_read_byte $E5BB
+  //              does `ASLB / BCS serial_no_parity`, so bit 7 set bypasses parity.
+  //
+  // sci_params_lo holds the data-bit count directly in its low nibble (5..8);
+  // the upper nibble is the baud-table index used by sci_baud_setup ($E48E) at
+  // configuration time but not consulted afterwards. We expose raw values; the
+  // UI does the friendly decoding.
+  getSciBaudPeriod(): number {
+    return (this.mainCPU.read(0x01AF) << 8) | this.mainCPU.read(0x01B0);
+  }
+  getSciParamsLo(): number { return this.mainCPU.read(0x01B5); }
+  getSciParamsHi(): number { return this.mainCPU.read(0x01B6); }
+  getSciXferFlags(): number { return this.mainCPU.read(0x007A); }
+  getRS232DataBits(): number {
+    // Low nibble of params_lo encodes data-bit count offset. ROM sources accept
+    // 5..8; clamp accordingly. Default to 8 if unconfigured.
+    const lo = this.getSciParamsLo() & 0x0F;
+    if (lo >= 5 && lo <= 8) return lo;
+    return 8;
+  }
+  getRS232ParityEnabled(): boolean {
+    // sci_params_hi bit 7: per serial_read_byte at $E5BB the BCS path skips parity
+    // when bit 7 of B (=params_hi) is set. So parity is *enabled* when bit 7 is 0.
+    return (this.getSciParamsHi() & 0x80) === 0;
+  }
+  getRS232StopBits(): number {
+    // serial_bitbang_send $E678: `ANDB #$03 / BNE skip / INCB` — value 0 → 1.
+    const n = this.getSciParamsHi() & 0x03;
+    return n === 0 ? 1 : n;
+  }
+  getRS232FlowControl(): { dsr: boolean; cts: boolean } {
+    // serial_write_byte $E5E5: bits 4/5 of params_hi being 0 enables the
+    // DSR/CTS check (must read 0 in PORT1 before transmitting).
+    const hi = this.getSciParamsHi();
+    return { dsr: (hi & 0x10) === 0, cts: (hi & 0x20) === 0 };
+  }
+  getRS232BaudRate(): number {
+    const p = this.getSciBaudPeriod();
+    if (!p) return 0;
+    return Math.round(HX20.E_CLOCK / p);
   }
 
   isROMLoaded(): boolean {
@@ -940,6 +1027,13 @@ export class HX20 {
         }
       }
     }
+
+    // Drain any complete bit-bang RS-232C TX frames captured this slice
+    this.rs232Decoder.tick(
+      this.mainCPU.totalCycles,
+      this.getSciBaudPeriod(),
+      (b) => this.rs232.recvFromBitbang(b, this.mainCPU.totalCycles),
+    );
 
     // Periodic RTC tick
     this.rtc.tick();

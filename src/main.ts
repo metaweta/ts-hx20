@@ -5,6 +5,8 @@ import { fetchBinaryROM } from './rom-loader';
 import { disassemble, formatDisasmLine } from './disasm';
 // FORTH ROM loaded from public/roms/forth.bin
 let forthROMData: Uint8Array | null = null;
+// Epson Link ROM loaded from public/roms/epson_link.bin
+let epsonLinkROMData: Uint8Array | null = null;
 
 const hx20 = new HX20();
 
@@ -61,6 +63,7 @@ hx20.onRegistersUpdate = (text: string) => {
 // Keyboard input from physical keyboard
 document.addEventListener('keydown', (e) => {
   if (e.target instanceof HTMLInputElement) return;
+  if (e.target instanceof HTMLTextAreaElement) return;
   // Let Cmd/Ctrl+V pass through so the browser paste event fires
   if (e.metaKey) return;
   if (e.ctrlKey && e.code === 'KeyV') return;
@@ -89,6 +92,7 @@ document.addEventListener('paste', (e) => {
 
 document.addEventListener('keyup', (e) => {
   if (e.target instanceof HTMLInputElement) return;
+  if (e.target instanceof HTMLTextAreaElement) return;
   hx20.keyboard.keyUp(e.code, e.key);
 });
 
@@ -135,6 +139,157 @@ btnPrinterCopy.addEventListener('click', async () => {
     statusText.textContent = 'Printer image copied';
   } catch {
     statusText.textContent = 'Clipboard access denied';
+  }
+});
+
+// RS-232C panel
+const btnRs232Toggle = document.getElementById('btn-rs232-toggle')!;
+const rs232Panel = document.getElementById('rs232-panel')!;
+const rs232ParamsEl = document.getElementById('rs232-params')!;
+const rs232TxLog = document.getElementById('rs232-tx-log')!;
+const rs232RxInput = document.getElementById('rs232-rx-input') as HTMLTextAreaElement;
+const rs232CtsCheckbox = document.getElementById('rs232-cts') as HTMLInputElement;
+const rs232DsrCheckbox = document.getElementById('rs232-dsr') as HTMLInputElement;
+const rs232CdCheckbox = document.getElementById('rs232-cd') as HTMLInputElement;
+const rs232RiCheckbox = document.getElementById('rs232-ri') as HTMLInputElement;
+const rs232RxCrlfCheckbox = document.getElementById('rs232-rx-crlf') as HTMLInputElement;
+const btnRs232TxClear = document.getElementById('btn-rs232-tx-clear')!;
+const btnRs232RxSend = document.getElementById('btn-rs232-rx-send')!;
+
+let rs232TxMode: 'text' | 'hex' = 'text';
+let rs232RxMode: 'text' | 'hex' = 'text';
+
+function rs232FormatByte(b: number, mode: 'text' | 'hex'): string {
+  if (mode === 'hex') return b.toString(16).padStart(2, '0').toUpperCase() + ' ';
+  if (b === 0x0D) return '\r';
+  if (b === 0x0A) return '\n';
+  if (b === 0x09) return '\t';
+  if (b >= 0x20 && b <= 0x7E) return String.fromCharCode(b);
+  return `\\x${b.toString(16).padStart(2, '0')}`;
+}
+
+function rs232RenderTxLog(): void {
+  const out: string[] = [];
+  for (const f of hx20.rs232.txLog) {
+    out.push(rs232FormatByte(f.byte, rs232TxMode));
+  }
+  rs232TxLog.textContent = out.join('');
+  rs232TxLog.scrollTop = rs232TxLog.scrollHeight;
+}
+
+hx20.rs232.onTx = () => {
+  if (!rs232Panel.classList.contains('hidden')) rs232RenderTxLog();
+};
+
+document.querySelectorAll<HTMLInputElement>('input[name="rs232-tx-mode"]').forEach(r => {
+  r.addEventListener('change', () => {
+    if (r.checked) { rs232TxMode = r.value as 'text' | 'hex'; rs232RenderTxLog(); }
+  });
+});
+document.querySelectorAll<HTMLInputElement>('input[name="rs232-rx-mode"]').forEach(r => {
+  r.addEventListener('change', () => {
+    if (r.checked) rs232RxMode = r.value as 'text' | 'hex';
+    rs232RxInput.placeholder = rs232RxMode === 'hex'
+      ? 'Hex bytes like "48 65 6c 6c 6f"'
+      : 'Text to send. \\r \\n \\t \\xHH escapes recognised.';
+  });
+});
+
+btnRs232TxClear.addEventListener('click', () => {
+  hx20.rs232.clearTxLog();
+  rs232RenderTxLog();
+});
+
+function parseRxBytes(input: string, mode: 'text' | 'hex'): number[] {
+  if (mode === 'hex') {
+    const cleaned = input.replace(/0x/gi, ' ').replace(/[,;]/g, ' ');
+    const tokens = cleaned.trim().split(/\s+/).filter(Boolean);
+    const bytes: number[] = [];
+    for (const tok of tokens) {
+      const n = parseInt(tok, 16);
+      if (!Number.isNaN(n) && n >= 0 && n <= 0xFF) bytes.push(n);
+    }
+    return bytes;
+  }
+  // Text mode with simple escape handling
+  const out: number[] = [];
+  for (let i = 0; i < input.length; i++) {
+    const c = input[i];
+    if (c === '\\' && i + 1 < input.length) {
+      const n = input[i + 1];
+      if (n === 'r') { out.push(0x0D); i++; continue; }
+      if (n === 'n') { out.push(0x0A); i++; continue; }
+      if (n === 't') { out.push(0x09); i++; continue; }
+      if (n === '0') { out.push(0x00); i++; continue; }
+      if (n === '\\') { out.push(0x5C); i++; continue; }
+      if (n === 'x' && i + 3 < input.length) {
+        const h = input.substr(i + 2, 2);
+        const v = parseInt(h, 16);
+        if (!Number.isNaN(v)) { out.push(v & 0xFF); i += 3; continue; }
+      }
+    }
+    out.push(c.charCodeAt(0) & 0xFF);
+  }
+  return out;
+}
+
+btnRs232RxSend.addEventListener('click', () => {
+  const bytes = parseRxBytes(rs232RxInput.value, rs232RxMode);
+  if (rs232RxCrlfCheckbox.checked) { bytes.push(0x0D); bytes.push(0x0A); }
+  if (!bytes.length) return;
+  hx20.rs232.sendBytes(bytes);
+  statusText.textContent = `RS-232C: sent ${bytes.length} byte(s) to host`;
+  rs232RxInput.value = '';
+});
+
+function syncRs232Handshake(): void {
+  hx20.rs232.cts = rs232CtsCheckbox.checked;
+  hx20.rs232.dsr = rs232DsrCheckbox.checked;
+  hx20.rs232.cd = rs232CdCheckbox.checked;
+  hx20.rs232.ri = rs232RiCheckbox.checked;
+}
+[rs232CtsCheckbox, rs232DsrCheckbox, rs232CdCheckbox, rs232RiCheckbox]
+  .forEach(cb => cb.addEventListener('change', syncRs232Handshake));
+syncRs232Handshake();
+
+function rs232RenderParams(): void {
+  const period = hx20.getSciBaudPeriod();
+  const lo = hx20.getSciParamsLo();
+  const hi = hx20.getSciParamsHi();
+  const flags = hx20.getSciXferFlags();
+  const baud = hx20.getRS232BaudRate();
+  const dataBits = hx20.getRS232DataBits();
+  const stopBits = hx20.getRS232StopBits();
+  const parity = hx20.getRS232ParityEnabled()
+    ? ((hi & 0x40) ? 'odd' : 'even')
+    : 'none';
+  const flow = hx20.getRS232FlowControl();
+  const flowBits: string[] = [];
+  if (flow.dsr) flowBits.push('DSR');
+  if (flow.cts) flowBits.push('CTS');
+  const flowDesc = flowBits.length ? flowBits.join('+') + ' required' : 'none';
+  const lines = [
+    `baud:       ${baud ? baud + ' bps' : '(unset)'}  (period $${period.toString(16).padStart(4, '0')} cycles)`,
+    `data bits:  ${dataBits}      stop bits: ${stopBits}   parity: ${parity}`,
+    `flow ctl:   ${flowDesc}`,
+    `params:     hi=$${hi.toString(16).padStart(2, '0')}  lo=$${lo.toString(16).padStart(2, '0')}  flags($7A)=$${flags.toString(16).padStart(2, '0')}`,
+    `routing:    SCI ${(hx20 as any).slaveSio ? '→ slave (cassette)' : '→ SIO bus (RS-232C/EPSP)'}`,
+  ];
+  rs232ParamsEl.textContent = lines.join('\n');
+}
+
+let rs232ParamsTimer: number | null = null;
+btnRs232Toggle.addEventListener('click', () => {
+  const nowHidden = rs232Panel.classList.toggle('hidden');
+  if (!nowHidden) {
+    rs232RenderParams();
+    rs232RenderTxLog();
+    if (rs232ParamsTimer === null) {
+      rs232ParamsTimer = window.setInterval(rs232RenderParams, 500);
+    }
+  } else if (rs232ParamsTimer !== null) {
+    window.clearInterval(rs232ParamsTimer);
+    rs232ParamsTimer = null;
   }
 });
 
@@ -387,6 +542,8 @@ function applyExpansionConfig(): void {
   const expansion = expansionSelect.value;
   if (expansion === 'forth') {
     if (forthROMData) hx20.loadOptionROM(forthROMData);
+  } else if (expansion === 'epson_link') {
+    if (epsonLinkROMData) hx20.loadOptionROM(epsonLinkROMData);
   } else {
     hx20.clearOptionROM();
   }
@@ -736,7 +893,7 @@ romFileInput.addEventListener('change', async () => {
 // Load binary ROMs from local public/roms/ directory
 async function loadLocalROMs(): Promise<void> {
   const base = import.meta.env.BASE_URL + 'roms/';
-  const [rom0, rom1, rom2, rom3, slave, boot80, dbasic, forth] = await Promise.all([
+  const [rom0, rom1, rom2, rom3, slave, boot80, dbasic, forth, epsonLink] = await Promise.all([
     fetchBinaryROM(base + 'rom0.bin'),
     fetchBinaryROM(base + 'rom1.bin'),
     fetchBinaryROM(base + 'rom2.bin'),
@@ -745,6 +902,7 @@ async function loadLocalROMs(): Promise<void> {
     fetchBinaryROM(base + 'boot80.bin'),
     fetchBinaryROM(base + 'dbasic.bin'),
     fetchBinaryROM(base + 'forth.bin'),
+    fetchBinaryROM(base + 'epson_link.bin'),
   ]);
 
   // ROM layout in mainROM buffer (0x8000 bytes for addresses 0x8000-0xFFFF):
@@ -759,6 +917,7 @@ async function loadLocalROMs(): Promise<void> {
   hx20.loadSlaveROM(slave);
   hx20.tf20.loadBootROMs(boot80, dbasic);
   forthROMData = forth;
+  epsonLinkROMData = epsonLink;
 }
 
 
